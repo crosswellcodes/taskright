@@ -1,0 +1,152 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Dependencies
+node_modules/
+yarn.lock
+package-lock.json
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.sublime-project
+.sublime-workspace
+
+# macOS
+.AppleDouble
+.LSOverride
+
+# ==================
+# Backend-specific
+# ==================
+backend/node_modules/
+backend/.env.local
+backend/dist/
+backend/build/
+
+# Database files (local dev)
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# ==================
+# Mobile App (React Native)
+# ==================
+TaskRight/node_modules/
+TaskRight/ios/Pods/
+TaskRight/ios/Podfile.lock
+TaskRight/.env.local
+TaskRight/dist/
+TaskRight/build/
+
+# Xcode
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.xcworkspace/
+!default.xcworkspace
+xcuserdata/
+*.xccheckout
+*.moved-aside
+DerivedData/
+*.hmap
+*.o
+*.pyc
+
+# Gradle
+TaskRight/android/.gradle/
+TaskRight/android/local.properties
+TaskRight/android/app/build/
+
+# Watchman
+.watchmanconfig
+
+# Expo
+.expo/
+dist/
+.expo-shared/
+
+# ==================
+# Website
+# ==================
+TaskRight-Website/node_modules/
+TaskRight-Website/.next/
+TaskRight-Website/out/
+TaskRight-Website/dist/
+TaskRight-Website/build/
+TaskRight-Website/.env.local
+TaskRight-Website/.env*.local
+TaskRight-Website/.vercel/
+TaskRight-Website/.turbo/
+
+# Next.js
+.next/
+out/
+build/
+
+# Storybook
+storybook-static/
+
+# ==================
+# Misc
+# ==================
+.claude/plans/
+.claude/projects/
+# Keep .claude/memory/ for persistent context
+!.claude/memory/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+~*
+
+# Node version managers
+.nvmrc
+.nvm/
+
+# Package managers
+.pnp
+.pnp.js
+
+# IDE config
+.eslintrc
+.prettierrc
+
+# CI/CD
+.github/workflows/
+.gitlab-ci.yml
+.travis.yml
+
+# Database backups
+*.backup
+*.dump
