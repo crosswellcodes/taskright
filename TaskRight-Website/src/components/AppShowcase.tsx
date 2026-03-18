@@ -11,14 +11,16 @@ type Hotspot = {
 
 type Screen = {
   label: string;
-  render: () => React.ReactNode;
+  render: (onCalViewChange?: (v: boolean) => void) => React.ReactNode;
   hotspots: Hotspot[];
+  calHotspots?: Hotspot[];
 };
 
 // ─── Business screen mocks ────────────────────────────────────────────────────
 
-function BusinessDashboard() {
+function BusinessDashboard({ onViewChange }: { onViewChange?: (v: boolean) => void }) {
   const [calView, setCalView] = useState(false);
+  function toggle(v: boolean) { setCalView(v); onViewChange?.(v); }
 
   const days = [
     { date: 'Mon, Mar 24', cycle: 'Weekly Clean', total: 4, submitted: 2, pending: 2 },
@@ -59,13 +61,13 @@ function BusinessDashboard() {
       {/* List / Calendar toggle */}
       <div className="flex gap-1.5 px-3 py-2">
         <button
-          onClick={() => setCalView(false)}
+          onClick={() => toggle(false)}
           className={`text-[10px] font-bold px-3 py-1 rounded-full border transition-all ${
             !calView ? 'bg-white shadow-sm text-[#1a1a1a] border-gray-100' : 'text-gray-400 border-transparent'
           }`}
         >List</button>
         <button
-          onClick={() => setCalView(true)}
+          onClick={() => toggle(true)}
           className={`text-[10px] font-bold px-3 py-1 rounded-full border transition-all ${
             calView ? 'bg-white shadow-sm text-[#1a1a1a] border-gray-100' : 'text-gray-400 border-transparent'
           }`}
@@ -350,11 +352,16 @@ function CustomerSuccess() {
 const businessScreens: Screen[] = [
   {
     label: 'Dashboard',
-    render: () => <BusinessDashboard />,
+    render: (onViewChange) => <BusinessDashboard onViewChange={onViewChange} />,
     hotspots: [
       { title: 'List / Calendar toggle', description: 'Switch between a scrollable card list and a full month calendar — the same toggle available in the real app.', top: '13%', left: '0%' },
-      { title: 'Service date tile',       description: 'Each tile is an upcoming service date. The four numbers show: Total customers scheduled, Done (submitted their task selections), Pending (haven\'t selected yet), and Rate (the overall submission percentage for that day).', top: '46%', left: '0%' },
-      { title: 'Color legend',           description: 'The legend explains what each dot color means so you can read your schedule status at a glance.', top: '76%', left: '2%' },
+      { title: 'Service date tile',      description: 'Each tile represents an upcoming service date. The four numbers show: Total customers scheduled, Done (submitted their task selections), Pending (haven\'t selected yet), and Rate (the overall submission percentage for that day).', top: '46%', left: '0%' },
+      { title: 'Progress bar',           description: 'The colored bar shows submission progress for that service date — green when all customers have selected, amber when mixed, blue when none have started yet.', top: '62%', left: '0%' },
+    ],
+    calHotspots: [
+      { title: 'List / Calendar toggle', description: 'Switch between a scrollable card list and a full month calendar — the same toggle available in the real app.', top: '13%', left: '0%' },
+      { title: 'Service date dots',      description: 'Colored dots mark every scheduled service date — blue when no customers have selected yet, amber when selections are mixed, green when all customers have submitted.', top: '52%', left: '55%' },
+      { title: 'Color legend',           description: 'The legend below the calendar explains what each dot color represents so you can read your full schedule status at a glance.', top: '76%', left: '2%' },
     ],
   },
   {
@@ -415,19 +422,28 @@ export default function AppShowcase() {
   const [activeTab, setActiveTab] = useState<'business' | 'customer'>('business');
   const [activeScreen, setActiveScreen] = useState(0);
   const [activeHotspot, setActiveHotspot] = useState<number | null>(null);
+  const [dashCalView, setDashCalView] = useState(false);
 
   const screens = activeTab === 'business' ? businessScreens : customerScreens;
   const current = screens[activeScreen];
-  const activeHotspotData = activeHotspot !== null ? current.hotspots[activeHotspot] : null;
+  const hotspots = (dashCalView && current.calHotspots) ? current.calHotspots : current.hotspots;
+  const activeHotspotData = activeHotspot !== null ? hotspots[activeHotspot] : null;
 
   function switchTab(tab: 'business' | 'customer') {
     setActiveTab(tab);
     setActiveScreen(0);
     setActiveHotspot(null);
+    setDashCalView(false);
   }
 
   function switchScreen(i: number) {
     setActiveScreen(i);
+    setActiveHotspot(null);
+    setDashCalView(false);
+  }
+
+  function handleDashViewChange(v: boolean) {
+    setDashCalView(v);
     setActiveHotspot(null);
   }
 
@@ -493,10 +509,10 @@ export default function AppShowcase() {
               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-5 bg-[#1a1a1a] rounded-b-xl z-20" />
               {/* Screen */}
               <div className="h-[560px] bg-[#f5f5f5] pt-6 relative overflow-hidden">
-                {current.render()}
+                {current.render(handleDashViewChange)}
 
                 {/* Hotspot circles */}
-                {current.hotspots.map((h, i) => (
+                {hotspots.map((h, i) => (
                   <button
                     key={i}
                     onClick={() => toggleHotspot(i)}
@@ -548,7 +564,7 @@ export default function AppShowcase() {
 
                 {/* Hotspot navigation dots */}
                 <div className="flex gap-2 mt-5 pl-11">
-                  {current.hotspots.map((_, i) => (
+                  {hotspots.map((_, i) => (
                     <button
                       key={i}
                       onClick={() => setActiveHotspot(i)}
