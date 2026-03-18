@@ -298,6 +298,7 @@ export default function AppShowcase() {
 
   const screens = activeTab === 'business' ? businessScreens : customerScreens;
   const current = screens[activeScreen];
+  const activeHotspotData = activeHotspot !== null ? current.hotspots[activeHotspot] : null;
 
   function switchTab(tab: 'business' | 'customer') {
     setActiveTab(tab);
@@ -322,12 +323,12 @@ export default function AppShowcase() {
         <div className="text-center mb-10">
           <h2 className="text-3xl font-bold text-text mb-4">See TaskRight in action</h2>
           <p className="text-text-muted text-lg max-w-xl mx-auto">
-            Explore the business and customer experience — tap the numbered hotspots to learn what each screen does.
+            Explore the business and customer experience — tap the numbered circles on the screen to learn what each part does.
           </p>
         </div>
 
         {/* Tab switcher */}
-        <div className="flex justify-center mb-10">
+        <div className="flex justify-center mb-6">
           <div className="inline-flex bg-surface border border-border rounded-xl p-1 gap-1">
             {(['business', 'customer'] as const).map((tab) => (
               <button
@@ -345,8 +346,25 @@ export default function AppShowcase() {
           </div>
         </div>
 
-        {/* Main content: phone + callouts */}
-        <div className="flex flex-col lg:flex-row items-start gap-10 justify-center">
+        {/* Screen selector — ABOVE the phone */}
+        <div className="flex justify-center gap-2 mb-8">
+          {screens.map((s, i) => (
+            <button
+              key={i}
+              onClick={() => switchScreen(i)}
+              className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeScreen === i
+                  ? 'bg-brand text-white'
+                  : 'bg-surface text-text-muted border border-border hover:border-brand/40 hover:text-text'
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Main content: phone + popup panel */}
+        <div className="flex flex-col lg:flex-row items-start gap-8 justify-center">
 
           {/* Phone frame */}
           <div className="relative mx-auto lg:mx-0 w-[280px] shrink-0">
@@ -366,7 +384,7 @@ export default function AppShowcase() {
                     className={`absolute w-7 h-7 rounded-full text-white text-xs font-bold
                       flex items-center justify-center ring-2 ring-white cursor-pointer z-30
                       transition-all duration-150 hover:scale-110 active:scale-95
-                      ${activeHotspot === i ? 'bg-brand scale-110' : 'bg-[#1d4ed8]'}`}
+                      ${activeHotspot === i ? 'bg-brand scale-110 ring-brand/40' : 'bg-[#1d4ed8]'}`}
                   >
                     {i + 1}
                   </button>
@@ -375,54 +393,76 @@ export default function AppShowcase() {
             </div>
           </div>
 
-          {/* Callout list */}
-          <div className="flex-1 max-w-md w-full space-y-3">
-            <p className="text-xs font-bold text-text-muted uppercase tracking-wider mb-4">
-              {activeTab === 'business' ? 'Business Account' : 'Customer Account'} · {current.label}
-            </p>
-            {current.hotspots.map((h, i) => (
-              <button
-                key={i}
-                onClick={() => toggleHotspot(i)}
-                className={`w-full flex gap-3 items-start text-left px-4 py-4 rounded-xl border transition-all duration-150 ${
-                  activeHotspot === i
-                    ? 'border-brand bg-brand/5 shadow-sm'
-                    : 'border-border bg-surface hover:border-brand/40'
-                }`}
+          {/* Popup panel — right of phone on desktop, below on mobile */}
+          <div className="w-full lg:w-80 shrink-0">
+            {activeHotspotData !== null ? (
+              /* Active popup card */
+              <div
+                key={`${activeTab}-${activeScreen}-${activeHotspot}`}
+                className="bg-surface rounded-2xl border-2 border-brand shadow-lg p-6 relative
+                  animate-[fadeSlideIn_0.18s_ease-out]"
               >
-                <span className={`w-6 h-6 rounded-full text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
-                  activeHotspot === i ? 'bg-brand' : 'bg-[#1d4ed8]'
-                }`}>
-                  {i + 1}
-                </span>
-                <div>
-                  <p className="font-semibold text-text text-sm">{h.title}</p>
-                  <p className={`text-sm mt-0.5 transition-colors ${activeHotspot === i ? 'text-text-muted' : 'text-text-muted/60'}`}>
-                    {h.description}
+                {/* Close button */}
+                <button
+                  onClick={() => setActiveHotspot(null)}
+                  className="absolute top-4 right-4 w-6 h-6 rounded-full bg-border flex items-center justify-center text-text-muted hover:bg-brand/10 hover:text-brand transition-colors text-sm font-bold"
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+
+                {/* Number + title */}
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="w-8 h-8 rounded-full bg-brand text-white text-sm font-bold flex items-center justify-center shrink-0">
+                    {(activeHotspot ?? 0) + 1}
+                  </span>
+                  <p className="font-bold text-text text-base leading-tight pr-6">
+                    {activeHotspotData.title}
                   </p>
                 </div>
-              </button>
-            ))}
+
+                {/* Description */}
+                <p className="text-text-muted text-sm leading-relaxed pl-11">
+                  {activeHotspotData.description}
+                </p>
+
+                {/* Hotspot navigation dots */}
+                <div className="flex gap-2 mt-5 pl-11">
+                  {current.hotspots.map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setActiveHotspot(i)}
+                      className={`w-2 h-2 rounded-full transition-all ${
+                        activeHotspot === i ? 'bg-brand w-4' : 'bg-border hover:bg-brand/40'
+                      }`}
+                      aria-label={`Hotspot ${i + 1}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              /* Idle hint */
+              <div className="bg-surface rounded-2xl border border-dashed border-border p-6 text-center">
+                <div className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center mx-auto mb-3">
+                  <span className="text-brand font-bold text-sm">?</span>
+                </div>
+                <p className="text-sm font-semibold text-text mb-1">Tap a numbered circle</p>
+                <p className="text-xs text-text-muted">
+                  Click any number on the screen to see a description of that feature.
+                </p>
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Screen selector */}
-        <div className="flex justify-center gap-2 mt-10">
-          {screens.map((s, i) => (
-            <button
-              key={i}
-              onClick={() => switchScreen(i)}
-              className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${
-                activeScreen === i
-                  ? 'bg-brand text-white'
-                  : 'bg-surface text-text-muted border border-border hover:border-brand/40 hover:text-text'
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
       </div>
+
+      {/* Keyframe for popup animation */}
+      <style>{`
+        @keyframes fadeSlideIn {
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </section>
   );
 }
