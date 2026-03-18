@@ -18,62 +18,159 @@ type Screen = {
 // ─── Business screen mocks ────────────────────────────────────────────────────
 
 function BusinessDashboard() {
+  const [calView, setCalView] = useState(false);
+
   const days = [
-    { date: 'Mon, Mar 24', cycle: 'Weekly Clean',  total: 4, submitted: 2, pending: 2 },
-    { date: 'Thu, Mar 28', cycle: 'Weekly Clean',  total: 3, submitted: 3, pending: 0 },
-    { date: 'Wed, Apr 2',  cycle: 'Deep Clean',    total: 3, submitted: 0, pending: 3 },
+    { date: 'Mon, Mar 24', cycle: 'Weekly Clean', total: 4, submitted: 2, pending: 2 },
+    { date: 'Thu, Mar 28', cycle: 'Weekly Clean', total: 3, submitted: 3, pending: 0 },
+    { date: 'Wed, Apr 2',  cycle: 'Deep Clean',   total: 3, submitted: 0, pending: 3 },
   ];
+
   function barColor(s: number, t: number) {
     if (s === 0) return '#2563eb';
     if (s === t) return '#10b981';
     return '#f59e0b';
   }
+
+  // March 2026 grid — Mar 1 = Sunday (index 0)
+  // Each entry: { day, month: 'mar'|'apr', dot?: string, selected?: boolean, today?: boolean }
+  type Cell = { day: number; faded?: boolean; dot?: string; selected?: boolean; today?: boolean };
+  const grid: Cell[] = [
+    // Week 1
+    { day: 1 }, { day: 2 }, { day: 3 }, { day: 4 }, { day: 5 }, { day: 6 }, { day: 7 },
+    // Week 2
+    { day: 8 }, { day: 9 }, { day: 10 }, { day: 11 }, { day: 12 }, { day: 13 }, { day: 14 },
+    // Week 3
+    { day: 15 }, { day: 16 }, { day: 17, today: true }, { day: 18 }, { day: 19 }, { day: 20 }, { day: 21 },
+    // Week 4 — 24 selected (amber), 28 green
+    { day: 22 }, { day: 23 }, { day: 24, dot: '#f59e0b', selected: true }, { day: 25 }, { day: 26 }, { day: 27 }, { day: 28, dot: '#10b981' },
+    // Week 5 — 29,30,31 Mar then Apr 1,2(blue),3,4
+    { day: 29 }, { day: 30 }, { day: 31 }, { day: 1, faded: true }, { day: 2, faded: true, dot: '#2563eb' }, { day: 3, faded: true }, { day: 4, faded: true },
+  ];
+
   return (
     <div className="flex flex-col h-full">
+      {/* Header */}
       <div className="px-4 pt-2 pb-2 bg-white border-b border-gray-100">
         <p className="text-base font-bold text-[#1a1a1a]">My Business</p>
         <p className="text-xs text-gray-400">30-Day Forecast</p>
       </div>
+
       {/* List / Calendar toggle */}
       <div className="flex gap-1.5 px-3 py-2">
-        <span className="bg-white shadow-sm text-[10px] font-bold text-[#1a1a1a] px-3 py-1 rounded-full border border-gray-100">List</span>
-        <span className="text-[10px] font-semibold text-gray-400 px-3 py-1 rounded-full">Calendar</span>
+        <button
+          onClick={() => setCalView(false)}
+          className={`text-[10px] font-bold px-3 py-1 rounded-full border transition-all ${
+            !calView ? 'bg-white shadow-sm text-[#1a1a1a] border-gray-100' : 'text-gray-400 border-transparent'
+          }`}
+        >List</button>
+        <button
+          onClick={() => setCalView(true)}
+          className={`text-[10px] font-bold px-3 py-1 rounded-full border transition-all ${
+            calView ? 'bg-white shadow-sm text-[#1a1a1a] border-gray-100' : 'text-gray-400 border-transparent'
+          }`}
+        >Calendar</button>
       </div>
-      <div className="flex-1 overflow-hidden px-3 space-y-2">
-        {days.map((d) => {
-          const pct = d.total > 0 ? Math.round((d.submitted / d.total) * 100) : 0;
-          const color = barColor(d.submitted, d.total);
-          return (
-            <div key={d.date} className="bg-white rounded-xl px-3 py-2.5 border border-gray-100">
-              <div className="mb-1.5">
-                <p className="text-xs font-bold text-[#1a1a1a]">{d.date}</p>
-                <p className="text-[10px] text-gray-400">{d.cycle}</p>
+
+      {calView ? (
+        /* ── Calendar view ── */
+        <div className="flex-1 overflow-hidden px-2 pb-2">
+          {/* Month nav */}
+          <div className="flex items-center justify-between px-1 mb-1">
+            <span className="text-[10px] text-[#2563eb] font-bold">‹</span>
+            <span className="text-[10px] font-bold text-[#1a1a1a]">March 2026</span>
+            <span className="text-[10px] text-[#2563eb] font-bold">›</span>
+          </div>
+
+          {/* Day-of-week headers */}
+          <div className="grid grid-cols-7 mb-0.5">
+            {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => (
+              <div key={d} className="text-center text-[8px] font-semibold text-gray-400">{d}</div>
+            ))}
+          </div>
+
+          {/* Date grid */}
+          <div className="grid grid-cols-7 gap-y-0.5">
+            {grid.map((cell, i) => (
+              <div key={i} className="flex flex-col items-center">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center
+                  ${cell.selected ? 'bg-[#2563eb]' : ''}
+                  ${cell.today && !cell.selected ? 'ring-1 ring-gray-300' : ''}`}
+                >
+                  <span className={`text-[9px] font-semibold
+                    ${cell.selected ? 'text-white' : cell.faded ? 'text-gray-300' : 'text-[#1a1a1a]'}`}
+                  >
+                    {cell.day}
+                  </span>
+                </div>
+                {cell.dot
+                  ? <div className="w-1 h-1 rounded-full mt-0.5" style={{ backgroundColor: cell.dot }} />
+                  : <div className="w-1 h-1 mt-0.5" />
+                }
               </div>
-              <div className="flex gap-3 mb-1.5">
-                <div className="text-center">
-                  <p className="text-sm font-bold text-[#1a1a1a]">{d.total}</p>
-                  <p className="text-[9px] text-gray-400">Total</p>
+            ))}
+          </div>
+
+          {/* Legend */}
+          <div className="flex gap-3 px-1 mt-2 mb-1.5">
+            {[['#2563eb','Pending'],['#f59e0b','Mixed'],['#10b981','All submitted']].map(([color, label]) => (
+              <div key={label} className="flex items-center gap-1">
+                <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                <span className="text-[8px] text-gray-400">{label}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Upcoming list */}
+          <div className="space-y-1">
+            <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wide px-1">Upcoming</p>
+            {days.map((d) => (
+              <div key={d.date} className="flex items-center gap-2 px-1 py-1 bg-white rounded-lg border border-gray-100">
+                <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: barColor(d.submitted, d.total) }} />
+                <span className="text-[9px] font-semibold text-[#1a1a1a] flex-1">{d.date}</span>
+                <span className="text-[8px] text-gray-400">{d.cycle}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        /* ── List view ── */
+        <div className="flex-1 overflow-hidden px-3 space-y-2">
+          {days.map((d) => {
+            const pct = d.total > 0 ? Math.round((d.submitted / d.total) * 100) : 0;
+            const color = barColor(d.submitted, d.total);
+            return (
+              <div key={d.date} className="bg-white rounded-xl px-3 py-2.5 border border-gray-100">
+                <div className="mb-1.5">
+                  <p className="text-xs font-bold text-[#1a1a1a]">{d.date}</p>
+                  <p className="text-[10px] text-gray-400">{d.cycle}</p>
                 </div>
-                <div className="text-center">
-                  <p className="text-sm font-bold text-[#10b981]">{d.submitted}</p>
-                  <p className="text-[9px] text-gray-400">Done</p>
+                <div className="flex gap-3 mb-1.5">
+                  <div className="text-center">
+                    <p className="text-sm font-bold text-[#1a1a1a]">{d.total}</p>
+                    <p className="text-[9px] text-gray-400">Total</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-bold text-[#10b981]">{d.submitted}</p>
+                    <p className="text-[9px] text-gray-400">Done</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-bold text-[#f59e0b]">{d.pending}</p>
+                    <p className="text-[9px] text-gray-400">Pending</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-bold" style={{ color }}>{pct}%</p>
+                    <p className="text-[9px] text-gray-400">Rate</p>
+                  </div>
                 </div>
-                <div className="text-center">
-                  <p className="text-sm font-bold text-[#f59e0b]">{d.pending}</p>
-                  <p className="text-[9px] text-gray-400">Pending</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-bold" style={{ color }}>{pct}%</p>
-                  <p className="text-[9px] text-gray-400">Rate</p>
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
                 </div>
               </div>
-              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -255,9 +352,9 @@ const businessScreens: Screen[] = [
     label: 'Dashboard',
     render: () => <BusinessDashboard />,
     hotspots: [
-      { title: '30-Day Forecast',   description: 'The dashboard shows every upcoming service date in the next 30 days — toggle between list and calendar view.',   top: '13%', left: '2%' },
-      { title: 'Submission stats',  description: 'Each card shows total customers, how many have submitted task selections, how many are still pending, and the overall rate.', top: '35%', left: '48%' },
-      { title: 'Progress bar',      description: 'The colored bar reflects submission progress — green when all customers have selected, amber when mixed, blue when none have started.', top: '46%', left: '2%' },
+      { title: 'List / Calendar toggle', description: 'Switch between a scrollable card list and a full month calendar — the same toggle available in the real app.', top: '13%', left: '2%' },
+      { title: 'Service date dots',      description: 'Colored dots mark every service date on the calendar — blue for no selections yet, amber for partial, green when all customers have submitted.', top: '52%', left: '55%' },
+      { title: 'Color legend',           description: 'The legend explains what each dot color means so you can read your schedule status at a glance.', top: '76%', left: '2%' },
     ],
   },
   {
