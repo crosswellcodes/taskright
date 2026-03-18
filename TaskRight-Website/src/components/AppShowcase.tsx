@@ -178,33 +178,54 @@ function BusinessDashboard({ onViewChange }: { onViewChange?: (v: boolean) => vo
 }
 
 function BusinessServiceDay() {
+  // Pending customers first, submitted last — matches actual app order
   const customers = [
-    { name: 'Jennifer M.', tasks: ['Bathroom', 'Vacuum'] },
-    { name: 'Robert A.',   tasks: ['Kitchen', 'Dusting'] },
-    { name: 'Lisa K.',     tasks: ['Bathroom', 'Laundry'] },
+    { name: 'Robert A.',   status: 'pending',   assignment: { type: 'none' } },
+    { name: 'David K.',    status: 'pending',   assignment: { type: 'person', name: 'Sarah J.' } },
+    { name: 'Jennifer M.', status: 'submitted', assignment: { type: 'group',  name: 'Team A' } },
+    { name: 'Lisa K.',     status: 'submitted', assignment: { type: 'person', name: 'Sarah J.' } },
   ];
+  const submitted = customers.filter(c => c.status === 'submitted').length;
+  const pending   = customers.filter(c => c.status === 'pending').length;
+
+  function AssignPill({ a }: { a: typeof customers[0]['assignment'] }) {
+    if (a.type === 'none')
+      return <span className="text-[9px] font-semibold text-gray-500 bg-[#f3f4f6] px-2 py-0.5 rounded-full">Assign</span>;
+    if (a.type === 'group')
+      return <span className="text-[9px] font-semibold text-[#6d28d9] bg-[#ede9fe] px-2 py-0.5 rounded-full">●● {a.name}</span>;
+    return <span className="text-[9px] font-semibold text-[#065f46] bg-[#d1fae5] px-2 py-0.5 rounded-full">{a.name}</span>;
+  }
+
   return (
     <div className="flex flex-col h-full">
-      <div className="px-4 pt-2 pb-3 bg-white border-b border-gray-100">
-        <p className="text-xs text-gray-400 mb-0.5">Service Day</p>
-        <p className="text-base font-bold text-[#1a1a1a]">March 24, 2026</p>
+      {/* Blue summary header card */}
+      <div className="mx-3 mt-3 rounded-2xl bg-[#2563eb] px-4 py-3 mb-3">
+        <p className="text-[10px] text-white/70 mb-0.5">Service Day</p>
+        <p className="text-sm font-bold text-white leading-tight mb-1">Monday, March 24, 2026</p>
+        <p className="text-[10px] text-white/80 font-medium mb-2">Weekly Clean</p>
+        <p className="text-[10px] text-white/60">
+          {customers.length} customers · {submitted} submitted · {pending} pending
+        </p>
       </div>
-      <div className="px-3 py-2">
-        <p className="text-[10px] font-bold text-[#2563eb] uppercase tracking-wide mb-1.5">Assigned Staff</p>
-        <div className="flex gap-1.5 flex-wrap">
-          <span className="bg-[#2563eb] text-white text-[10px] font-semibold px-2.5 py-1 rounded-full">Sarah J.</span>
-          <span className="bg-[#2563eb] text-white text-[10px] font-semibold px-2.5 py-1 rounded-full">Team A</span>
+
+      {/* Customers section */}
+      <div className="mx-3 bg-white rounded-xl border border-gray-100 overflow-hidden">
+        {/* Section header */}
+        <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100">
+          <p className="text-[10px] font-bold text-[#1a1a1a]">Customers</p>
+          <span className="text-[10px] text-gray-400">∨</span>
         </div>
-      </div>
-      <div className="flex-1 overflow-hidden px-3 space-y-2">
-        {customers.map((c) => (
-          <div key={c.name} className="bg-white rounded-xl px-3 py-2.5 border border-gray-100">
-            <p className="text-xs font-semibold text-[#1a1a1a] mb-1.5">{c.name}</p>
-            <div className="flex gap-1.5 flex-wrap">
-              {c.tasks.map((t) => (
-                <span key={t} className="bg-[#f0f4ff] text-[#2563eb] text-[10px] font-medium px-2 py-0.5 rounded-full">{t}</span>
-              ))}
+        {/* Customer rows */}
+        {customers.map((c, i) => (
+          <div key={c.name} className={`flex items-center justify-between px-3 py-2 ${i < customers.length - 1 ? 'border-b border-[#f3f4f6]' : ''}`}>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-[10px] font-semibold text-[#1a1a1a] truncate">{c.name}</span>
+              {c.status === 'submitted'
+                ? <span className="text-[9px] font-bold text-[#065f46] bg-[#d1fae5] px-1.5 py-0.5 rounded-full shrink-0">Submitted</span>
+                : <span className="text-[9px] font-bold text-[#92400e] bg-[#fef3c7] px-1.5 py-0.5 rounded-full shrink-0">Pending</span>
+              }
             </div>
+            <AssignPill a={c.assignment} />
           </div>
         ))}
       </div>
@@ -368,9 +389,9 @@ const businessScreens: Screen[] = [
     label: 'Service Day',
     render: () => <BusinessServiceDay />,
     hotspots: [
-      { title: 'Service date',          description: 'See every job scheduled for a given day — date, time, and customer count.',       top: '12%', left: '40%' },
-      { title: 'Staff assignment pills', description: 'Assign individual team members or named groups to cover the day\'s jobs.',       top: '30%', left: '12%' },
-      { title: 'Customer task preview', description: 'See exactly what each customer has selected before your team arrives.',           top: '58%', left: '12%' },
+      { title: 'Service summary card',  description: 'The blue card shows the service date, cycle name, and a live count of how many customers have submitted their task selections vs. still pending.',  top: '12%', left: '2%' },
+      { title: 'Submission status pill', description: 'Each customer row shows their submission status — green Submitted when tasks are locked in, amber Pending when they still need to select.',             top: '55%', left: '2%' },
+      { title: 'Assignment pill',        description: 'Tap the pill on the right to assign a team member (green) or a group (purple) to that customer\'s service. Gray means unassigned.',                   top: '65%', left: '55%' },
     ],
   },
   {
