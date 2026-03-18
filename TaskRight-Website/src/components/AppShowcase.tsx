@@ -232,7 +232,7 @@ const businessScreens: Screen[] = [
     label: 'Dashboard',
     render: () => <BusinessDashboard />,
     hotspots: [
-      { title: 'Customer card',   description: 'Each row shows the customer name, next service date, and hours available.',         top: '25%', left: '12%' },
+      { title: 'Customer card',   description: 'Each row shows the customer name, next service date, and hours available.',         top: '13%', left: '2%' },
       { title: 'Status badge',    description: 'Green means tasks are submitted. Amber means the customer hasn\'t selected yet.',   top: '33%', left: '65%' },
       { title: 'Add Customer',    description: 'Add new customers and link them to your scheduled service cycles.',                 top: '82%', left: '40%' },
     ],
