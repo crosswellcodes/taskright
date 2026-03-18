@@ -353,7 +353,7 @@ const businessScreens: Screen[] = [
     render: () => <BusinessDashboard />,
     hotspots: [
       { title: 'List / Calendar toggle', description: 'Switch between a scrollable card list and a full month calendar — the same toggle available in the real app.', top: '13%', left: '0%' },
-      { title: 'Service date tile',       description: 'Each tile is an upcoming service date. The four numbers show: Total customers scheduled, Done (submitted their task selections), Pending (haven\'t selected yet), and Rate (the overall submission percentage for that day).', top: '38%', left: '48%' },
+      { title: 'Service date tile',       description: 'Each tile is an upcoming service date. The four numbers show: Total customers scheduled, Done (submitted their task selections), Pending (haven\'t selected yet), and Rate (the overall submission percentage for that day).', top: '46%', left: '0%' },
       { title: 'Color legend',           description: 'The legend explains what each dot color means so you can read your schedule status at a glance.', top: '76%', left: '2%' },
     ],
   },
