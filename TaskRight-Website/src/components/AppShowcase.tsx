@@ -18,38 +18,61 @@ type Screen = {
 // ─── Business screen mocks ────────────────────────────────────────────────────
 
 function BusinessDashboard() {
-  const customers = [
-    { name: 'Jennifer M.', date: 'March 24 · 3 hrs', submitted: true },
-    { name: 'Robert A.',   date: 'March 24 · 2 hrs', submitted: false },
-    { name: 'Lisa K.',     date: 'March 25 · 3 hrs', submitted: true },
+  const days = [
+    { date: 'Mon, Mar 24', cycle: 'Weekly Clean',  total: 4, submitted: 2, pending: 2 },
+    { date: 'Thu, Mar 28', cycle: 'Weekly Clean',  total: 3, submitted: 3, pending: 0 },
+    { date: 'Wed, Apr 2',  cycle: 'Deep Clean',    total: 3, submitted: 0, pending: 3 },
   ];
+  function barColor(s: number, t: number) {
+    if (s === 0) return '#2563eb';
+    if (s === t) return '#10b981';
+    return '#f59e0b';
+  }
   return (
     <div className="flex flex-col h-full">
-      <div className="px-4 pt-2 pb-3 bg-white border-b border-gray-100">
-        <p className="text-xs text-gray-400 mb-0.5">My Customers</p>
-        <p className="text-base font-bold text-[#1a1a1a]">3 active customers</p>
+      <div className="px-4 pt-2 pb-2 bg-white border-b border-gray-100">
+        <p className="text-base font-bold text-[#1a1a1a]">My Business</p>
+        <p className="text-xs text-gray-400">30-Day Forecast</p>
       </div>
-      <div className="flex-1 overflow-hidden px-3 py-2 space-y-2">
-        {customers.map((c) => (
-          <div key={c.name} className="bg-white rounded-xl px-3 py-3 border border-gray-100">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="text-sm font-semibold text-[#1a1a1a]">{c.name}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{c.date}</p>
+      {/* List / Calendar toggle */}
+      <div className="flex gap-1.5 px-3 py-2">
+        <span className="bg-white shadow-sm text-[10px] font-bold text-[#1a1a1a] px-3 py-1 rounded-full border border-gray-100">List</span>
+        <span className="text-[10px] font-semibold text-gray-400 px-3 py-1 rounded-full">Calendar</span>
+      </div>
+      <div className="flex-1 overflow-hidden px-3 space-y-2">
+        {days.map((d) => {
+          const pct = d.total > 0 ? Math.round((d.submitted / d.total) * 100) : 0;
+          const color = barColor(d.submitted, d.total);
+          return (
+            <div key={d.date} className="bg-white rounded-xl px-3 py-2.5 border border-gray-100">
+              <div className="mb-1.5">
+                <p className="text-xs font-bold text-[#1a1a1a]">{d.date}</p>
+                <p className="text-[10px] text-gray-400">{d.cycle}</p>
               </div>
-              {c.submitted ? (
-                <span className="text-[10px] font-bold text-[#065f46] bg-[#d1fae5] px-2 py-0.5 rounded-full whitespace-nowrap">✓ Tasks Selected</span>
-              ) : (
-                <span className="text-[10px] font-bold text-[#92400e] bg-[#fef3c7] px-2 py-0.5 rounded-full whitespace-nowrap">Pending</span>
-              )}
+              <div className="flex gap-3 mb-1.5">
+                <div className="text-center">
+                  <p className="text-sm font-bold text-[#1a1a1a]">{d.total}</p>
+                  <p className="text-[9px] text-gray-400">Total</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-bold text-[#10b981]">{d.submitted}</p>
+                  <p className="text-[9px] text-gray-400">Done</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-bold text-[#f59e0b]">{d.pending}</p>
+                  <p className="text-[9px] text-gray-400">Pending</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-bold" style={{ color }}>{pct}%</p>
+                  <p className="text-[9px] text-gray-400">Rate</p>
+                </div>
+              </div>
+              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
-      <div className="px-3 pb-3">
-        <div className="bg-[#2563eb] rounded-xl px-4 py-2.5 text-center">
-          <p className="text-white text-xs font-semibold">+ Add Customer</p>
-        </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -232,9 +255,9 @@ const businessScreens: Screen[] = [
     label: 'Dashboard',
     render: () => <BusinessDashboard />,
     hotspots: [
-      { title: 'Customer card',   description: 'Each row shows the customer name, next service date, and hours available.',         top: '13%', left: '2%' },
-      { title: 'Status badge',    description: 'Green means tasks are submitted. Amber means the customer hasn\'t selected yet.',   top: '33%', left: '65%' },
-      { title: 'Add Customer',    description: 'Add new customers and link them to your scheduled service cycles.',                 top: '82%', left: '40%' },
+      { title: '30-Day Forecast',   description: 'The dashboard shows every upcoming service date in the next 30 days — toggle between list and calendar view.',   top: '13%', left: '2%' },
+      { title: 'Submission stats',  description: 'Each card shows total customers, how many have submitted task selections, how many are still pending, and the overall rate.', top: '35%', left: '48%' },
+      { title: 'Progress bar',      description: 'The colored bar reflects submission progress — green when all customers have selected, amber when mixed, blue when none have started.', top: '46%', left: '2%' },
     ],
   },
   {
