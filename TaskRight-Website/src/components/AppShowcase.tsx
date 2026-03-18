@@ -390,7 +390,7 @@ const businessScreens: Screen[] = [
     render: () => <BusinessServiceDay />,
     hotspots: [
       { title: 'Service summary card',  description: 'The blue card shows the service date, cycle name, and a live count of how many customers have submitted their task selections vs. still pending.',  top: '12%', left: '2%' },
-      { title: 'Submission status pill', description: 'Each customer row shows their submission status — green Submitted when tasks are locked in, amber Pending when they still need to select.',             top: '55%', left: '2%' },
+      { title: 'Submission status pill', description: 'Each customer row shows their submission status — green Submitted when tasks are locked in, amber Pending when they still need to select.',             top: '38%', left: '28%' },
       { title: 'Assignment pill',        description: 'Tap the pill on the right to assign a team member (green) or a group (purple) to that customer\'s service. Gray means unassigned.',                   top: '65%', left: '55%' },
     ],
   },
