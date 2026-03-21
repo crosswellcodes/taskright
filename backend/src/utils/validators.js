@@ -22,6 +22,12 @@ function validateBusinessSignup(data) {
     errors.push('Phone number must be in E.164 format (e.g., +1234567890)');
   }
 
+  // Optional scheduling format — defaults to 'date_based' if omitted
+  const validFormats = ['date_based', 'day_of_week'];
+  if (data.schedulingFormat && !validFormats.includes(data.schedulingFormat)) {
+    errors.push('schedulingFormat must be date_based or day_of_week');
+  }
+
   return {
     isValid: errors.length === 0,
     errors

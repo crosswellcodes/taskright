@@ -11,10 +11,10 @@ const customerService = require('../services/customerService');
  */
 router.post('/businesses/signup', async (req, res) => {
   try {
-    const { name, phoneNumber } = req.body;
+    const { name, phoneNumber, schedulingFormat } = req.body;
 
     // Validate input
-    const validation = validateBusinessSignup({ name, phoneNumber });
+    const validation = validateBusinessSignup({ name, phoneNumber, schedulingFormat });
     if (!validation.isValid) {
       return res.status(400).json({
         success: false,
@@ -24,7 +24,7 @@ router.post('/businesses/signup', async (req, res) => {
     }
 
     // Create business
-    const business = await businessService.createBusiness(name, phoneNumber);
+    const business = await businessService.createBusiness(name, phoneNumber, schedulingFormat || 'date_based');
 
     // Generate token
     const { token, expiresIn } = generateToken({
@@ -40,6 +40,7 @@ router.post('/businesses/signup', async (req, res) => {
         id: business.id,
         name: business.name,
         phoneNumber: business.phone_number,
+        schedulingFormat: business.scheduling_format,
         createdAt: business.created_at
       },
       token,
@@ -105,7 +106,8 @@ router.post('/businesses/login', async (req, res) => {
       business: {
         id: business.id,
         name: business.name,
-        phoneNumber: business.phone_number
+        phoneNumber: business.phone_number,
+        schedulingFormat: business.scheduling_format
       },
       token,
       expiresIn

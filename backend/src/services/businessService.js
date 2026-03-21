@@ -5,7 +5,7 @@ const knex = require('../db');
 /**
  * Create a new business
  */
-async function createBusiness(name, phoneNumber) {
+async function createBusiness(name, phoneNumber, schedulingFormat = 'date_based') {
   const existingBusiness = await knex('businesses')
     .where('phone_number', phoneNumber)
     .first();
@@ -21,6 +21,7 @@ async function createBusiness(name, phoneNumber) {
     .insert({
       name: name.trim(),
       phone_number: phoneNumber,
+      scheduling_format: schedulingFormat,
       created_at: knex.raw('CURRENT_TIMESTAMP'),
       updated_at: knex.raw('CURRENT_TIMESTAMP')
     })
@@ -297,7 +298,7 @@ async function updateCustomerDetails(customerId, data) {
 
 // ─── CYCLE ASSIGNMENT ────────────────────────────────────────────────────────
 
-async function assignCycle(customerId, serviceCycleId, totalHours) {
+async function assignCycle(customerId, serviceCycleId, totalHours, startDate, dayOfWeek = null) {
   const existing = await knex('customer_cycle_assignments')
     .where('customer_id', customerId)
     .where('service_cycle_id', serviceCycleId)
@@ -315,6 +316,8 @@ async function assignCycle(customerId, serviceCycleId, totalHours) {
       customer_id: customerId,
       service_cycle_id: serviceCycleId,
       total_hours: totalHours,
+      start_date: startDate,
+      day_of_week: dayOfWeek,
       created_at: knex.raw('CURRENT_TIMESTAMP'),
       updated_at: knex.raw('CURRENT_TIMESTAMP')
     })
@@ -322,40 +325,47 @@ async function assignCycle(customerId, serviceCycleId, totalHours) {
 
   const assignment = inserted[0];
   const serviceCycle = await knex('service_cycles').where('id', serviceCycleId).first();
-  await generateUpcomingSelectionCycles(customerId, serviceCycle);
+  await generateUpcomingSelectionCycles(customerId, serviceCycle, startDate, dayOfWeek);
 
   return assignment;
 }
 
-async function generateUpcomingSelectionCycles(customerId, serviceCycle) {
-  let currentDate = new Date();
+function addDays(date, n) {
+  return new Date(date.getTime() + n * 24 * 60 * 60 * 1000);
+}
+
+async function generateUpcomingSelectionCycles(customerId, serviceCycle, startDate, dayOfWeek = null) {
+  let currentDate;
+
+  if (dayOfWeek !== null) {
+    if (startDate) {
+      // User picked a specific starting date from the inline calendar — honour it
+      currentDate = new Date(startDate);
+    } else {
+      // No specific date chosen — default to the next occurrence of this weekday from tomorrow
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      const daysUntil = (dayOfWeek - tomorrow.getDay() + 7) % 7;
+      currentDate = addDays(tomorrow, daysUntil);
+    }
+  } else {
+    // Date-based format: start from the chosen date
+    currentDate = new Date(startDate);
+  }
 
   for (let i = 0; i < 4; i++) {
-    if (serviceCycle.frequency === 'weekly') {
-      currentDate = new Date(currentDate.getTime() + 7 * 24 * 60 * 60 * 1000);
-    } else if (serviceCycle.frequency === 'biweekly') {
-      currentDate = new Date(currentDate.getTime() + 14 * 24 * 60 * 60 * 1000);
-    } else if (serviceCycle.frequency === 'monthly') {
-      currentDate = new Date(currentDate);
-      currentDate.setMonth(currentDate.getMonth() + 1);
-    } else if (serviceCycle.frequency === 'yearly') {
-      currentDate = new Date(currentDate);
-      currentDate.setFullYear(currentDate.getFullYear() + 1);
-    } else {
-      currentDate = new Date(currentDate.getTime() + 7 * 24 * 60 * 60 * 1000);
-    }
-
     const serviceDate = currentDate.toISOString().split('T')[0];
     const deadlineMs = currentDate.getTime() - serviceCycle.days_before_service_deadline * 24 * 60 * 60 * 1000;
     const submissionDeadline = new Date(deadlineMs).toISOString().split('T')[0];
 
-    const existing = await knex('selection_cycles')
+    const existingCycle = await knex('selection_cycles')
       .where('customer_id', customerId)
       .where('service_cycle_id', serviceCycle.id)
       .where('service_date', serviceDate)
       .first();
 
-    if (!existing) {
+    if (!existingCycle) {
       await knex('selection_cycles').insert({
         service_cycle_id: serviceCycle.id,
         customer_id: customerId,
@@ -365,6 +375,31 @@ async function generateUpcomingSelectionCycles(customerId, serviceCycle) {
         created_at: knex.raw('CURRENT_TIMESTAMP'),
         updated_at: knex.raw('CURRENT_TIMESTAMP')
       });
+    }
+
+    // Advance to next service date
+    if (dayOfWeek !== null) {
+      // Day-of-week: always advance by fixed day multiples to keep the same weekday
+      if (serviceCycle.frequency === 'weekly')        currentDate = addDays(currentDate, 7);
+      else if (serviceCycle.frequency === 'biweekly') currentDate = addDays(currentDate, 14);
+      else if (serviceCycle.frequency === 'monthly')  currentDate = addDays(currentDate, 28);  // 4 weeks
+      else if (serviceCycle.frequency === 'yearly')   currentDate = addDays(currentDate, 364); // 52 weeks
+      else                                            currentDate = addDays(currentDate, 7);
+    } else {
+      // Date-based: use calendar month/year increments
+      if (serviceCycle.frequency === 'weekly') {
+        currentDate = addDays(currentDate, 7);
+      } else if (serviceCycle.frequency === 'biweekly') {
+        currentDate = addDays(currentDate, 14);
+      } else if (serviceCycle.frequency === 'monthly') {
+        currentDate = new Date(currentDate);
+        currentDate.setMonth(currentDate.getMonth() + 1);
+      } else if (serviceCycle.frequency === 'yearly') {
+        currentDate = new Date(currentDate);
+        currentDate.setFullYear(currentDate.getFullYear() + 1);
+      } else {
+        currentDate = addDays(currentDate, 7);
+      }
     }
   }
 }
@@ -506,77 +541,82 @@ async function getBusinessForecast(businessId) {
     .where('service_date', '<=', thirtyDaysStr)
     .orderBy('service_date', 'asc');
 
-  // Group by service_date + service_cycle_id
-  const grouped = {};
+  // Group by service_date, then by service_cycle_id within each date
+  const dateGrouped = {};
   for (const sc of selectionCycles) {
-    const key = `${sc.service_date}-${sc.service_cycle_id}`;
-    if (!grouped[key]) {
-      grouped[key] = { serviceDate: sc.service_date, serviceCycleId: sc.service_cycle_id, cycles: [] };
+    // Normalize to plain YYYY-MM-DD string (pg returns date columns as Date objects)
+    const dateKey = typeof sc.service_date === 'string'
+      ? sc.service_date.split('T')[0]
+      : sc.service_date.toISOString().split('T')[0];
+    if (!dateGrouped[dateKey]) {
+      dateGrouped[dateKey] = { serviceDate: sc.service_date, cycleGroups: {} };
     }
-    grouped[key].cycles.push(sc);
+    if (!dateGrouped[dateKey].cycleGroups[sc.service_cycle_id]) {
+      dateGrouped[dateKey].cycleGroups[sc.service_cycle_id] = {
+        serviceCycleId: sc.service_cycle_id,
+        selectionCycles: [],
+      };
+    }
+    dateGrouped[dateKey].cycleGroups[sc.service_cycle_id].selectionCycles.push(sc);
   }
 
   const upcomingServices = [];
-  for (const group of Object.values(grouped)) {
-    const serviceCycle = await knex('service_cycles').where('id', group.serviceCycleId).first();
-    const cycleIds = group.cycles.map(c => c.id);
+  for (const dateGroup of Object.values(dateGrouped)) {
+    let totalSubmitted = 0;
+    let totalPending = 0;
+    let totalHours = 0;
+    const serviceCycles = [];
 
-    const submissions = await knex('selections')
-      .whereIn('selection_cycle_id', cycleIds)
-      .where('status', 'submitted');
+    for (const cycleGroup of Object.values(dateGroup.cycleGroups)) {
+      const serviceCycle = await knex('service_cycles').where('id', cycleGroup.serviceCycleId).first();
+      const cycleSelectionIds = cycleGroup.selectionCycles.map(sc => sc.id);
+      const cycleCustomerIds = cycleGroup.selectionCycles.map(sc => sc.customer_id);
 
-    const submitted = submissions.length;
-    const pending = group.cycles.length - submitted;
+      const submissions = await knex('selections')
+        .whereIn('selection_cycle_id', cycleSelectionIds)
+        .where('status', 'submitted');
 
-    const taskStats = {};
-    for (const sel of submissions) {
-      const tasks = sel.selected_tasks;
-      for (const taskId of tasks) {
-        taskStats[taskId] = (taskStats[taskId] || 0) + 1;
-      }
+      const submittedCustomerIds = new Set(submissions.map(s => s.customer_id));
+
+      const submitted = submissions.length;
+      const pending = cycleGroup.selectionCycles.length - submitted;
+
+      totalSubmitted += submitted;
+      totalPending += pending;
+
+      // Sum hours for all customers assigned to this cycle on this date
+      const assignments = await knex('customer_cycle_assignments')
+        .where('service_cycle_id', cycleGroup.serviceCycleId)
+        .whereIn('customer_id', cycleCustomerIds);
+      totalHours += assignments.reduce((sum, a) => sum + (parseFloat(a.total_hours) || 0), 0);
+
+      const pendingCustomers = customers
+        .filter(c => cycleCustomerIds.includes(c.id) && !submittedCustomerIds.has(c.id))
+        .map(c => {
+          const sc = cycleGroup.selectionCycles.find(s => s.customer_id === c.id);
+          return { id: c.id, name: c.name, selectionCycleId: sc ? sc.id : null };
+        });
+
+      const submittedCustomers = customers
+        .filter(c => cycleCustomerIds.includes(c.id) && submittedCustomerIds.has(c.id))
+        .map(c => {
+          const sc = cycleGroup.selectionCycles.find(s => s.customer_id === c.id);
+          return { id: c.id, name: c.name, selectionCycleId: sc ? sc.id : null };
+        });
+
+      serviceCycles.push({
+        id: cycleGroup.serviceCycleId,
+        name: serviceCycle ? serviceCycle.name : null,
+        pendingCustomers,
+        submittedCustomers,
+      });
     }
 
-    const taskIds = Object.keys(taskStats).map(Number);
-    const tasks = taskIds.length > 0 ? await knex('tasks').whereIn('id', taskIds) : [];
-
-    const taskSummary = tasks.map(t => ({
-      taskId: t.id,
-      taskName: t.name,
-      selectedByCustomers: taskStats[t.id] || 0,
-      totalTimeRequired: (taskStats[t.id] || 0) * t.time_allotment_minutes
-    }));
-
-    const totalHoursForecast = submitted > 0
-      ? submissions.reduce((sum, s) => sum + s.selected_total_hours, 0)
-      : null;
-
-    // Build per-customer breakdown using data already in scope (no extra DB queries)
-    const submittedCustomerIds = new Set(submissions.map(s => s.customer_id));
-    const cycleCustomerIds = group.cycles.map(c => c.customer_id);
-
-    const pendingCustomers = customers
-      .filter(c => cycleCustomerIds.includes(c.id) && !submittedCustomerIds.has(c.id))
-      .map(c => {
-        const cycle = group.cycles.find(sc => sc.customer_id === c.id);
-        return { id: c.id, name: c.name, selectionCycleId: cycle ? cycle.id : null };
-      });
-
-    const submittedCustomers = customers
-      .filter(c => cycleCustomerIds.includes(c.id) && submittedCustomerIds.has(c.id))
-      .map(c => {
-        const cycle = group.cycles.find(sc => sc.customer_id === c.id);
-        return { id: c.id, name: c.name, selectionCycleId: cycle ? cycle.id : null };
-      });
-
     upcomingServices.push({
-      serviceDate: group.serviceDate,
-      serviceCycleName: serviceCycle ? serviceCycle.name : null,
-      customerSelectionsStatus: { submitted, pending },
-      totalHoursForecast,
-      averageHoursPerCustomer: submitted > 0 ? totalHoursForecast / submitted : null,
-      tasks: taskSummary,
-      pendingCustomers,
-      submittedCustomers
+      serviceDate: dateGroup.serviceDate,
+      customerSelectionsStatus: { submitted: totalSubmitted, pending: totalPending },
+      totalHours,
+      serviceCycles,
     });
   }
 
@@ -825,6 +865,36 @@ async function setTeamGroupMembers(teamId, businessId, memberIds) {
   });
 }
 
+// ─── RESCHEDULE ───────────────────────────────────────────────────────────────
+
+async function rescheduleSelectionCycle(selectionCycleId, businessId, newServiceDate) {
+  const sc = await knex('selection_cycles')
+    .join('service_cycles', 'selection_cycles.service_cycle_id', 'service_cycles.id')
+    .where('selection_cycles.id', selectionCycleId)
+    .where('service_cycles.business_id', businessId)
+    .select('selection_cycles.*')
+    .first();
+
+  if (!sc) {
+    const err = new Error('Selection cycle not found');
+    err.code = 'NOT_FOUND';
+    err.statusCode = 404;
+    throw err;
+  }
+  if (sc.status === 'completed') {
+    const err = new Error('Cannot reschedule a completed service call');
+    err.code = 'ALREADY_COMPLETED';
+    err.statusCode = 409;
+    throw err;
+  }
+
+  const [updated] = await knex('selection_cycles')
+    .where('id', selectionCycleId)
+    .update({ service_date: newServiceDate, updated_at: knex.raw('CURRENT_TIMESTAMP') })
+    .returning('*');
+  return updated;
+}
+
 module.exports = {
   // Auth
   createBusiness,
@@ -856,6 +926,7 @@ module.exports = {
   getBusinessForecast,
   // Completion
   markServiceComplete,
+  rescheduleSelectionCycle,
   // Feedback
   getLatestFeedbackForCustomer,
   updateFeedbackBusinessNotes,

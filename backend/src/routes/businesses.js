@@ -494,7 +494,7 @@ router.post('/:businessId/customers/:customerId/assign-cycle', requireBusiness, 
   try {
     const businessId = parseInt(req.params.businessId);
     const customerId = parseInt(req.params.customerId);
-    const { serviceCycleId, totalHours } = req.body;
+    const { serviceCycleId, totalHours, startDate, dayOfWeek } = req.body;
 
     if (!serviceCycleId || typeof serviceCycleId !== 'number') {
       return res.status(400).json({
@@ -511,6 +511,26 @@ router.post('/:businessId/customers/:customerId/assign-cycle', requireBusiness, 
       });
     }
 
+    // Validate scheduling fields based on business format
+    const business = await knex('businesses').where('id', businessId).first();
+    if (business && business.scheduling_format === 'day_of_week') {
+      if (dayOfWeek === undefined || dayOfWeek === null || !Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
+        return res.status(400).json({
+          success: false,
+          error: 'dayOfWeek (0–6) is required for day-of-week scheduling',
+          code: 'VALIDATION_ERROR'
+        });
+      }
+    } else {
+      if (!startDate || !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+        return res.status(400).json({
+          success: false,
+          error: 'startDate is required and must be in YYYY-MM-DD format',
+          code: 'VALIDATION_ERROR'
+        });
+      }
+    }
+
     // Verify customer belongs to this business
     const customer = await knex('customers').where('id', customerId).where('business_id', businessId).first();
     if (!customer) {
@@ -523,7 +543,11 @@ router.post('/:businessId/customers/:customerId/assign-cycle', requireBusiness, 
       return res.status(404).json({ success: false, error: 'Service cycle not found', code: 'CYCLE_NOT_FOUND' });
     }
 
-    const assignment = await businessService.assignCycle(customerId, serviceCycleId, totalHours);
+    const assignment = await businessService.assignCycle(
+      customerId, serviceCycleId, totalHours,
+      startDate || null,
+      dayOfWeek !== undefined ? dayOfWeek : null
+    );
 
     return res.status(201).json({
       success: true,
@@ -652,6 +676,36 @@ router.post('/:businessId/customers/:customerId/mark-service-complete', requireB
       });
     }
     console.error('Mark service complete error:', error);
+    return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
+  }
+});
+
+// ─── RESCHEDULE SELECTION CYCLE ──────────────────────────────────────────────
+
+/**
+ * PATCH /api/businesses/:businessId/selection-cycles/:selectionCycleId/reschedule
+ * Move a single service call to a new date — does not affect any other scheduled dates
+ */
+router.patch('/:businessId/selection-cycles/:selectionCycleId/reschedule', requireBusiness, async (req, res) => {
+  try {
+    const businessId = parseInt(req.params.businessId);
+    const selectionCycleId = parseInt(req.params.selectionCycleId);
+    const { newServiceDate } = req.body;
+
+    if (!newServiceDate || !/^\d{4}-\d{2}-\d{2}$/.test(newServiceDate)) {
+      return res.status(400).json({ success: false, error: 'newServiceDate is required in YYYY-MM-DD format', code: 'VALIDATION_ERROR' });
+    }
+
+    const updated = await businessService.rescheduleSelectionCycle(selectionCycleId, businessId, newServiceDate);
+    return res.status(200).json({ success: true, selectionCycle: updated });
+  } catch (err) {
+    if (err.code === 'NOT_FOUND') {
+      return res.status(404).json({ success: false, error: err.message, code: 'NOT_FOUND' });
+    }
+    if (err.code === 'ALREADY_COMPLETED') {
+      return res.status(409).json({ success: false, error: err.message, code: 'ALREADY_COMPLETED' });
+    }
+    console.error('Reschedule selection cycle error:', err);
     return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
   }
 });
