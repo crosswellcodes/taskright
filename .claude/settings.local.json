@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "Bash(git -C /Users/cobymakela/Desktop/TaskRight_Project/TaskRight rev-parse --git-dir)"
     ]
-  }
+  },
+  "disableAllHooks": true
 }

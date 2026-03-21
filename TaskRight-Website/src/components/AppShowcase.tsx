@@ -25,7 +25,7 @@ function BusinessDashboard({ onViewChange }: { onViewChange?: (v: boolean) => vo
   const days = [
     { date: 'Mon, Mar 24', cycle: 'Weekly Clean', total: 4, submitted: 2, pending: 2 },
     { date: 'Thu, Mar 28', cycle: 'Weekly Clean', total: 3, submitted: 3, pending: 0 },
-    { date: 'Wed, Apr 2',  cycle: 'Deep Clean',   total: 3, submitted: 0, pending: 3 },
+    { date: 'Wed, Apr 2',  cycle: 'Deep Clean',   total: 3, submitted: 1, pending: 2 },
   ];
 
   function barColor(s: number, t: number) {
@@ -47,7 +47,7 @@ function BusinessDashboard({ onViewChange }: { onViewChange?: (v: boolean) => vo
     // Week 4 — 24 selected (amber), 28 green
     { day: 22 }, { day: 23 }, { day: 24, dot: '#f59e0b', selected: true }, { day: 25 }, { day: 26 }, { day: 27 }, { day: 28, dot: '#10b981' },
     // Week 5 — 29,30,31 Mar then Apr 1,2(blue),3,4
-    { day: 29 }, { day: 30 }, { day: 31 }, { day: 1, faded: true }, { day: 2, faded: true, dot: '#2563eb' }, { day: 3, faded: true }, { day: 4, faded: true },
+    { day: 29 }, { day: 30 }, { day: 31 }, { day: 1, faded: true }, { day: 2, faded: true, dot: '#f59e0b' }, { day: 3, faded: true }, { day: 4, faded: true },
   ];
 
   return (
@@ -234,37 +234,71 @@ function BusinessServiceDay() {
 }
 
 function BusinessTeam() {
+  const [tab, setTab] = useState<'members' | 'groups'>('members');
+
   const members = [
-    { name: 'Sarah Johnson', group: 'Team A' },
-    { name: 'Mike Torres',   group: 'Team A' },
-    { name: 'Dana Lee',      group: 'Team B' },
+    { name: 'Sarah Johnson', initials: 'SJ', phone: '(555) 201-4832', hours: 20, groups: 'Team A' },
+    { name: 'Mike Torres',   initials: 'MT', phone: '(555) 384-9021', hours: 15, groups: 'Team A' },
+    { name: 'Dana Lee',      initials: 'DL', phone: '(555) 467-3310', hours: 12, groups: 'Team B' },
   ];
+
+  const groups = [
+    { name: 'Team A', members: ['Sarah Johnson', 'Mike Torres'] },
+    { name: 'Team B', members: ['Dana Lee'] },
+  ];
+
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 pt-2 pb-3 bg-white border-b border-gray-100">
         <p className="text-xs text-gray-400 mb-0.5">My Team</p>
         <div className="flex gap-3 mt-1">
-          <span className="text-xs font-bold text-[#2563eb] border-b-2 border-[#2563eb] pb-0.5">Members</span>
-          <span className="text-xs text-gray-400">Groups</span>
+          <button
+            onClick={() => setTab('members')}
+            className={`text-xs font-bold pb-0.5 border-b-2 transition-colors ${tab === 'members' ? 'text-[#2563eb] border-[#2563eb]' : 'text-gray-400 border-transparent'}`}
+          >Members</button>
+          <button
+            onClick={() => setTab('groups')}
+            className={`text-xs font-bold pb-0.5 border-b-2 transition-colors ${tab === 'groups' ? 'text-[#2563eb] border-[#2563eb]' : 'text-gray-400 border-transparent'}`}
+          >Groups</button>
         </div>
       </div>
-      <div className="flex-1 overflow-hidden px-3 py-2 space-y-2">
-        {members.map((m) => (
-          <div key={m.name} className="bg-white rounded-xl px-3 py-2.5 border border-gray-100 flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-full bg-[#dbeafe] flex items-center justify-center shrink-0">
-              <span className="text-[10px] font-bold text-[#2563eb]">{m.name.split(' ').map(n => n[0]).join('')}</span>
+      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
+        {tab === 'members' ? (
+          members.map((m) => (
+            <div key={m.name} className="bg-white rounded-xl px-3 py-2.5 border border-gray-100 flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-full bg-[#dbeafe] flex items-center justify-center shrink-0">
+                <span className="text-[10px] font-bold text-[#2563eb]">{m.initials}</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-[#1a1a1a] truncate">{m.name}</p>
+                <p className="text-[10px] text-gray-400">{m.phone}</p>
+                <p className="text-[10px] text-[#2563eb]">{m.groups}</p>
+              </div>
+              <span className="bg-[#eff6ff] text-[#2563eb] text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap">{m.hours} hrs/wk</span>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-[#1a1a1a] truncate">{m.name}</p>
+          ))
+        ) : (
+          groups.map((g) => (
+            <div key={g.name} className="bg-white rounded-xl px-3 py-2.5 border border-gray-100">
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-xs font-bold text-[#1a1a1a]">{g.name}</p>
+                <span className="text-[10px] text-gray-400">{g.members.length} member{g.members.length !== 1 ? 's' : ''}</span>
+              </div>
+              <p className="text-[10px] text-gray-400">{g.members.join(' · ')}</p>
             </div>
-            <span className="bg-[#f0f4ff] text-[#2563eb] text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0">{m.group}</span>
-          </div>
-        ))}
-        <div className="bg-white rounded-xl px-3 py-2.5 border border-gray-100">
-          <p className="text-[10px] font-bold text-[#1a1a1a] mb-1.5">Team A · 2 members</p>
-          <p className="text-[10px] text-gray-400">Sarah Johnson · Mike Torres</p>
-        </div>
+          ))
+        )}
       </div>
+      {tab === 'members' && (
+        <div className="px-3 py-2 border-t border-gray-100 bg-white">
+          <button className="w-full bg-[#2563eb] text-white text-xs font-semibold py-2.5 rounded-xl">+ Add Team Member</button>
+        </div>
+      )}
+      {tab === 'groups' && (
+        <div className="px-3 py-2 border-t border-gray-100 bg-white">
+          <button className="w-full bg-[#2563eb] text-white text-xs font-semibold py-2.5 rounded-xl">+ Create Group</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -377,7 +411,7 @@ const businessScreens: Screen[] = [
     hotspots: [
       { title: 'List / Calendar toggle', description: 'Switch between a scrollable card list and a full month calendar — the same toggle available in the real app.', top: '13%', left: '0%' },
       { title: 'Service date tile',      description: 'Each tile represents an upcoming service date. The four numbers show: Total customers scheduled, Done (submitted their task selections), Pending (haven\'t selected yet), and Rate (the overall submission percentage for that day).', top: '46%', left: '0%' },
-      { title: 'Progress bar',           description: 'The colored bar shows submission progress for that service date — green when all customers have selected, amber when mixed, blue when none have started yet.', top: '62%', left: '0%' },
+      { title: 'Progress bar',           description: 'The colored bar shows submission progress for that service date — green when all customers have selected, amber when mixed, blue when none have started yet.', top: '76%', left: '0%' },
     ],
     calHotspots: [
       { title: 'List / Calendar toggle', description: 'Switch between a scrollable card list and a full month calendar — the same toggle available in the real app.', top: '13%', left: '0%' },
@@ -391,16 +425,16 @@ const businessScreens: Screen[] = [
     hotspots: [
       { title: 'Service summary card',  description: 'The blue card shows the service date, cycle name, and a live count of how many customers have submitted their task selections vs. still pending.',  top: '12%', left: '2%' },
       { title: 'Submission status pill', description: 'Each customer row shows their submission status — green Submitted when tasks are locked in, amber Pending when they still need to select.',             top: '27%', left: '42%' },
-      { title: 'Assignment pill',        description: 'Tap the pill on the right to assign a team member (green) or a group (purple) to that customer\'s service. Gray means unassigned.',                   top: '27%', left: '62%' },
+      { title: 'Assignment pill',        description: 'Tap the pill on the right to assign a team member (green) or a group (purple) to that customer\'s service. Gray means unassigned.',                   top: '27%', left: '72%' },
     ],
   },
   {
     label: 'My Team',
     render: () => <BusinessTeam />,
     hotspots: [
-      { title: 'Team member row', description: 'Add staff by name — each member appears here with their group assignment.',           top: '27%', left: '12%' },
-      { title: 'Group badge',     description: 'Members belong to named groups for faster bulk scheduling and assignment.',           top: '42%', left: '65%' },
-      { title: 'Team group card', description: 'Create groups and see every member at a glance — assign the whole group in one tap.', top: '73%', left: '20%' },
+      { title: 'Team member row', description: 'Add staff by name — each member appears here with their group assignment.',           top: '6%', left: '48%' },
+      { title: 'Group badge',     description: 'Members belong to named groups for faster bulk scheduling and assignment.',           top: '25%', left: '65%' },
+      { title: 'Team group card', description: 'Create groups and see every member at a glance — assign the whole group in one tap.', top: '88%', left: '20%' },
     ],
   },
 ];
@@ -540,8 +574,8 @@ export default function AppShowcase() {
                     style={{ top: h.top, left: h.left }}
                     className={`absolute w-7 h-7 rounded-full text-white text-xs font-bold
                       flex items-center justify-center ring-2 ring-white cursor-pointer z-30
-                      transition-all duration-150 hover:scale-110 active:scale-95
-                      ${activeHotspot === i ? 'bg-brand scale-110 ring-brand/40' : 'bg-[#1d4ed8]'}`}
+                      transition-all duration-150
+                      ${activeHotspot === i ? 'bg-brand ring-brand/40' : 'bg-[#1d4ed8]'}`}
                   >
                     {i + 1}
                   </button>
