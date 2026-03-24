@@ -177,6 +177,136 @@ function BusinessDashboard({ onViewChange }: { onViewChange?: (v: boolean) => vo
   );
 }
 
+function BusinessCustomer() {
+  const [showList, setShowList] = useState(false);
+
+  const customers = [
+    { name: 'Nancy Fancy',       phone: '(555) 391-2847', cycles: 1 },
+    { name: 'Robert Adams',      phone: '(555) 204-9183', cycles: 1 },
+    { name: 'Jennifer Martinez', phone: '(555) 837-2041', cycles: 2 },
+    { name: 'David Kim',         phone: '(555) 419-5672', cycles: 1 },
+    { name: 'Lisa Kendall',      phone: '(555) 763-0284', cycles: 0 },
+  ];
+
+  const upcomingServices = [
+    { date: 'Mon, Mar 24', cycle: 'Weekly Clean' },
+    { date: 'Thu, Mar 28', cycle: 'Weekly Clean' },
+    { date: 'Mon, Mar 31', cycle: 'Weekly Clean' },
+  ];
+
+  if (showList) {
+    return (
+      <div className="flex flex-col h-full bg-[#f5f5f5]">
+        {/* Nav bar */}
+        <div className="bg-white border-b border-gray-100 px-3 py-2 flex items-center justify-center shrink-0">
+          <p className="text-xs font-bold text-[#1a1a1a]">Customers</p>
+        </div>
+
+        {/* Customer list */}
+        <div className="flex-1 overflow-y-auto px-3 pt-3 space-y-2 pb-16">
+          {customers.map((c) => (
+            <button
+              key={c.name}
+              onClick={() => setShowList(false)}
+              className="w-full bg-white rounded-xl px-3 py-2.5 border border-gray-100 flex items-center justify-between text-left active:opacity-70 transition-opacity"
+            >
+              <div>
+                <p className="text-[10px] font-semibold text-[#1a1a1a]">{c.name}</p>
+                <p className="text-[9px] text-gray-400 mt-0.5">{c.phone}</p>
+              </div>
+              <span className="text-[9px] font-semibold text-[#2563eb] bg-[#eff6ff] px-2 py-0.5 rounded-full shrink-0">
+                {c.cycles} cycle{c.cycles !== 1 ? 's' : ''}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Add Customer FAB */}
+        <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-3 pt-2 pb-3">
+          <div className="bg-[#2563eb] rounded-xl py-2.5 text-center">
+            <p className="text-white text-[10px] font-semibold">+ Add Customer</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Nav bar */}
+      <div className="bg-white border-b border-gray-100 px-3 py-2 flex items-center shrink-0">
+        <button
+          onClick={() => setShowList(true)}
+          className="flex items-center gap-1 text-[#2563eb] active:opacity-60 transition-opacity"
+        >
+          <span className="text-sm font-light leading-none">‹</span>
+          <span className="text-[10px] font-semibold">Customers</span>
+        </button>
+      </div>
+
+      {/* Blue header */}
+      <div className="bg-[#2563eb] px-4 pt-4 pb-4">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-sm font-bold text-white leading-tight">Nancy Fancy</p>
+            <p className="text-[10px] text-white/70 mt-0.5">(555) 391-2847</p>
+          </div>
+          <span className="text-[10px] font-semibold text-white border border-white/50 rounded-lg px-2.5 py-1 shrink-0">
+            Details
+          </span>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto bg-[#f5f5f5] px-3 pt-3 space-y-3 pb-3">
+        {/* Assigned Cycles */}
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wide px-3 pt-2 pb-1.5 border-b border-gray-100">
+            Assigned Cycles
+          </p>
+          <div className="flex items-center justify-between px-3 py-2 border-b border-[#f3f4f6]">
+            <span className="text-[10px] font-semibold text-[#1a1a1a]">Weekly Clean</span>
+            <span className="text-[10px] text-gray-400">2.5h / visit</span>
+          </div>
+          <div className="px-3 py-2">
+            <div className="text-[9px] font-semibold text-[#2563eb] border border-[#2563eb] rounded-lg px-2 py-1.5 text-center">
+              + Assign Cycle
+            </div>
+          </div>
+        </div>
+
+        {/* Upcoming Services */}
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wide px-3 pt-2 pb-1.5 border-b border-gray-100">
+            Upcoming Services
+          </p>
+          {upcomingServices.map((s, i) => (
+            <div
+              key={s.date}
+              className={`flex items-center justify-between px-3 py-2 ${i < upcomingServices.length - 1 ? 'border-b border-[#f3f4f6]' : ''}`}
+            >
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold text-[#1a1a1a]">{s.date}</p>
+                <p className="text-[9px] text-gray-400">{s.cycle}</p>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="text-[9px] font-bold text-[#1d4ed8] bg-[#dbeafe] px-1.5 py-0.5 rounded-full">
+                  Open
+                </span>
+                <span className="text-[11px] text-[#c7d2fe] font-light">›</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Mark Service Complete */}
+        <div className="bg-[#10b981] rounded-xl px-4 py-2.5 text-center">
+          <p className="text-white text-[10px] font-semibold">Mark Service Complete</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BusinessServiceDay() {
   // Pending customers first, submitted last — matches actual app order
   const customers = [
@@ -228,6 +358,51 @@ function BusinessServiceDay() {
             <AssignPill a={c.assignment} />
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function BusinessServiceCycle() {
+  const cycles = [
+    { name: 'Weekly Clean',  freq: 'Weekly',    tasks: 6,  deadline: 3 },
+    { name: 'Deep Clean',    freq: 'Monthly',   tasks: 12, deadline: 5 },
+    { name: 'Lawn Care',     freq: 'Biweekly',  tasks: 4,  deadline: 3 },
+  ];
+
+  return (
+    <div className="flex flex-col h-full bg-[#f5f5f5]">
+      {/* Nav bar */}
+      <div className="bg-white border-b border-gray-100 px-3 py-2 flex items-center justify-center shrink-0">
+        <p className="text-xs font-bold text-[#1a1a1a]">Service Cycles</p>
+      </div>
+
+      {/* Cycle cards */}
+      <div className="flex-1 overflow-y-auto px-3 pt-3 space-y-2 pb-16">
+        {cycles.map((c) => (
+          <div key={c.name} className="bg-white rounded-xl px-3 py-2.5 border border-gray-100 flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-semibold text-[#1a1a1a]">{c.name}</p>
+              <p className="text-[9px] text-gray-400 mt-0.5 capitalize">
+                {c.freq} · {c.tasks} tasks
+              </p>
+              <p className="text-[9px] text-gray-300 mt-0.5">
+                Deadline: {c.deadline}d before service
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0 ml-2">
+              <span className="text-[9px] font-semibold text-[#2563eb] bg-[#eff6ff] px-2 py-0.5 rounded-lg">Edit</span>
+              <span className="text-[9px] font-semibold text-[#ef4444] bg-[#fef2f2] px-2 py-0.5 rounded-lg">Delete</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* New Cycle FAB */}
+      <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-3 pt-2 pb-3">
+        <div className="bg-[#2563eb] rounded-xl py-2.5 text-center">
+          <p className="text-white text-[10px] font-semibold">+ New Cycle</p>
+        </div>
       </div>
     </div>
   );
@@ -306,34 +481,189 @@ function BusinessTeam() {
 // ─── Customer screen mocks ────────────────────────────────────────────────────
 
 function CustomerMyService() {
+  const [showList, setShowList] = useState(false);
+
+  const upcomingServices = [
+    { date: 'Mon, Mar 24', label: 'Next', hours: 3, submitted: true,  tasks: 2 },
+    { date: 'Mon, Mar 31', label: null,   hours: 3, submitted: false, tasks: 0 },
+    { date: 'Mon, Apr 7',  label: null,   hours: 3, submitted: false, tasks: 0 },
+    { date: 'Mon, Apr 14', label: null,   hours: 3, submitted: false, tasks: 0 },
+  ];
+
+  if (showList) {
+    return (
+      <div className="flex flex-col h-full bg-[#f5f5f5]">
+        {/* Header */}
+        <div className="px-4 pt-2 pb-2 bg-white border-b border-gray-100 shrink-0 flex items-center gap-2">
+          <button onClick={() => setShowList(false)} className="text-[#2563eb] text-xs font-semibold">‹ Back</button>
+          <p className="text-sm font-bold text-[#1a1a1a]">Upcoming Services</p>
+        </div>
+        {/* List */}
+        <div className="flex-1 overflow-y-auto px-3 pt-3 space-y-2 pb-4">
+          {upcomingServices.map((s, i) => (
+            <div key={s.date} className="bg-white rounded-2xl border border-gray-100 flex overflow-hidden">
+              {/* Accent bar */}
+              <div className={`w-1 shrink-0 ${i === 0 ? 'bg-[#2563eb]' : 'bg-gray-200'}`} />
+              <div className="flex-1 px-3 py-2.5">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <p className="text-[11px] font-bold text-[#1a1a1a]">{s.date}</p>
+                  {s.label && (
+                    <span className="text-[9px] font-bold text-[#2563eb] bg-[#eff6ff] px-1.5 py-0.5 rounded-full">Next</span>
+                  )}
+                </div>
+                <p className="text-[9px] text-gray-400 mb-1.5">{s.hours} hours available</p>
+                <div className="flex items-center justify-between">
+                  {s.submitted ? (
+                    <span className="text-[9px] font-bold text-[#065f46] bg-[#d1fae5] px-2 py-0.5 rounded-full">✓ Tasks Selected</span>
+                  ) : (
+                    <span className="text-[9px] font-bold text-[#2563eb] bg-[#eff6ff] px-2 py-0.5 rounded-full">Select Tasks →</span>
+                  )}
+                  {s.tasks > 0 && (
+                    <p className="text-[9px] text-gray-400">{s.tasks} task{s.tasks !== 1 ? 's' : ''}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const calDays = [
+    { d: 1 },  { d: 2 },  { d: 3 },  { d: 4 },  { d: 5 },  { d: 6 },  { d: 7 },
+    { d: 8 },  { d: 9 },  { d: 10 }, { d: 11 }, { d: 12 }, { d: 13 }, { d: 14 },
+    { d: 15 }, { d: 16 }, { d: 17 }, { d: 18 }, { d: 19 }, { d: 20 }, { d: 21 },
+    { d: 22, today: true }, { d: 23 }, { d: 24, dot: '#10b981', selected: true }, { d: 25 }, { d: 26 }, { d: 27 }, { d: 28 },
+    { d: 29 }, { d: 30 }, { d: 31, dot: '#2563eb' }, null, null, null, null,
+  ];
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-4 pt-2 pb-2 flex items-center justify-between">
-        <p className="text-base font-bold text-[#1a1a1a]">Hi, Jennifer</p>
+    <div className="flex flex-col h-full bg-[#f5f5f5]">
+      {/* Header */}
+      <div className="px-4 pt-2 pb-2 flex items-center justify-between bg-white border-b border-gray-100 shrink-0">
+        <p className="text-sm font-bold text-[#1a1a1a]">Hi, Jennifer</p>
         <p className="text-xs text-[#2563eb]">Sign Out</p>
       </div>
-      {/* Blue card */}
-      <div className="mx-3 rounded-2xl bg-[#2563eb] p-4 mb-3">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-[10px] text-white/70">Next Service</p>
-          <span className="text-[10px] font-bold text-[#86efac] bg-white/10 border border-white/20 px-2 py-0.5 rounded-full">✓ Submitted</span>
+
+      <div className="flex-1 overflow-y-auto pb-2">
+        {/* Blue Next Service card */}
+        <div className="mx-3 mt-2 rounded-2xl bg-[#2563eb] p-3 mb-2">
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-[10px] text-white/70">Next Service</p>
+            <span className="text-[10px] font-bold text-[#86efac] bg-white/10 border border-white/20 px-2 py-0.5 rounded-full">✓ Submitted</span>
+          </div>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <p className="text-xs font-bold text-white leading-tight mb-0.5">Monday, March 24</p>
+              <p className="text-[10px] text-white/80 font-medium mb-0.5">ABC Cleaning Co.</p>
+              <p className="text-[10px] text-white/70">3 hours available</p>
+              <p className="text-[10px] text-white/50 mt-1.5">Tap to see your selections →</p>
+            </div>
+            <div className="flex flex-col gap-1.5 items-end">
+              <span className="bg-white/20 text-white text-[10px] font-semibold px-2.5 py-1 rounded-full">Sarah J.</span>
+              <span className="bg-white/20 text-white text-[10px] font-semibold px-2.5 py-1 rounded-full">Mike T.</span>
+            </div>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <div className="flex-1">
-            <p className="text-sm font-bold text-white leading-tight mb-0.5">Monday, March 24</p>
-            <p className="text-[10px] text-white/80 font-medium mb-0.5">ABC Cleaning Co.</p>
-            <p className="text-[10px] text-white/70">3 hours available</p>
-            <p className="text-[10px] text-white/50 mt-2">Tap to see your selections →</p>
+
+        {/* List View button */}
+        <div className="mx-3 mb-2">
+          <button onClick={() => setShowList(true)} className="w-full border-2 border-[#2563eb] rounded-xl px-4 py-2 text-center">
+            <p className="text-[#2563eb] text-[11px] font-semibold">List View of Upcoming Services</p>
+          </button>
+        </div>
+
+        {/* Inline Calendar */}
+        <div className="mx-3 mb-2 bg-white rounded-2xl p-3 border border-gray-100">
+          {/* Month nav */}
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] text-gray-400 font-medium px-1">‹</span>
+            <p className="text-[10px] font-bold text-[#1a1a1a]">March 2026</p>
+            <span className="text-[11px] text-gray-400 font-medium px-1">›</span>
           </div>
-          <div className="flex flex-col gap-1.5 items-end">
-            <span className="bg-white/20 text-white text-[10px] font-semibold px-2.5 py-1 rounded-full">Sarah J.</span>
-            <span className="bg-white/20 text-white text-[10px] font-semibold px-2.5 py-1 rounded-full">Mike T.</span>
+          {/* Day labels */}
+          <div className="grid grid-cols-7 mb-0.5">
+            {['S','M','T','W','T','F','S'].map((d, i) => (
+              <p key={i} className="text-[8px] text-center text-gray-400 font-medium">{d}</p>
+            ))}
           </div>
+          {/* Day grid */}
+          <div className="grid grid-cols-7">
+            {calDays.map((day, i) => day ? (
+              <div key={i} className={`flex flex-col items-center justify-center h-5 rounded-full relative ${day.selected ? 'bg-[#2563eb]' : ''}`}>
+                <p className={`text-[9px] font-medium leading-none ${day.selected ? 'text-white font-bold' : day.today ? 'text-[#2563eb] font-bold' : 'text-gray-500'}`}>{day.d}</p>
+                {day.dot && !day.selected && (
+                  <div className="w-1 h-1 rounded-full absolute bottom-0" style={{ backgroundColor: day.dot }} />
+                )}
+              </div>
+            ) : <div key={i} className="h-5" />)}
+          </div>
+
+          {/* Selected date detail */}
+          <div className="mt-2 pt-2 border-t border-gray-100 flex items-start justify-between">
+            <div>
+              <p className="text-[10px] font-semibold text-[#1a1a1a]">Wed, Mar 24</p>
+              <p className="text-[9px] text-gray-400 mt-0.5">Weekly Clean · 3 hrs</p>
+            </div>
+            <span className="text-[9px] font-bold text-[#065f46] bg-[#d1fae5] px-2 py-0.5 rounded-full">✓ Selected</span>
+          </div>
+        </div>
+
+        {/* View History */}
+        <div className="text-center py-1">
+          <p className="text-xs text-[#2563eb] font-medium">View History</p>
         </div>
       </div>
-      <div className="mx-3">
-        <div className="border-2 border-[#2563eb] rounded-xl px-4 py-2.5 text-center">
-          <p className="text-[#2563eb] text-xs font-semibold">View Upcoming Services</p>
+    </div>
+  );
+}
+
+function CustomerNextService() {
+  const submittedTasks = [
+    { name: 'Bathroom cleaning', mins: 45 },
+    { name: 'Dusting surfaces',  mins: 20 },
+  ];
+  return (
+    <div className="flex flex-col h-full bg-[#f5f5f5]">
+      {/* Blue header */}
+      <div className="bg-[#2563eb] px-4 pt-4 pb-4 shrink-0">
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-[10px] text-white/70 uppercase tracking-wide font-semibold">Next Service</p>
+          <span className="text-[10px] font-bold text-[#86efac] bg-white/10 border border-white/20 px-2 py-0.5 rounded-full">✓ Submitted</span>
+        </div>
+        <p className="text-sm font-bold text-white mb-0.5">Monday, March 24</p>
+        <p className="text-[10px] text-white/80">ABC Cleaning Co. · 3 hours</p>
+      </div>
+
+      <div className="flex-1 overflow-y-auto pb-2">
+        {/* Who's Coming */}
+        <div className="mx-3 mt-3 bg-white rounded-2xl p-3 border border-gray-100">
+          <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Who&apos;s Coming</p>
+          <div className="flex gap-2">
+            <span className="bg-[#eff6ff] text-[#2563eb] text-[10px] font-semibold px-3 py-1 rounded-full">Sarah J.</span>
+            <span className="bg-[#eff6ff] text-[#2563eb] text-[10px] font-semibold px-3 py-1 rounded-full">Mike T.</span>
+          </div>
+        </div>
+
+        {/* Submitted Tasks */}
+        <div className="mx-3 mt-2 bg-white rounded-2xl p-3 border border-gray-100">
+          <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Your Selections</p>
+          <div className="space-y-1">
+            {submittedTasks.map((t, i) => (
+              <div key={t.name} className={`flex items-center justify-between px-2 py-2 ${i > 0 ? 'border-t border-gray-100' : ''}`}>
+                <p className="text-[10px] font-medium text-[#1a1a1a]">{t.name}</p>
+                <p className="text-[10px] font-medium text-gray-400">{t.mins} min</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-[9px] text-gray-400 mt-2 text-right">65 / 180 min used</p>
+        </div>
+
+        {/* Edit button */}
+        <div className="mx-3 mt-2">
+          <div className="border-2 border-[#2563eb] rounded-xl py-2 text-center">
+            <p className="text-[#2563eb] text-[11px] font-semibold">Edit Task Selection</p>
+          </div>
         </div>
       </div>
     </div>
@@ -349,36 +679,46 @@ function CustomerTaskPicker() {
   ];
   const used = 45;
   const total = 180;
+  const remaining = total - used;
   const pct = Math.round((used / total) * 100);
+  const checkedCount = tasks.filter(t => t.checked).length;
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-4 pt-2 pb-2 bg-white border-b border-gray-100">
-        <p className="text-xs text-gray-400 mb-0.5">Select Tasks</p>
-        <p className="text-base font-bold text-[#1a1a1a]">ABC Cleaning Co.</p>
+    <div className="flex flex-col h-full bg-[#f5f5f5]">
+      {/* Header */}
+      <div className="px-4 pt-2 pb-2 bg-white border-b border-gray-100 shrink-0">
+        <p className="text-[10px] text-gray-400 mb-0.5">Select Tasks</p>
+        <p className="text-sm font-bold text-[#1a1a1a]">ABC Cleaning Co.</p>
       </div>
-      <div className="px-3 py-2">
-        <div className="flex items-center justify-between mb-1">
-          <p className="text-[10px] text-gray-400">Time selected</p>
-          <p className="text-[10px] font-bold text-[#2563eb]">{used} / {total} min</p>
-        </div>
-        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+
+      {/* Time budget bar */}
+      <div className="px-3 py-2 bg-white border-b border-gray-100 shrink-0">
+        <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-1">
           <div className="h-full bg-[#2563eb] rounded-full" style={{ width: `${pct}%` }} />
         </div>
+        <p className="text-[9px] text-gray-400">
+          {used} / {total} min used · <span className="text-[#2563eb] font-semibold">{remaining} min remaining</span>
+        </p>
       </div>
-      <div className="flex-1 overflow-hidden px-3 space-y-1.5">
+
+      {/* Task list */}
+      <div className="flex-1 overflow-y-auto px-3 pt-2 space-y-1.5 pb-14">
         {tasks.map((t) => (
-          <div key={t.name} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border ${t.checked ? 'bg-[#f0fdf4] border-[#86efac]/40' : 'bg-white border-gray-100'}`}>
-            <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 border-2 ${t.checked ? 'bg-[#16a34a] border-[#16a34a]' : 'border-gray-300'}`}>
+          <div key={t.name} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border ${t.checked ? 'bg-[#eff6ff] border-[#2563eb]' : 'bg-white border-gray-100'}`}>
+            <p className={`text-xs flex-1 ${t.checked ? 'font-semibold text-[#2563eb]' : 'text-[#1a1a1a]'}`}>{t.name}</p>
+            <p className="text-[10px] text-gray-400 mr-1.5">{t.mins} min</p>
+            <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 border-2 ${t.checked ? 'bg-[#2563eb] border-[#2563eb]' : 'border-gray-300'}`}>
               {t.checked && <span className="text-white text-[10px] font-bold">✓</span>}
             </div>
-            <p className={`text-xs flex-1 ${t.checked ? 'font-semibold text-[#15803d]' : 'text-[#1a1a1a]'}`}>{t.name}</p>
-            <p className="text-[10px] text-gray-400">{t.mins} min</p>
           </div>
         ))}
       </div>
-      <div className="px-3 pb-3 pt-2">
+
+      {/* Submit footer */}
+      <div className="absolute bottom-0 left-0 right-0 px-3 pb-3 pt-2 bg-white border-t border-gray-100">
         <div className="bg-[#2563eb] rounded-xl px-4 py-2.5 text-center">
-          <p className="text-white text-xs font-semibold">Review Selection</p>
+          <p className="text-white text-xs font-semibold">
+            Review Selection ({checkedCount} {checkedCount === 1 ? 'task' : 'tasks'})
+          </p>
         </div>
       </div>
     </div>
@@ -429,6 +769,24 @@ const businessScreens: Screen[] = [
     ],
   },
   {
+    label: 'Customer',
+    render: () => <BusinessCustomer />,
+    hotspots: [
+      { title: '‹ Customers',             description: 'The back button returns to your full customer list — keeping the customer detail screen one tap deep from anywhere in the Customers tab.', top: '5%',  left: '26%' },
+      { title: 'Assigned cycles',        description: 'Every service cycle assigned to this customer is listed with its total hours per visit. Use "+ Assign Cycle" to add a new recurring schedule at any time.', top: '38%', left: '2%' },
+      { title: 'Upcoming service rows',  description: 'Each upcoming service date is tappable — tap any row to open the Service Call detail view showing date, cycle, submission deadline, and a Change Date option for rescheduling that single visit without affecting the rest of the series.', top: '65%', left: '2%' },
+    ],
+  },
+  {
+    label: 'Service Cycle',
+    render: () => <BusinessServiceCycle />,
+    hotspots: [
+      { title: 'Service cycle card',   description: 'Each card represents a named service cycle — with its frequency, how many tasks are attached, and the selection deadline. Tap Edit to adjust it at any time.', top: '10%', left: '2%' },
+      { title: 'Task & frequency info', description: 'The frequency sets how often this cycle repeats (weekly, biweekly, monthly). Tasks are the menu of work items customers can choose from during their selection window.', top: '22%', left: '48%' },
+      { title: '+ New Cycle',          description: 'Create a new service cycle — define the name, frequency, deadline window, and which tasks belong to it. Cycles are then assigned to individual customers.', top: '92%', left: '20%' },
+    ],
+  },
+  {
     label: 'My Team',
     render: () => <BusinessTeam />,
     hotspots: [
@@ -444,19 +802,29 @@ const customerScreens: Screen[] = [
     label: 'My Service',
     render: () => <CustomerMyService />,
     hotspots: [
-      { title: 'Next Service card',  description: 'Tap the blue card to see your selected tasks or the full task list for the service.', top: '22%', left: '10%' },
-      { title: 'Submitted badge',    description: 'Once you\'ve submitted tasks, a green badge confirms your selection is locked in.',    top: '18%', left: '60%' },
-      { title: 'Staff pills',        description: 'See exactly who\'s coming — first name and last initial for privacy.',                 top: '36%', left: '64%' },
-      { title: 'Upcoming services',  description: 'View all future scheduled dates and submit task preferences for each one.',            top: '62%', left: '20%' },
+      { title: 'Next Service card',       description: 'Tap the blue card to see your selected tasks or the full task list for the service.', top: '12%', left: '38%' },
+      { title: 'Submitted badge',         description: 'Once you\'ve submitted tasks, a green badge confirms your selection is locked in. The pills on the right show the first name and last initial of each team member assigned to your service call.',    top: '10%', left: '78%' },
+      { title: 'List View button',        description: 'Open a scrollable list of all upcoming service dates with status and hours for each.', top: '32%', left: '62%' },
+      { title: 'Inline calendar',         description: 'Your scheduled service dates are marked right on the calendar — green means tasks are submitted, blue means they\'re still pending.', top: '47%', left: '15%' },
+    ],
+  },
+  {
+    label: 'Next Service',
+    render: () => <CustomerNextService />,
+    hotspots: [
+      { title: 'Service header',    description: 'The blue card confirms the date, business, and total hours for the next scheduled visit — plus your submission status at a glance.', top: '14%', left: '78%' },
+      { title: 'Who\'s Coming',     description: 'See the staff members assigned to your service call before they arrive — first name and last initial only.', top: '24%', left: '40%' },
+      { title: 'Your selections',   description: 'Tasks you\'ve submitted are shown here with their time allotments — everything locked in and ready for your service team.', top: '35%', left: '2%' },
+      { title: 'Edit tasks',        description: 'Need to change your mind? Tap here to go back and adjust your task selection before the deadline.', top: '59%', left: '2%' },
     ],
   },
   {
     label: 'Select Tasks',
     render: () => <CustomerTaskPicker />,
     hotspots: [
-      { title: 'Time budget bar',  description: 'Your available time is shown as a budget — select tasks until it\'s filled.',           top: '22%', left: '12%' },
-      { title: 'Selected task',    description: 'Checked tasks are confirmed for your upcoming service and shown in green.',              top: '43%', left: '10%' },
-      { title: 'Unselected task',  description: 'Tap any task to add it to your selection — the time counter updates instantly.',        top: '55%', left: '10%' },
+      { title: 'Time budget bar',  description: 'Your available time is shown as a budget — select tasks until it\'s filled.',           top: '12%', left: '50%' },
+      { title: 'Selected task',    description: 'Checked tasks are confirmed for your upcoming service and shown in green.',              top: '18%', left: '78%' },
+      { title: 'Unselected task',  description: 'Tap any task to add it to your selection — the time counter updates instantly.',        top: '55%', left: '78%' },
       { title: 'Review button',    description: 'When your selection is ready, review the full summary before confirming.',              top: '86%', left: '30%' },
     ],
   },
@@ -464,9 +832,9 @@ const customerScreens: Screen[] = [
     label: 'Confirmed',
     render: () => <CustomerSuccess />,
     hotspots: [
-      { title: 'Confirmation',      description: 'The green checkmark confirms your selection was received by your service provider.',   top: '22%', left: '55%' },
-      { title: 'Locked in message', description: 'Your tasks are set — the team will arrive knowing exactly what needs to be done.',     top: '52%', left: '20%' },
-      { title: 'Back to Home',      description: 'Returns to your My Service screen, now showing the ✓ Submitted badge on your card.',  top: '74%', left: '20%' },
+      { title: 'Confirmation',      description: 'The green checkmark confirms your selection was received by your service provider.',   top: '28%', left: '55%' },
+      { title: 'Locked in message', description: 'Your tasks are set — the team will arrive knowing exactly what needs to be done.',     top: '55%', left: '2%' },
+      { title: 'Back to Home',      description: 'Returns to your My Service screen, now showing the ✓ Submitted badge on your card.',  top: '69%', left: '2%' },
     ],
   },
 ];
