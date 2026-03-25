@@ -41,7 +41,7 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "/og-image.jpg",
+        url: "/og-image.svg",
         width: 1200,
         height: 630,
         alt: "TaskRight service management app interface showing customer preferences and scheduling",
@@ -53,7 +53,7 @@ export const metadata: Metadata = {
     title: "TaskRight — Service Management App for Small Business",
     description:
       "Affordable service management software for growing cleaning and lawn care businesses.",
-    images: ["/og-image.jpg"],
+    images: ["/og-image.svg"],
   },
   robots: {
     index: true,
@@ -68,7 +68,7 @@ const organizationSchema = {
   "@type": "Organization",
   name: "TaskRight",
   url: "https://taskright.com",
-  logo: "https://taskright.com/logo.png",
+  logo: "https://taskright.com/logo.svg",
   description:
     "Affordable service management software for small cleaning, lawn care, and home service businesses.",
   foundingDate: "2024",

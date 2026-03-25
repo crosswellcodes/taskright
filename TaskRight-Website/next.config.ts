@@ -50,13 +50,13 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        source: "/og-image.jpg",
+        source: "/og-image.svg",
         headers: [
           { key: "Cache-Control", value: "public, max-age=31536000, immutable" }, // 1 year
         ],
       },
       {
-        source: "/logo.png",
+        source: "/logo.svg",
         headers: [
           { key: "Cache-Control", value: "public, max-age=31536000, immutable" }, // 1 year
         ],

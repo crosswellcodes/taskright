@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#2563eb"/>
+
+  <!-- Subtle grid texture overlay -->
+  <rect width="1200" height="630" fill="url(#grid)" opacity="0.06"/>
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" stroke-width="0.5"/>
+    </pattern>
+  </defs>
+
+  <!-- Right-side decorative app UI cards -->
+  <!-- Card 1 — background -->
+  <rect x="720" y="80" width="380" height="200" rx="16" fill="white" opacity="0.12"/>
+  <!-- Card 1 — header stripe -->
+  <rect x="720" y="80" width="380" height="44" rx="16" fill="white" opacity="0.1"/>
+  <rect x="720" y="108" width="380" height="16" fill="white" opacity="0.1"/>
+  <!-- Card 1 — row items -->
+  <rect x="748" y="144" width="200" height="10" rx="5" fill="white" opacity="0.3"/>
+  <rect x="748" y="164" width="240" height="10" rx="5" fill="white" opacity="0.2"/>
+  <rect x="748" y="184" width="160" height="10" rx="5" fill="white" opacity="0.2"/>
+  <!-- Card 1 — status pill -->
+  <rect x="1022" y="140" width="58" height="22" rx="11" fill="#10b981" opacity="0.9"/>
+  <rect x="1022" y="162" width="58" height="22" rx="11" fill="#f59e0b" opacity="0.9"/>
+  <rect x="1022" y="184" width="58" height="22" rx="11" fill="#10b981" opacity="0.9"/>
+
+  <!-- Card 2 — calendar-like block -->
+  <rect x="720" y="304" width="176" height="176" rx="16" fill="white" opacity="0.12"/>
+  <!-- Calendar header -->
+  <rect x="740" y="322" width="136" height="10" rx="5" fill="white" opacity="0.4"/>
+  <!-- Calendar days row 1 -->
+  <rect x="740" y="350" width="16" height="16" rx="4" fill="white" opacity="0.2"/>
+  <rect x="764" y="350" width="16" height="16" rx="4" fill="white" opacity="0.2"/>
+  <rect x="788" y="350" width="16" height="16" rx="4" fill="white" opacity="0.2"/>
+  <rect x="812" y="350" width="16" height="16" rx="4" fill="#fff" opacity="0.85"/>
+  <rect x="836" y="350" width="16" height="16" rx="4" fill="white" opacity="0.2"/>
+  <rect x="860" y="350" width="16" height="16" rx="4" fill="white" opacity="0.2"/>
+  <!-- Calendar days row 2 -->
+  <rect x="740" y="374" width="16" height="16" rx="4" fill="white" opacity="0.2"/>
+  <rect x="764" y="374" width="16" height="16" rx="4" fill="white" opacity="0.2"/>
+  <rect x="788" y="374" width="16" height="16" rx="4" fill="#10b981" opacity="0.8"/>
+  <rect x="812" y="374" width="16" height="16" rx="4" fill="white" opacity="0.2"/>
+  <rect x="836" y="374" width="16" height="16" rx="4" fill="white" opacity="0.2"/>
+  <rect x="860" y="374" width="16" height="16" rx="4" fill="#10b981" opacity="0.8"/>
+  <!-- Calendar days row 3 -->
+  <rect x="740" y="398" width="16" height="16" rx="4" fill="white" opacity="0.2"/>
+  <rect x="764" y="398" width="16" height="16" rx="4" fill="white" opacity="0.2"/>
+  <rect x="788" y="398" width="16" height="16" rx="4" fill="white" opacity="0.2"/>
+  <rect x="812" y="398" width="16" height="16" rx="4" fill="white" opacity="0.2"/>
+  <rect x="836" y="398" width="16" height="16" rx="4" fill="#2563eb" opacity="0.6"/>
+  <rect x="860" y="398" width="16" height="16" rx="4" fill="white" opacity="0.2"/>
+  <!-- Calendar days row 4 -->
+  <rect x="740" y="422" width="136" height="10" rx="5" fill="white" opacity="0.15"/>
+  <rect x="740" y="440" width="100" height="10" rx="5" fill="white" opacity="0.15"/>
+
+  <!-- Card 3 — task list -->
+  <rect x="916" y="304" width="184" height="176" rx="16" fill="white" opacity="0.12"/>
+  <rect x="936" y="322" width="100" height="10" rx="5" fill="white" opacity="0.4"/>
+  <!-- Task rows -->
+  <circle cx="952" cy="356" r="7" fill="white" opacity="0.3"/>
+  <rect x="968" y="351" width="112" height="9" rx="4" fill="white" opacity="0.25"/>
+  <circle cx="952" cy="380" r="7" fill="#10b981" opacity="0.85"/>
+  <rect x="968" y="375" width="90" height="9" rx="4" fill="white" opacity="0.25"/>
+  <circle cx="952" cy="404" r="7" fill="#10b981" opacity="0.85"/>
+  <rect x="968" y="399" width="104" height="9" rx="4" fill="white" opacity="0.25"/>
+  <circle cx="952" cy="428" r="7" fill="white" opacity="0.3"/>
+  <rect x="968" y="423" width="78" height="9" rx="4" fill="white" opacity="0.25"/>
+  <circle cx="952" cy="452" r="7" fill="white" opacity="0.3"/>
+  <rect x="968" y="447" width="96" height="9" rx="4" fill="white" opacity="0.25"/>
+
+  <!-- Left content: Wordmark + taglines -->
+  <!-- TR logomark -->
+  <rect x="80" y="80" width="72" height="72" rx="16" fill="white" opacity="0.2"/>
+  <text x="116" y="131" font-family="Georgia, serif" font-size="36" font-weight="700" fill="white" text-anchor="middle">TR</text>
+
+  <!-- TaskRight wordmark -->
+  <text x="80" y="226" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="68" font-weight="800" fill="white" letter-spacing="-1">TaskRight</text>
+
+  <!-- Tagline -->
+  <text x="80" y="285" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="26" font-weight="400" fill="white" opacity="0.85">Service management, simplified.</text>
+
+  <!-- Sub-tagline -->
+  <text x="80" y="336" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="20" font-weight="400" fill="white" opacity="0.65">Built for cleaning, lawn care &amp; home service businesses.</text>
+
+  <!-- Divider -->
+  <rect x="80" y="376" width="560" height="2" fill="white" opacity="0.2"/>
+
+  <!-- Trust signals row -->
+  <!-- Green dot + label 1 -->
+  <circle cx="92" cy="414" r="5" fill="#10b981"/>
+  <text x="106" y="419" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="17" fill="white" opacity="0.8">Free for early adopters</text>
+
+  <!-- Green dot + label 2 -->
+  <circle cx="308" cy="414" r="5" fill="#10b981"/>
+  <text x="322" y="419" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="17" fill="white" opacity="0.8">No credit card required</text>
+
+  <!-- Green dot + label 3 -->
+  <circle cx="92" cy="448" r="5" fill="#10b981"/>
+  <text x="106" y="453" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="17" fill="white" opacity="0.8">iOS app available now</text>
+
+  <!-- URL badge -->
+  <rect x="80" y="530" width="200" height="36" rx="18" fill="white" opacity="0.15"/>
+  <text x="180" y="553" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="15" font-weight="600" fill="white" opacity="0.9" text-anchor="middle">taskright.com</text>
+</svg>
