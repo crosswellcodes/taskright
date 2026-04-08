@@ -19,7 +19,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "taskright.com",
+        hostname: "taskrightpro.com",
       },
     ],
   },

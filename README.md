@@ -255,7 +255,7 @@ netlify deploy            # If using Netlify
 The website and mobile app both call the same backend API:
 
 - **Base URL (dev)**: `http://localhost:3000/api`
-- **Base URL (prod)**: `https://api.taskright.com/api`
+- **Base URL (prod)**: `https://api.taskrightpro.com/api`
 - **Auth Header**: `Authorization: Bearer <jwt_token>`
 
 See [`shared/API_REFERENCE.md`](./shared/API_REFERENCE.md) for all available endpoints.
@@ -353,7 +353,7 @@ npm run dev -- -p 3001
 ## 📧 Contact & Support
 
 For questions, issues, or feature requests:
-- **Email**: support@taskright.com
+- **Email**: support@taskrightpro.com
 - **GitHub Issues**: [Link to issues]
 - **Slack**: [Link to Slack workspace]
 

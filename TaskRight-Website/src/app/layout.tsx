@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,13 +14,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://taskright.com"),
+  metadataBase: new URL("https://taskrightpro.com"),
   // 53 chars — fits Google SERP display without truncation
   title: "TaskRight — Service Management App for Small Business",
   description:
     "TaskRight is the affordable customer communication tool for small cleaning and lawn care businesses. Capture preferences, send reminders, collect feedback. Apply for free beta access.",
   alternates: {
-    canonical: "https://taskright.com/",
+    canonical: "https://taskrightpro.com/",
   },
   // Keywords: Tier 1–3 from SEO Action Plan (Google ignores but documents target keywords)
   keywords: [
@@ -36,7 +37,7 @@ export const metadata: Metadata = {
     title: "TaskRight — Service Management App for Small Business",
     description:
       "Affordable service management software for growing cleaning and lawn care businesses. Manage customer preferences, send reminders, collect feedback.",
-    url: "https://taskright.com/",
+    url: "https://taskrightpro.com/",
     siteName: "TaskRight",
     type: "website",
     images: [
@@ -67,8 +68,8 @@ const organizationSchema = {
   "@context": "https://schema.org",
   "@type": "Organization",
   name: "TaskRight",
-  url: "https://taskright.com",
-  logo: "https://taskright.com/logo.svg",
+  url: "https://taskrightpro.com",
+  logo: "https://taskrightpro.com/logo.svg",
   description:
     "Affordable service management software for small cleaning, lawn care, and home service businesses.",
   foundingDate: "2024",
@@ -79,7 +80,7 @@ const organizationSchema = {
   contactPoint: {
     "@type": "ContactPoint",
     contactType: "customer support",
-    email: "hello@taskright.com",
+    email: "hello@taskrightpro.com",
   },
   sameAs: [],
 };
@@ -88,7 +89,7 @@ const localBusinessSchema = {
   "@context": "https://schema.org",
   "@type": "LocalBusiness",
   name: "TaskRight",
-  url: "https://taskright.com",
+  url: "https://taskrightpro.com",
   description:
     "Service management app built for small cleaning, lawn care, and home service businesses in the Midwest. Manage customer preferences, automate reminders, collect feedback.",
   priceRange: "$$",
@@ -168,12 +169,12 @@ const faqPageSchema = {
  *   "@type": "BlogPosting",
  *   headline: "Blog post title",
  *   description: "Meta description for the post",
- *   image: "https://taskright.com/blog/images/post-featured.jpg",
+ *   image: "https://taskrightpro.com/blog/images/post-featured.jpg",
  *   datePublished: "2026-04-01",
  *   dateModified: "2026-04-01",
  *   author: { "@type": "Person", name: "TaskRight Team" },
- *   publisher: { "@type": "Organization", name: "TaskRight", logo: "https://taskright.com/logo.png" },
- *   mainEntityOfPage: { "@type": "WebPage", "@id": "https://taskright.com/blog/post-slug/" },
+ *   publisher: { "@type": "Organization", name: "TaskRight", logo: "https://taskrightpro.com/logo.png" },
+ *   mainEntityOfPage: { "@type": "WebPage", "@id": "https://taskrightpro.com/blog/post-slug/" },
  * };
  */
 
@@ -182,7 +183,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const gaId = process.env.NEXT_PUBLIC_GA_ID;
   const gscVerification = process.env.NEXT_PUBLIC_GSC_VERIFICATION;
 
   return (
@@ -191,28 +191,6 @@ export default function RootLayout({
         {/* Google Search Console verification */}
         {gscVerification && (
           <meta name="google-site-verification" content={gscVerification} />
-        )}
-
-        {/* Google Analytics 4
-            Set NEXT_PUBLIC_GA_ID in .env.local (dev) and deployment env (prod)
-            Get your GA4 property ID at: https://analytics.google.com */}
-        {gaId && (
-          <>
-            <script
-              async
-              src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
-            />
-            <script
-              dangerouslySetInnerHTML={{
-                __html: `
-                  window.dataLayer = window.dataLayer || [];
-                  function gtag(){dataLayer.push(arguments);}
-                  gtag('js', new Date());
-                  gtag('config', '${gaId}', { page_path: window.location.pathname });
-                `,
-              }}
-            />
-          </>
         )}
 
         {/* JSON-LD Structured Data */}
@@ -233,6 +211,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         {children}
+        <Analytics />
       </body>
     </html>
   );

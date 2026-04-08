@@ -5,7 +5,7 @@ import Footer from '@/components/Footer';
 export const metadata: Metadata = {
   title: 'Privacy Policy',
   description: 'How TaskRight collects, uses, and protects your data. We will never sell your information.',
-  alternates: { canonical: 'https://taskright.com/privacy/' },
+  alternates: { canonical: 'https://taskrightpro.com/privacy/' },
   robots: { index: true, follow: true },
 };
 
@@ -39,8 +39,8 @@ export default function PrivacyPolicyPage() {
               </p>
               <p className="mt-4">
                 If you have questions at any time, contact us at{' '}
-                <a href="mailto:hello@taskright.com" className="text-brand hover:underline">
-                  hello@taskright.com
+                <a href="mailto:hello@taskrightpro.com" className="text-brand hover:underline">
+                  hello@taskrightpro.com
                 </a>.
               </p>
             </div>
@@ -134,7 +134,7 @@ export default function PrivacyPolicyPage() {
               </ul>
               <p className="mt-4">
                 To exercise any of these rights, contact us at{' '}
-                <a href="mailto:hello@taskright.com" className="text-brand hover:underline">hello@taskright.com</a>.
+                <a href="mailto:hello@taskrightpro.com" className="text-brand hover:underline">hello@taskrightpro.com</a>.
                 We will respond within 30 days.
               </p>
             </Section>
@@ -163,8 +163,8 @@ export default function PrivacyPolicyPage() {
               <div className="mt-4 bg-bg rounded-xl p-5 text-sm">
                 <p className="font-semibold text-text">TaskRight</p>
                 <p className="mt-1">
-                  <a href="mailto:hello@taskright.com" className="text-brand hover:underline">
-                    hello@taskright.com
+                  <a href="mailto:hello@taskrightpro.com" className="text-brand hover:underline">
+                    hello@taskrightpro.com
                   </a>
                 </p>
               </div>

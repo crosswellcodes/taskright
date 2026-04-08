@@ -57,7 +57,7 @@ export default function Footer() {
                 </a>
               </li>
               <li>
-                <a href="mailto:hello@taskright.com" className="text-white/50 hover:text-white/80 text-sm transition-colors">
+                <a href="mailto:hello@taskrightpro.com" className="text-white/50 hover:text-white/80 text-sm transition-colors">
                   Contact Us
                 </a>
               </li>

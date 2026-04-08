@@ -21,11 +21,11 @@ export async function generateMetadata(
   return {
     title: post.title,
     description: post.description,
-    alternates: { canonical: `https://taskright.com/blog/${post.slug}/` },
+    alternates: { canonical: `https://taskrightpro.com/blog/${post.slug}/` },
     openGraph: {
       title: post.title,
       description: post.description,
-      url: `https://taskright.com/blog/${post.slug}/`,
+      url: `https://taskrightpro.com/blog/${post.slug}/`,
       type: 'article',
       publishedTime: post.date,
     },

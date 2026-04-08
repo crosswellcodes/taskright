@@ -101,5 +101,5 @@
 
   <!-- URL badge -->
   <rect x="80" y="530" width="200" height="36" rx="18" fill="white" opacity="0.15"/>
-  <text x="180" y="553" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="15" font-weight="600" fill="white" opacity="0.9" text-anchor="middle">taskright.com</text>
+  <text x="180" y="553" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="15" font-weight="600" fill="white" opacity="0.9" text-anchor="middle">taskrightpro.com</text>
 </svg>

@@ -6,15 +6,15 @@ These items are fully wired in code but require a manual step, account creation,
 
 ## 🌐 Domain & Hosting
 
-- [ ] **Purchase domain** — `taskright.com` (or closest available)
-  - Recommended registrars: Namecheap, Cloudflare Registrar (no markup)
-  - Unlocks: Google Search Console, production GA4 data, real OG image sharing, live Mailchimp signups
+- [ ] **Purchase domain** — `taskrightpro.com` (or closest available)
+  - Registrar: Porkbun (porkbun.com) — free WHOIS privacy, ~$10-12/year
+  - Unlocks: Google Search Console, production GA4 data, real OG image sharing, live MailerLite signups
 
-- [ ] **Deploy website to hosting** — Vercel recommended (free tier works for Next.js)
+- [ ] **Deploy website to hosting** — Vercel (free tier works for Next.js)
   - Connect GitHub repo (`crosswellcodes/taskright`)
   - Set root directory to `TaskRight-Website/`
-  - Add environment variables (see below)
-  - Point domain DNS to Vercel after purchase
+  - Add environment variables (see each section below)
+  - Connect domain: add Vercel's nameservers in Porkbun DNS settings, or add A record + CNAME pointing to Vercel — Vercel's dashboard walks through this step by step after you add the domain
 
 ---
 
@@ -43,21 +43,29 @@ These items are fully wired in code but require a manual step, account creation,
   - Meta tag already wired in `src/app/layout.tsx` ✅
 
 - [ ] **Submit sitemap** after domain is verified
-  - URL to submit: `https://taskright.com/sitemap.xml`
+  - URL to submit: `https://taskrightpro.com/sitemap.xml`
   - Dynamic sitemap already built at `src/app/sitemap.ts` ✅
 
 ---
 
-## 📧 Mailchimp (Email Capture)
+## 📧 MailerLite (Email Capture)
 
-- [ ] **Create Mailchimp account** at mailchimp.com (free up to 500 contacts)
-- [ ] **Create audience** — name it "TaskRight Beta Applicants"
-- [ ] **Get API key** — Account → Extras → API Keys
-- [ ] **Wire EarlyAccessForm.tsx** to Mailchimp API
+- [ ] **Create MailerLite account** at app.mailerlite.com (free up to 1,000 subscribers, 12,000 emails/month)
+- [ ] **Create a Group** — name it "Beta Applicants"
+  - Groups → Add New Group → note the Group ID
+- [ ] **Get API key** — Integrations → API → Generate new token
+- [ ] **Add credentials to `TaskRight-Website/.env.local`**:
+  ```
+  MAILERLITE_API_KEY=<your_api_key>
+  MAILERLITE_GROUP_ID=<your_group_id>
+  ```
+  - Add same values to Vercel environment variables for production
+- [ ] **Wire EarlyAccessForm.tsx** to MailerLite API
   - Form fields already built: Name, Email, Business Type, State, Customer Count ✅
   - Currently form submissions are local-only (no backend call yet)
-  - Will need: API route in Next.js (`/api/subscribe`) + Mailchimp SDK call
-- [ ] **Set up welcome email sequence** in Mailchimp
+  - Will need: Next.js API route (`/api/subscribe`) that calls MailerLite server-side (keeps API key off client)
+- [ ] **Set up welcome automation** in MailerLite
+  - Automations → Create new → trigger: "Subscriber joins a group" → "Beta Applicants"
   - Email 1 (immediate): "We received your application" confirmation
   - Email 2 (day 3): What TaskRight does, what beta means
   - Email 3 (day 7): What to expect next, invite to follow along
@@ -94,5 +102,5 @@ These items are fully wired in code but require a manual step, account creation,
 ## 📝 Notes
 
 - **All code is complete** — nothing above blocks development or testing
-- **Order of operations when ready**: Domain → Hosting/Vercel deploy → GA4 ID → GSC verify → Mailchimp wire-up → Twilio
+- **Order of operations when ready**: Domain → Hosting/Vercel deploy → GA4 ID → GSC verify → MailerLite wire-up → Twilio
 - **Zero-cost testing**: Everything works locally without these steps — expenses only hit when going live

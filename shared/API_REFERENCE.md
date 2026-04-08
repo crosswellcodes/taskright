@@ -8,7 +8,7 @@ The TaskRight backend is a Node.js/Express API server with PostgreSQL 18 databas
 
 ### Base URL
 - **Development**: `http://localhost:3000/api`
-- **Production**: `https://api.taskright.com/api` (example)
+- **Production**: `https://api.taskrightpro.com/api` (example)
 
 ### Authentication
 - **Method**: JWT (JSON Web Tokens)

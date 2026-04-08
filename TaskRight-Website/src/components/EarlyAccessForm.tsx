@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { track } from '@vercel/analytics';
 
 const businessTypes = [
   { value: 'cleaning', label: 'House / Office Cleaning' },
@@ -47,9 +48,10 @@ export default function EarlyAccessForm() {
   const [customerCount, setCustomerCount] = useState('');
   const [wantsUpdates, setWantsUpdates] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) { setError('Please enter your name.'); return; }
     if (!email.includes('@')) { setError('Please enter a valid email address.'); return; }
@@ -57,22 +59,35 @@ export default function EarlyAccessForm() {
     if (!state) { setError('Please select your state.'); return; }
     if (!customerCount) { setError('Please select how many customers you serve.'); return; }
     setError('');
-    setSubmitted(true);
+    setLoading(true);
 
-    // GA4 conversion event — tracks beta applications with demographic properties
-    // Requires NEXT_PUBLIC_GA_ID to be set (see next.config.ts for setup instructions)
-    type GtagWindow = Window & { gtag?: (...args: unknown[]) => void };
-    if (typeof window !== 'undefined' && typeof (window as GtagWindow).gtag === 'function') {
-      (window as GtagWindow).gtag!('event', 'form_submission', {
-        form_name: 'early_access_signup',
-        business_type: businessType,
-        state,
-        customer_count: customerCount,
-        wants_updates: wantsUpdates,
+    try {
+      const res = await fetch('/api/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, businessType, state, customerCount, wantsUpdates }),
       });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Something went wrong. Please try again.');
+        return;
+      }
+    } catch {
+      setError('Something went wrong. Please try again.');
+      return;
+    } finally {
+      setLoading(false);
     }
 
-    // TODO: wire to backend or Mailchimp when integration is ready
+    setSubmitted(true);
+
+    // Vercel Analytics conversion event
+    track('beta_application', {
+      business_type: businessType,
+      state,
+      customer_count: customerCount,
+      wants_updates: wantsUpdates,
+    });
   }
 
   return (
@@ -202,10 +217,11 @@ export default function EarlyAccessForm() {
 
             <button
               type="submit"
+              disabled={loading}
               aria-label="Apply for free beta access"
-              className="w-full bg-white text-brand font-semibold px-6 py-4 rounded-lg hover:bg-white/90 transition-colors text-base"
+              className="w-full bg-white text-brand font-semibold px-6 py-4 rounded-lg hover:bg-white/90 transition-colors text-base disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              Apply for Free Beta Access
+              {loading ? 'Submitting…' : 'Apply for Free Beta Access'}
             </button>
 
             <p className="text-white/60 text-sm text-center leading-relaxed">

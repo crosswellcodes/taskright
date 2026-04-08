@@ -7,11 +7,11 @@ import { getAllPosts, formatDate } from '@/lib/blog';
 export const metadata: Metadata = {
   title: 'Blog — Service Business Tips & Tools',
   description: 'Practical guides for cleaning, lawn care, and home service business owners. Customer communication, retention strategies, and affordable software tips.',
-  alternates: { canonical: 'https://taskright.com/blog/' },
+  alternates: { canonical: 'https://taskrightpro.com/blog/' },
   openGraph: {
     title: 'TaskRight Blog — Service Business Tips & Tools',
     description: 'Practical guides for small service business owners on customer communication, retention, and management.',
-    url: 'https://taskright.com/blog/',
+    url: 'https://taskrightpro.com/blog/',
   },
 };
 

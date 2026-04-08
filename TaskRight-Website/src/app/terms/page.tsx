@@ -5,7 +5,7 @@ import Footer from '@/components/Footer';
 export const metadata: Metadata = {
   title: 'Terms of Service',
   description: 'The terms and conditions governing your use of TaskRight, including our beta program, service limitations, and acceptable use policy.',
-  alternates: { canonical: 'https://taskright.com/terms/' },
+  alternates: { canonical: 'https://taskrightpro.com/terms/' },
   robots: { index: true, follow: true },
 };
 
@@ -33,15 +33,15 @@ export default function TermsOfServicePage() {
             <div>
               <p>
                 These Terms of Service (&quot;Terms&quot;) govern your access to and use of TaskRight,
-                including our website at taskright.com, our iOS mobile application, and our beta program
+                including our website at taskrightpro.com, our iOS mobile application, and our beta program
                 (collectively, the &quot;Service&quot;). By creating an account or using the Service,
                 you agree to be bound by these Terms.
               </p>
               <p className="mt-4">
                 If you do not agree to these Terms, do not use the Service. If you have questions,
                 contact us at{' '}
-                <a href="mailto:hello@taskright.com" className="text-brand hover:underline">
-                  hello@taskright.com
+                <a href="mailto:hello@taskrightpro.com" className="text-brand hover:underline">
+                  hello@taskrightpro.com
                 </a>.
               </p>
             </div>
@@ -61,7 +61,7 @@ export default function TermsOfServicePage() {
             <Section title="2. Eligibility and Accounts">
               <ul className="list-disc pl-5 space-y-2">
                 <li>You must be at least 18 years old and legally capable of entering into a binding contract to use the Service.</li>
-                <li>You are responsible for maintaining the security of your account credentials. Notify us immediately at hello@taskright.com if you suspect unauthorized access.</li>
+                <li>You are responsible for maintaining the security of your account credentials. Notify us immediately at hello@taskrightpro.com if you suspect unauthorized access.</li>
                 <li>One business account per business entity. You may not create accounts on behalf of others without their express authorization.</li>
                 <li>We reserve the right to suspend or terminate accounts that violate these Terms.</li>
               </ul>
@@ -140,7 +140,21 @@ export default function TermsOfServicePage() {
               </p>
             </Section>
 
-            <Section title="8. Indemnification">
+            <Section title="8. Age Requirement">
+              <p>
+                TaskRight is a business management tool intended exclusively for adults. You must be
+                at least 18 years old to create an account or use the Service. We do not knowingly
+                collect information from anyone under 18. If we become aware that a user is under 18,
+                we will terminate their account and delete their data promptly. If you believe we have
+                inadvertently collected information from someone under 18, contact us at{' '}
+                <a href="mailto:hello@taskrightpro.com" className="text-brand hover:underline">
+                  hello@taskrightpro.com
+                </a>{' '}
+                and we will address it immediately.
+              </p>
+            </Section>
+
+            <Section title="9. Indemnification">
               <p>
                 You agree to defend, indemnify, and hold harmless TaskRight and its team members from
                 any claims, damages, liabilities, and expenses (including reasonable legal fees) arising
@@ -149,10 +163,10 @@ export default function TermsOfServicePage() {
               </p>
             </Section>
 
-            <Section title="9. Termination">
+            <Section title="10. Termination">
               <p>
                 Either party may terminate your account at any time. You may delete your account by
-                contacting us at hello@taskright.com. We may suspend or terminate your access if you
+                contacting us at hello@taskrightpro.com. We may suspend or terminate your access if you
                 violate these Terms, with or without prior notice depending on the severity of the
                 violation.
               </p>
@@ -163,7 +177,7 @@ export default function TermsOfServicePage() {
               </p>
             </Section>
 
-            <Section title="10. Changes to These Terms">
+            <Section title="11. Changes to These Terms">
               <p>
                 We may update these Terms from time to time. Material changes will be communicated to
                 active users via email or in-app notice at least 14 days before they take effect.
@@ -172,7 +186,7 @@ export default function TermsOfServicePage() {
               </p>
             </Section>
 
-            <Section title="11. Governing Law">
+            <Section title="12. Governing Law">
               <p>
                 These Terms are governed by the laws of the United States. Any disputes arising from
                 these Terms or your use of the Service shall be resolved through good-faith negotiation
@@ -181,15 +195,15 @@ export default function TermsOfServicePage() {
               </p>
             </Section>
 
-            <Section title="12. Contact">
+            <Section title="13. Contact">
               <p>
                 Questions about these Terms should be directed to:
               </p>
               <div className="mt-4 bg-bg rounded-xl p-5 text-sm">
                 <p className="font-semibold text-text">TaskRight</p>
                 <p className="mt-1">
-                  <a href="mailto:hello@taskright.com" className="text-brand hover:underline">
-                    hello@taskright.com
+                  <a href="mailto:hello@taskrightpro.com" className="text-brand hover:underline">
+                    hello@taskrightpro.com
                   </a>
                 </p>
               </div>
