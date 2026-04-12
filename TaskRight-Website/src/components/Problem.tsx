@@ -15,7 +15,7 @@ const problems = [
     icon: "💸",
     title: "Premium Tools Don't Fit Your Budget",
     description:
-      "Enterprise platforms charge $100+/month for features you don't need yet. TaskRight delivers the essentials at a fraction of the cost — so you can grow without breaking the bank.",
+      "Enterprise platforms have features you don't need yet, but it's included in the price you pay. TaskRight delivers the essentials without charging you for complexity that doesn't apply to your business.",
   },
   {
     icon: "📱",

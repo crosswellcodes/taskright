@@ -25,7 +25,7 @@ const features = [
     ariaLabel: "Money icon",
     title: "Affordable Pricing",
     description:
-      "No $100+/month enterprise fees. TaskRight is built for businesses with 10–75 customers, not 500 — and priced to match.",
+      "No enterprise price tag for features you don't need. TaskRight is built for businesses with 10–75 customers, not 500 — and priced to match the size of your operation.",
   },
 ];
 
