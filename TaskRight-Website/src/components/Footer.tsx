@@ -19,21 +19,6 @@ export default function Footer() {
                   Blog
                 </a>
               </li>
-              <li>
-                <a href="/blog/why-service-businesses-struggle-customer-communication/" className="text-white/50 hover:text-white/80 text-sm transition-colors">
-                  Customer Communication Tips
-                </a>
-              </li>
-              <li>
-                <a href="/blog/how-to-stop-losing-customers-service-business/" className="text-white/50 hover:text-white/80 text-sm transition-colors">
-                  Reduce Customer Churn
-                </a>
-              </li>
-              <li>
-                <a href="/blog/why-enterprise-service-software-isnt-built-for-you/" className="text-white/50 hover:text-white/80 text-sm transition-colors">
-                  Why Enterprise Software Isn&apos;t For You
-                </a>
-              </li>
             </ul>
           </div>
 

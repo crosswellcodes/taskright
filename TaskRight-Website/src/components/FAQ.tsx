@@ -2,12 +2,12 @@ const faqs = [
   {
     question: "How much does TaskRight cost?",
     answer:
-      "Early access members get free forever access. Once we launch publicly, pricing will start at $29–99/month depending on business size. Beta participants lock in their free tier — no expiration, no credit card required.",
+      "Early access members get free forever access. Once we launch publicly, pricing will be based on the size of your operation — we're not going to charge a 10-customer business the same as a 75-customer one. If TaskRight isn't the right fit for your situation, we'll tell you that upfront rather than waste your time. Beta participants lock in their free tier — no expiration, no credit card required.",
   },
   {
     question: "Is TaskRight better than enterprise service tools?",
     answer:
-      "Enterprise service tools are built for large operations — complex scheduling, routing, invoicing, and team management at $99–$199/month. TaskRight is built for something different: helping small service businesses manage customer communication and retention without the enterprise price tag or complexity. If you have 10–75 customers and need smarter communication, TaskRight is designed for you.",
+      "Enterprise service tools are built for large operations — complex scheduling, routing, invoicing, and team management at enterprise-level price points. TaskRight is built for something different: helping small service businesses manage customer communication and retention without the enterprise price tag or complexity. If you have 10–75 customers and need smarter communication, TaskRight is designed for you.",
   },
   {
     question: "What about data security?",

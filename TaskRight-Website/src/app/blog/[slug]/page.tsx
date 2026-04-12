@@ -39,7 +39,7 @@ export default async function BlogPostPage(
   const { slug } = await params;
   const post = getPostBySlug(slug);
 
-  if (!post) notFound();
+  if (!post || !post.published) notFound();
 
   // All other published posts for the "Related" section (exclude current)
   const related = getAllPosts(true).filter(p => p.slug !== post.slug).slice(0, 2);
@@ -82,13 +82,12 @@ export default async function BlogPostPage(
             {/* Article body */}
             <article className="lg:col-span-2">
               <div className="bg-white rounded-2xl border border-border p-8 prose prose-blue max-w-none
-                              prose-headings:text-text prose-p:text-text-muted prose-p:leading-relaxed
+                              prose-headings:text-text prose-headings:font-bold prose-headings:mt-10 prose-headings:mb-3
+                              prose-h2:text-xl prose-h2:border-b prose-h2:border-border prose-h2:pb-2
+                              prose-p:text-text-muted prose-p:leading-relaxed
                               prose-a:text-brand prose-a:no-underline hover:prose-a:underline
                               prose-strong:text-text prose-li:text-text-muted">
-                {/* Post content — replace post.content with MDX/components when real post lands */}
-                {post.content.split('\n').map((line, i) => (
-                  <p key={i}>{line}</p>
-                ))}
+                <div dangerouslySetInnerHTML={{ __html: post.content }} />
               </div>
 
               {/* Inline CTA */}
