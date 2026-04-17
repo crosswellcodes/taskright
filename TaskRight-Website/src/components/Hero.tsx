@@ -21,7 +21,7 @@ export default function Hero() {
             Apply for Free Beta Access
           </a>
           <a
-            href="#how-it-works"
+            href="#app-showcase"
             className="text-brand font-semibold px-8 py-3.5 rounded-lg border border-brand/30 hover:border-brand transition-colors text-base"
           >
             See how it works →

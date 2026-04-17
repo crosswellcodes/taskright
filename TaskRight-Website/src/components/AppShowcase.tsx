@@ -875,7 +875,7 @@ export default function AppShowcase() {
   }
 
   return (
-    <section className="bg-bg py-20 px-6">
+    <section id="app-showcase" className="bg-bg py-20 px-6">
       <div className="max-w-6xl mx-auto">
 
         {/* Heading */}

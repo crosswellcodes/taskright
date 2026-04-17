@@ -15,10 +15,10 @@ export default function Home() {
       <Navbar />
       <main>
         <Hero />
+        <AppShowcase />
         <Problem />
         <Features />
         <HowItWorks />
-        <AppShowcase />
         <FounderStory />
         <FAQ />
         <EarlyAccessForm />
