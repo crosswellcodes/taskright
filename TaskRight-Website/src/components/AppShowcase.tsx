@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 type Hotspot = {
   title: string;
@@ -21,6 +21,13 @@ type Screen = {
 function BusinessDashboard({ onViewChange }: { onViewChange?: (v: boolean) => void }) {
   const [calView, setCalView] = useState(false);
   function toggle(v: boolean) { setCalView(v); onViewChange?.(v); }
+
+  useEffect(() => {
+    const t1 = setTimeout(() => { setCalView(true);  onViewChange?.(true);  }, 1500);
+    const t2 = setTimeout(() => { setCalView(false); onViewChange?.(false); }, 3200);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const days = [
     { date: 'Mon, Mar 24', cycle: 'Weekly Clean', total: 4, submitted: 2, pending: 2 },
@@ -59,7 +66,7 @@ function BusinessDashboard({ onViewChange }: { onViewChange?: (v: boolean) => vo
       </div>
 
       {/* List / Calendar toggle */}
-      <div className="flex gap-1.5 px-3 py-2">
+      <div className="flex gap-1.5 px-3 pt-2 pb-0.5">
         <button
           onClick={() => toggle(false)}
           className={`text-[10px] font-bold px-3 py-1 rounded-full border transition-all ${
@@ -73,6 +80,8 @@ function BusinessDashboard({ onViewChange }: { onViewChange?: (v: boolean) => vo
           }`}
         >Calendar</button>
       </div>
+
+      <p className="text-[9px] text-[#2563eb]/60 text-center pb-1 italic font-medium tracking-wide">↑ Interactive — try the toggle</p>
 
       {calView ? (
         /* ── Calendar view ── */
@@ -177,8 +186,17 @@ function BusinessDashboard({ onViewChange }: { onViewChange?: (v: boolean) => vo
   );
 }
 
-function BusinessCustomer() {
+function BusinessCustomer({ onViewChange }: { onViewChange?: (v: boolean) => void }) {
   const [showList, setShowList] = useState(false);
+
+  function setList(v: boolean) { setShowList(v); onViewChange?.(v); }
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setList(true),  1500);
+    const t2 = setTimeout(() => setList(false), 3200);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const customers = [
     { name: 'Nancy Fancy',       phone: '(555) 391-2847', cycles: 1 },
@@ -198,8 +216,9 @@ function BusinessCustomer() {
     return (
       <div className="flex flex-col h-full bg-[#f5f5f5]">
         {/* Nav bar */}
-        <div className="bg-white border-b border-gray-100 px-3 py-2 flex items-center justify-center shrink-0">
+        <div className="bg-white border-b border-gray-100 px-3 pt-2 pb-1 flex flex-col items-center shrink-0">
           <p className="text-xs font-bold text-[#1a1a1a]">Customers</p>
+          <p className="text-[9px] text-[#2563eb]/60 text-center pt-1 italic font-medium tracking-wide">↓ Interactive — tap a customer to view their profile</p>
         </div>
 
         {/* Customer list */}
@@ -207,7 +226,7 @@ function BusinessCustomer() {
           {customers.map((c) => (
             <button
               key={c.name}
-              onClick={() => setShowList(false)}
+              onClick={() => setList(false)}
               className="w-full bg-white rounded-xl px-3 py-2.5 border border-gray-100 flex items-center justify-between text-left active:opacity-70 transition-opacity"
             >
               <div>
@@ -234,19 +253,20 @@ function BusinessCustomer() {
   return (
     <div className="flex flex-col h-full">
       {/* Nav bar */}
-      <div className="bg-white border-b border-gray-100 px-3 py-2 flex items-center shrink-0">
+      <div className="bg-white border-b border-gray-100 px-3 pt-2 pb-0.5 flex flex-col shrink-0">
         <button
-          onClick={() => setShowList(true)}
-          className="flex items-center gap-1 text-[#2563eb] active:opacity-60 transition-opacity"
+          onClick={() => setList(true)}
+          className="flex items-center gap-1 text-[#2563eb] active:opacity-60 transition-opacity self-start"
         >
           <span className="text-sm font-light leading-none">‹</span>
           <span className="text-[10px] font-semibold">Customers</span>
         </button>
+        <p className="text-[9px] text-[#2563eb]/60 text-center pb-1 italic font-medium tracking-wide">↑ Interactive — tap to browse your customers</p>
       </div>
 
       {/* Blue header */}
-      <div className="bg-[#2563eb] px-4 pt-4 pb-4">
-        <div className="flex items-start justify-between">
+      <div className="bg-[#2563eb] px-4 pt-3 pb-3 shrink-0">
+        <div className="flex items-start justify-between mb-2">
           <div>
             <p className="text-sm font-bold text-white leading-tight">Nancy Fancy</p>
             <p className="text-[10px] text-white/70 mt-0.5">(555) 391-2847</p>
@@ -255,43 +275,67 @@ function BusinessCustomer() {
             Details
           </span>
         </div>
+        {/* Address / Get Directions */}
+        <div className="bg-white/15 rounded-lg px-3 py-2">
+          <p className="text-[9px] text-white/70 mb-0.5">214 Elm St, Chicago, IL</p>
+          <p className="text-[9px] font-bold text-white">Get Directions →</p>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto bg-[#f5f5f5] px-3 pt-3 space-y-3 pb-3">
+      <div className="flex-1 overflow-y-auto bg-[#f5f5f5] px-3 pt-2.5 space-y-2 pb-3">
+        {/* Customer Notes */}
+        <div className="flex bg-[#fffbeb] rounded-xl border border-gray-100 overflow-hidden">
+          <div className="w-1 bg-[#f59e0b] shrink-0" />
+          <div className="flex-1 px-2.5 py-2">
+            <p className="text-[8px] font-bold text-[#b45309] uppercase tracking-wider mb-1">Customer Notes</p>
+            <p className="text-[9px] text-[#1a1a1a] leading-relaxed">Prefers eco-friendly products. Has a cat — keep the front door closed.</p>
+          </div>
+        </div>
+
         {/* Assigned Cycles */}
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-          <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wide px-3 pt-2 pb-1.5 border-b border-gray-100">
+          <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wider px-3 pt-2 pb-1.5 border-b border-gray-100">
             Assigned Cycles
           </p>
-          <div className="flex items-center justify-between px-3 py-2 border-b border-[#f3f4f6]">
+          <div className="flex items-center justify-between px-3 py-1.5 border-b border-[#f3f4f6]">
             <span className="text-[10px] font-semibold text-[#1a1a1a]">Weekly Clean</span>
             <span className="text-[10px] text-gray-400">2.5h / visit</span>
           </div>
-          <div className="px-3 py-2">
-            <div className="text-[9px] font-semibold text-[#2563eb] border border-[#2563eb] rounded-lg px-2 py-1.5 text-center">
+          <div className="px-3 py-1.5">
+            <div className="text-[9px] font-semibold text-[#2563eb] border border-[#2563eb] rounded-lg px-2 py-1 text-center">
               + Assign Cycle
             </div>
           </div>
         </div>
 
+        {/* Recent Feedback */}
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wider px-3 pt-2 pb-1.5 border-b border-gray-100">
+            Recent Feedback
+          </p>
+          <div className="px-3 py-2">
+            <p className="text-[9px] text-gray-400 mb-0.5">Mon, Mar 17</p>
+            <p className="text-[9px] text-[#1a1a1a] leading-relaxed mb-1">"Everything looked great — loved the attention to detail."</p>
+            <p className="text-[9px] font-semibold text-[#2563eb]">View full feedback →</p>
+          </div>
+        </div>
+
         {/* Upcoming Services */}
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-          <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wide px-3 pt-2 pb-1.5 border-b border-gray-100">
+          <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wider px-3 pt-2 pb-1.5 border-b border-gray-100">
             Upcoming Services
           </p>
           {upcomingServices.map((s, i) => (
             <div
               key={s.date}
-              className={`flex items-center justify-between px-3 py-2 ${i < upcomingServices.length - 1 ? 'border-b border-[#f3f4f6]' : ''}`}
+              className={`flex items-center justify-between px-3 py-1.5 ${i < upcomingServices.length - 1 ? 'border-b border-[#f3f4f6]' : ''}`}
             >
               <div className="min-w-0">
                 <p className="text-[10px] font-semibold text-[#1a1a1a]">{s.date}</p>
                 <p className="text-[9px] text-gray-400">{s.cycle}</p>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
-                <span className="text-[9px] font-bold text-[#1d4ed8] bg-[#dbeafe] px-1.5 py-0.5 rounded-full">
-                  Open
-                </span>
+                <span className="text-[9px] font-bold text-[#1d4ed8] bg-[#dbeafe] px-1.5 py-0.5 rounded-full">Open</span>
                 <span className="text-[11px] text-[#c7d2fe] font-light">›</span>
               </div>
             </div>
@@ -299,7 +343,7 @@ function BusinessCustomer() {
         </div>
 
         {/* Mark Service Complete */}
-        <div className="bg-[#10b981] rounded-xl px-4 py-2.5 text-center">
+        <div className="bg-[#10b981] rounded-xl px-4 py-2 text-center">
           <p className="text-white text-[10px] font-semibold">Mark Service Complete</p>
         </div>
       </div>
@@ -411,6 +455,12 @@ function BusinessServiceCycle() {
 function BusinessTeam() {
   const [tab, setTab] = useState<'members' | 'groups'>('members');
 
+  useEffect(() => {
+    const t1 = setTimeout(() => setTab('groups'),  1500);
+    const t2 = setTimeout(() => setTab('members'), 3200);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+
   const members = [
     { name: 'Sarah Johnson', initials: 'SJ', phone: '(555) 201-4832', hours: 20, groups: 'Team A' },
     { name: 'Mike Torres',   initials: 'MT', phone: '(555) 384-9021', hours: 15, groups: 'Team A' },
@@ -424,7 +474,7 @@ function BusinessTeam() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-4 pt-2 pb-3 bg-white border-b border-gray-100">
+      <div className="px-4 pt-2 pb-1 bg-white border-b border-gray-100">
         <p className="text-xs text-gray-400 mb-0.5">My Team</p>
         <div className="flex gap-3 mt-1">
           <button
@@ -436,6 +486,7 @@ function BusinessTeam() {
             className={`text-xs font-bold pb-0.5 border-b-2 transition-colors ${tab === 'groups' ? 'text-[#2563eb] border-[#2563eb]' : 'text-gray-400 border-transparent'}`}
           >Groups</button>
         </div>
+        <p className="text-[9px] text-[#2563eb]/60 text-center py-1 italic font-medium tracking-wide">↑ Interactive — try the Members / Groups tabs</p>
       </div>
       <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
         {tab === 'members' ? (
@@ -480,8 +531,17 @@ function BusinessTeam() {
 
 // ─── Customer screen mocks ────────────────────────────────────────────────────
 
-function CustomerMyService() {
+function CustomerMyService({ onViewChange }: { onViewChange?: (v: boolean) => void }) {
   const [showList, setShowList] = useState(false);
+
+  function setList(v: boolean) { setShowList(v); onViewChange?.(v); }
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setList(true),  1500);
+    const t2 = setTimeout(() => setList(false), 3200);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const upcomingServices = [
     { date: 'Mon, Mar 24', label: 'Next', hours: 3, submitted: true,  tasks: 2 },
@@ -495,7 +555,7 @@ function CustomerMyService() {
       <div className="flex flex-col h-full bg-[#f5f5f5]">
         {/* Header */}
         <div className="px-4 pt-2 pb-2 bg-white border-b border-gray-100 shrink-0 flex items-center gap-2">
-          <button onClick={() => setShowList(false)} className="text-[#2563eb] text-xs font-semibold">‹ Back</button>
+          <button onClick={() => setList(false)} className="text-[#2563eb] text-xs font-semibold">‹ Back</button>
           <p className="text-sm font-bold text-[#1a1a1a]">Upcoming Services</p>
         </div>
         {/* List */}
@@ -567,11 +627,12 @@ function CustomerMyService() {
         </div>
 
         {/* List View button */}
-        <div className="mx-3 mb-2">
-          <button onClick={() => setShowList(true)} className="w-full border-2 border-[#2563eb] rounded-xl px-4 py-2 text-center">
+        <div className="mx-3 mb-1">
+          <button onClick={() => setList(true)} className="w-full border-2 border-[#2563eb] rounded-xl px-4 py-2 text-center">
             <p className="text-[#2563eb] text-[11px] font-semibold">List View of Upcoming Services</p>
           </button>
         </div>
+        <p className="text-[9px] text-[#2563eb]/60 text-center pb-1 italic font-medium tracking-wide">↑ Interactive — try the list view</p>
 
         {/* Inline Calendar */}
         <div className="mx-3 mb-2 bg-white rounded-2xl p-3 border border-gray-100">
@@ -742,6 +803,198 @@ function CustomerSuccess() {
   );
 }
 
+function CustomerHistory() {
+  const pastServices = [
+    { date: 'Mon, Mar 17', cycle: 'Weekly Clean', tasks: 3, ref: 28, rated: true },
+    { date: 'Mon, Mar 10', cycle: 'Weekly Clean', tasks: 2, ref: 21, rated: true },
+    { date: 'Mon, Mar 3',  cycle: 'Weekly Clean', tasks: 4, ref: 14, rated: false },
+  ];
+  return (
+    <div className="flex flex-col h-full bg-[#f5f5f5]">
+      <div className="px-4 pt-2 pb-2 bg-white border-b border-gray-100 shrink-0">
+        <p className="text-sm font-bold text-[#1a1a1a]">Service History</p>
+      </div>
+      <div className="flex-1 overflow-y-auto px-3 pt-3 space-y-2 pb-4">
+        {pastServices.map((s) => (
+          <div key={s.ref} className="bg-white rounded-xl px-3 py-2.5 border border-gray-100">
+            <div className="flex items-start justify-between mb-1">
+              <div>
+                <p className="text-[10px] font-bold text-[#1a1a1a]">{s.date}</p>
+                <p className="text-[9px] text-gray-400">{s.cycle}</p>
+              </div>
+              {s.rated
+                ? <span className="text-[9px] font-bold text-[#065f46] bg-[#d1fae5] px-1.5 py-0.5 rounded-full shrink-0">★ Rated</span>
+                : <span className="text-[9px] font-bold text-[#2563eb] bg-[#eff6ff] px-1.5 py-0.5 rounded-full shrink-0">Rate</span>
+              }
+            </div>
+            <div className="flex items-center justify-between mt-1">
+              <p className="text-[9px] text-gray-400">{s.tasks} tasks completed</p>
+              <p className="text-[9px] text-gray-300">Ref #{s.ref}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CustomerFeedback() {
+  const [rating, setRating] = useState(4);
+  return (
+    <div className="flex flex-col h-full bg-[#f5f5f5]">
+      <div className="bg-white border-b border-gray-100 px-3 py-2 flex items-center shrink-0">
+        <button className="flex items-center gap-1 text-[#2563eb]">
+          <span className="text-sm font-light leading-none">‹</span>
+          <span className="text-[10px] font-semibold">History</span>
+        </button>
+      </div>
+      <div className="bg-[#2563eb] px-4 pt-3 pb-3 shrink-0">
+        <p className="text-[10px] text-white/70 mb-0.5">Mon, Mar 17</p>
+        <p className="text-sm font-bold text-white">ABC Cleaning Co.</p>
+        <p className="text-[10px] text-white/80 mt-0.5">Weekly Clean · 3 tasks</p>
+      </div>
+      <div className="flex-1 overflow-y-auto px-3 pt-3 space-y-2 pb-3">
+        <div className="bg-white rounded-xl px-3 py-3 border border-gray-100">
+          <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wide mb-2">How was your service?</p>
+          <div className="flex gap-2 justify-center mb-1">
+            {[1,2,3,4,5].map((star) => (
+              <button
+                key={star}
+                onClick={() => setRating(star)}
+                className="text-lg leading-none transition-transform active:scale-90"
+              >
+                <span style={{ color: star <= rating ? '#f59e0b' : '#d1d5db' }}>★</span>
+              </button>
+            ))}
+          </div>
+          <p className="text-center text-[9px] text-gray-400">
+            {rating === 5 ? 'Excellent!' : rating === 4 ? 'Great' : rating === 3 ? 'Good' : 'Needs work'}
+          </p>
+        </div>
+        <div className="bg-white rounded-xl px-3 py-3 border border-gray-100">
+          <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">Comments (optional)</p>
+          <div className="h-12 bg-[#f5f5f5] rounded-lg border border-gray-100 px-2 py-1.5 flex items-start">
+            <p className="text-[9px] text-gray-300">Add any notes for your service provider…</p>
+          </div>
+        </div>
+        <div className="bg-[#2563eb] rounded-xl px-4 py-2.5 text-center">
+          <p className="text-white text-[10px] font-semibold">Submit Feedback</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TeamMemberMyJobs() {
+  const jobs = [
+    { id: 1, customer: 'Nancy Fancy',       address: '214 Elm St, Chicago, IL',   date: 'Mon, Mar 24', time: '9:00 AM',  tasks: 4 },
+    { id: 2, customer: 'Robert Adams',      address: '87 Oak Ave, Evanston, IL',  date: 'Mon, Mar 24', time: '11:30 AM', tasks: 3 },
+    { id: 3, customer: 'Jennifer Martinez', address: '533 Maple Dr, Chicago, IL', date: 'Thu, Mar 28', time: '10:00 AM', tasks: 5 },
+  ];
+  return (
+    <div className="flex flex-col h-full bg-[#f5f5f5]">
+      <div className="px-4 pt-2 pb-2 bg-white border-b border-gray-100 shrink-0">
+        <p className="text-sm font-bold text-[#1a1a1a]">My Jobs</p>
+        <p className="text-xs text-gray-400">3 upcoming</p>
+      </div>
+      <div className="flex-1 overflow-y-auto px-3 pt-3 space-y-2 pb-4">
+        {jobs.map((j) => (
+          <div key={j.id} className="bg-white rounded-xl px-3 py-2.5 border border-gray-100 flex items-start justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-bold text-[#1a1a1a]">{j.date} · {j.time}</p>
+              <p className="text-[11px] font-semibold text-[#1a1a1a] mt-0.5">{j.customer}</p>
+              <p className="text-[9px] text-gray-400 mt-0.5 truncate">{j.address}</p>
+            </div>
+            <div className="flex flex-col items-end gap-1 shrink-0 ml-2">
+              <span className="text-[9px] font-bold text-[#1d4ed8] bg-[#dbeafe] px-1.5 py-0.5 rounded-full">{j.tasks} tasks</span>
+              <span className="text-[11px] text-gray-300 font-light">›</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TeamMemberJobDetail() {
+  const [checked, setChecked] = useState([true, false, false, false]);
+  const tasks = [
+    { name: 'Vacuum all rooms',   mins: 30 },
+    { name: 'Bathroom cleaning',  mins: 45 },
+    { name: 'Kitchen deep clean', mins: 60 },
+    { name: 'Dusting surfaces',   mins: 20 },
+  ];
+  const doneCount = checked.filter(Boolean).length;
+  return (
+    <div className="flex flex-col h-full">
+      {/* Blue header */}
+      <div className="bg-[#2563eb] px-4 pt-3 pb-4 shrink-0">
+        <button className="flex items-center gap-1 text-[#bfdbfe] mb-2.5">
+          <span className="text-sm font-light leading-none">‹</span>
+          <span className="text-[10px] font-medium">My Jobs</span>
+        </button>
+        <p className="text-sm font-extrabold text-white leading-tight mb-0.5">Nancy Fancy</p>
+        <p className="text-[10px] text-[#bfdbfe] mb-0.5">Weekly Clean</p>
+        <p className="text-[10px] text-[#dbeafe] font-medium mb-2">Monday, March 24, 2026</p>
+        <span className="text-[9px] font-bold text-white bg-white/20 px-2.5 py-0.5 rounded-full">Open</span>
+      </div>
+
+      <div className="flex-1 overflow-y-auto bg-[#f5f5f5] px-3 pt-2.5 space-y-2 pb-3">
+        {/* Address card */}
+        <div className="bg-white rounded-xl px-3 py-2 border border-gray-100 flex items-center justify-between">
+          <div className="flex-1 min-w-0 mr-2">
+            <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Address</p>
+            <p className="text-[10px] font-medium text-[#1a1a1a]">214 Elm St, Chicago, IL</p>
+          </div>
+          <div className="bg-[#2563eb] rounded-lg px-2 py-1 shrink-0">
+            <p className="text-white text-[9px] font-bold">Get Directions</p>
+          </div>
+        </div>
+
+        {/* Customer notes */}
+        <div className="flex bg-[#fffbeb] rounded-xl border border-gray-100 overflow-hidden">
+          <div className="w-1 bg-[#f59e0b] shrink-0" />
+          <div className="flex-1 px-2.5 py-2">
+            <p className="text-[8px] font-bold text-[#b45309] uppercase tracking-wider mb-1">Customer Notes</p>
+            <p className="text-[9px] text-[#1a1a1a] leading-relaxed">Use the side entrance. The dog is friendly.</p>
+          </div>
+        </div>
+
+        {/* Tasks */}
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wider px-3 pt-2 pb-1.5 border-b border-gray-100">
+            Tasks ({doneCount}/{tasks.length})
+          </p>
+          {tasks.map((t, i) => (
+            <button
+              key={t.name}
+              onClick={() => setChecked(c => { const n = [...c]; n[i] = !n[i]; return n; })}
+              className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-left ${i < tasks.length - 1 ? 'border-b border-[#f3f4f6]' : ''}`}
+            >
+              <div className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center ${checked[i] ? 'bg-[#10b981] border-[#10b981]' : 'border-gray-300'}`}>
+                {checked[i] && <span className="text-white text-[8px] font-bold">✓</span>}
+              </div>
+              <p className={`text-[10px] flex-1 ${checked[i] ? 'line-through text-gray-400' : 'text-[#1a1a1a]'}`}>{t.name}</p>
+              <p className="text-[9px] text-gray-400">{t.mins}m</p>
+            </button>
+          ))}
+        </div>
+
+        {/* Completion notes + Mark Complete */}
+        <div className="bg-white rounded-xl px-3 py-2 border border-gray-100">
+          <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Completion Notes (Optional)</p>
+          <div className="h-7 bg-[#fafafa] rounded-lg border border-gray-200 px-2 py-1 mb-2 flex items-center">
+            <p className="text-[9px] text-gray-300">Gate code, access notes…</p>
+          </div>
+          <div className="bg-[#10b981] rounded-xl py-2 text-center">
+            <p className="text-white text-[10px] font-bold">Mark Service Complete</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Screen definitions ───────────────────────────────────────────────────────
 
 const businessScreens: Screen[] = [
@@ -770,11 +1023,14 @@ const businessScreens: Screen[] = [
   },
   {
     label: 'Customer',
-    render: () => <BusinessCustomer />,
+    render: (onViewChange) => <BusinessCustomer onViewChange={onViewChange} />,
+    calHotspots: [],
     hotspots: [
-      { title: '‹ Customers',             description: 'The back button returns to your full customer list — keeping the customer detail screen one tap deep from anywhere in the Customers tab.', top: '5%',  left: '26%' },
-      { title: 'Assigned cycles',        description: 'Every service cycle assigned to this customer is listed with its total hours per visit. Use "+ Assign Cycle" to add a new recurring schedule at any time.', top: '38%', left: '2%' },
-      { title: 'Upcoming service rows',  description: 'Each upcoming service date is tappable — tap any row to open the Service Call detail view showing date, cycle, submission deadline, and a Change Date option for rescheduling that single visit without affecting the rest of the series.', top: '65%', left: '2%' },
+      { title: 'Get Directions',         description: 'The customer\'s address is stored on their profile and tappable right from the header — opens Maps so your team can navigate without copying anything out of a text.', top: '19%', left: '2%' },
+      { title: 'Customer Notes',         description: 'Any notes you\'ve added to the customer profile are shown here — preferences, access instructions, anything the team needs to know before arriving.', top: '30%', left: '2%' },
+      { title: 'Assigned Cycles',        description: 'Every service cycle assigned to this customer is listed with its hours per visit. Add or adjust cycles at any time — changes take effect on the next scheduled service.', top: '53%', left: '2%' },
+      { title: 'Recent Feedback',        description: 'The latest feedback from this customer surfaces right on their profile. Tap to read the full response — so you always know where you stand before their next visit.', top: '65%', left: '2%' },
+      { title: 'Upcoming service rows',  description: 'Each upcoming service date is tappable — opens the Service Call detail view with the submission status, assignment, deadline, and a reschedule option for that single visit.', top: '83%', left: '2%' },
     ],
   },
   {
@@ -800,12 +1056,13 @@ const businessScreens: Screen[] = [
 const customerScreens: Screen[] = [
   {
     label: 'My Service',
-    render: () => <CustomerMyService />,
+    render: (onViewChange) => <CustomerMyService onViewChange={onViewChange} />,
+    calHotspots: [],
     hotspots: [
       { title: 'Next Service card',       description: 'Tap the blue card to see your selected tasks or the full task list for the service.', top: '12%', left: '38%' },
       { title: 'Submitted badge',         description: 'Once you\'ve submitted tasks, a green badge confirms your selection is locked in. The pills on the right show the first name and last initial of each team member assigned to your service call.',    top: '10%', left: '78%' },
       { title: 'List View button',        description: 'Open a scrollable list of all upcoming service dates with status and hours for each.', top: '32%', left: '62%' },
-      { title: 'Inline calendar',         description: 'Your scheduled service dates are marked right on the calendar — green means tasks are submitted, blue means they\'re still pending.', top: '47%', left: '15%' },
+      { title: 'Inline calendar',         description: 'Your scheduled service dates are marked right on the calendar — green means tasks are submitted, blue means they\'re still pending.', top: '44%', left: '12%' },
     ],
   },
   {
@@ -837,22 +1094,62 @@ const customerScreens: Screen[] = [
       { title: 'Back to Home',      description: 'Returns to your My Service screen, now showing the ✓ Submitted badge on your card.',  top: '69%', left: '2%' },
     ],
   },
+  {
+    label: 'History',
+    render: () => <CustomerHistory />,
+    hotspots: [
+      { title: 'Past service card',  description: 'Every completed service is listed here — date, cycle name, task count, and the reference number that links to the business owner\'s record.', top: '5%', left: '55%' },
+      { title: 'Rate badge',         description: 'After a service is complete, you\'ll see a prompt to rate it. Once submitted, the badge shows ★ Rated so you know your feedback was received.', top: '17%', left: '67%' },
+      { title: 'Reference number',   description: 'The Ref # matches the number the business owner sees on their end — useful for following up about a specific visit.', top: '49%', left: '67%' },
+    ],
+  },
+  {
+    label: 'Feedback',
+    render: () => <CustomerFeedback />,
+    hotspots: [
+      { title: 'Star rating',      description: 'Rate your service from 1 to 5 stars — your feedback goes directly to the business owner so they can track satisfaction over time.', top: '37%', left: '30%' },
+      { title: 'Comment field',    description: 'Add an optional comment — a shout-out for the team, a note about what to focus on next time, or anything else worth sharing.', top: '43%', left: '2%' },
+    ],
+  },
+];
+
+const teamMemberScreens: Screen[] = [
+  {
+    label: 'My Jobs',
+    render: () => <TeamMemberMyJobs />,
+    hotspots: [
+      { title: 'Service date & time', description: 'Each job card shows the scheduled date and time — jobs are sorted so the next one is always first. No more checking texts to figure out where to be.',       top: '15%', left: '2%' },
+      { title: 'Customer & address',  description: 'Name and full address are right on the card — tap any job to open the detail view with a directions-ready address and the full task list for that visit.',   top: '32%', left: '50%' },
+      { title: 'Task count badge',    description: 'The blue badge shows how many tasks the customer selected for this visit, so you know what to expect before you even pull up.',                              top: '49%', left: '70%' },
+    ],
+  },
+  {
+    label: 'Job Detail',
+    render: () => <TeamMemberJobDetail />,
+    hotspots: [
+      { title: 'Job header',            description: 'The blue card shows the customer name, service cycle, date, and Open/Completed status — everything needed to know before you arrive.',                              top: '5%', left: '2%' },
+      { title: 'Address & Directions',  description: 'The customer\'s address is pulled directly from their profile. Tap Get Directions and it opens in Maps — no copying addresses out of a text thread.',              top: '27%', left: '2%' },
+      { title: 'Customer Notes',        description: 'Any notes the business owner added to the customer profile show up here — gate codes, pet warnings, access instructions — right where you need them.',              top: '37%', left: '2%' },
+      { title: 'Task checklist',        description: 'Work through the task list as you go — tap each item to check it off. The counter tracks your progress. Checkboxes are local so you can use them freely.',         top: '49%', left: '2%' },
+      { title: 'Mark Service Complete', description: 'Add optional completion notes — a gate code for next time, something that came up — then tap to confirm. The business owner sees the timestamp instantly.',         top: '88%', left: '2%' },
+    ],
+  },
 ];
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function AppShowcase() {
-  const [activeTab, setActiveTab] = useState<'business' | 'customer'>('business');
+  const [activeTab, setActiveTab] = useState<'business' | 'customer' | 'teamMember'>('business');
   const [activeScreen, setActiveScreen] = useState(0);
   const [activeHotspot, setActiveHotspot] = useState<number | null>(null);
   const [dashCalView, setDashCalView] = useState(false);
 
-  const screens = activeTab === 'business' ? businessScreens : customerScreens;
+  const screens = activeTab === 'business' ? businessScreens : activeTab === 'customer' ? customerScreens : teamMemberScreens;
   const current = screens[activeScreen];
   const hotspots = (dashCalView && current.calHotspots) ? current.calHotspots : current.hotspots;
   const activeHotspotData = activeHotspot !== null ? hotspots[activeHotspot] : null;
 
-  function switchTab(tab: 'business' | 'customer') {
+  function switchTab(tab: 'business' | 'customer' | 'teamMember') {
     setActiveTab(tab);
     setActiveScreen(0);
     setActiveHotspot(null);
@@ -889,24 +1186,24 @@ export default function AppShowcase() {
         {/* Tab switcher */}
         <div className="flex justify-center mb-6">
           <div className="inline-flex bg-surface border border-border rounded-xl p-1 gap-1">
-            {(['business', 'customer'] as const).map((tab) => (
+            {(['business', 'teamMember', 'customer'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => switchTab(tab)}
-                className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
                   activeTab === tab
                     ? 'bg-brand text-white shadow-sm'
                     : 'text-text-muted hover:text-text'
                 }`}
               >
-                {tab === 'business' ? 'Business Account' : 'Customer Account'}
+                {tab === 'business' ? 'Business Account' : tab === 'teamMember' ? 'Team Member' : 'Customer Account'}
               </button>
             ))}
           </div>
         </div>
 
         {/* Screen selector — ABOVE the phone */}
-        <div className="flex justify-center gap-2 mb-8">
+        <div className="flex flex-wrap justify-center gap-2 mb-8">
           {screens.map((s, i) => (
             <button
               key={i}

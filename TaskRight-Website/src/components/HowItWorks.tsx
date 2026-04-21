@@ -9,7 +9,7 @@ const steps = [
     number: "2",
     title: "Build your team",
     description:
-      "Add staff members, organize them into groups, and assign the right people to the right jobs.",
+      "Add staff members, organize them into groups, and give them access to the app — they see their assigned jobs, customer addresses, and task lists before every visit.",
   },
   {
     number: "3",

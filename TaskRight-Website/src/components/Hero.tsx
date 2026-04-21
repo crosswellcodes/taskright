@@ -10,8 +10,9 @@ export default function Hero() {
         </h1>
         <p className="text-lg text-text-muted leading-relaxed mb-10 max-w-2xl mx-auto">
           TaskRight is built for growing cleaning, lawn care, and service businesses
-          that need smarter customer communication — without the enterprise price tag.
-          We&apos;re looking for founding business owners to help us get it right.
+          that need smarter communication — customers, staff, and business owners all
+          on the same page. Without the enterprise price tag. We&apos;re looking for
+          founding business owners to help us get it right.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
           <a
