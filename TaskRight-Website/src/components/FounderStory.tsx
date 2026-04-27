@@ -13,9 +13,9 @@ export default function FounderStory() {
             10–75 customers, not 500.
           </p>
           <p className="text-text-muted text-lg leading-relaxed">
-            TaskRight is in active development. We&apos;re looking for real service business
-            owners who want a tool built around their actual needs — and who are willing to
-            use it and tell us honestly what works and what doesn&apos;t.
+            TaskRight is a tool built around actual needs, simplicity, and helps to ensure
+            tasks are done right. If there is a feature you see that would help your business
+            or customer, let us know.
           </p>
         </div>
       </div>

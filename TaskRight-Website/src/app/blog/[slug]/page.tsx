@@ -102,7 +102,7 @@ export default async function BlogPostPage(
                   href="/#early-access"
                   className="inline-block bg-brand hover:bg-brand-dark text-white font-semibold px-6 py-3 rounded-lg transition-colors"
                 >
-                  Apply for Free Beta Access
+                  Apply for Early Access
                 </a>
               </div>
             </article>

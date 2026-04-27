@@ -14,7 +14,7 @@ export default function Navbar() {
             href="#early-access"
             className="bg-brand hover:bg-brand-dark text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
           >
-            Apply for Free Beta Access
+            Apply for Early Access
           </a>
         </div>
       </div>

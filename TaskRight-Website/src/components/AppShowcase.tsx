@@ -1179,7 +1179,8 @@ export default function AppShowcase() {
         <div className="text-center mb-10">
           <h2 className="text-3xl font-bold text-text mb-4">See TaskRight in action</h2>
           <p className="text-text-muted text-lg max-w-xl mx-auto">
-            Explore the business and customer experience — tap the numbered circles on the screen to learn what each part does.
+            Explore the Business Owner, Team Member, and Customer Experience.{' '}
+            Tap the numbered circles on the screen to learn what each part does.
           </p>
         </div>
 

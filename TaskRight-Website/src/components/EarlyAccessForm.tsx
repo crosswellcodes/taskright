@@ -95,7 +95,7 @@ export default function EarlyAccessForm() {
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-10">
           <h2 className="text-3xl font-bold text-white mb-4">
-            Get Free Access to TaskRight Before We Launch
+            Get Free Access to TaskRight through Early Access Signup
           </h2>
           <p className="text-white/75 text-lg leading-relaxed">
             TaskRight is built for small cleaning, lawn care, and home service businesses
@@ -221,12 +221,12 @@ export default function EarlyAccessForm() {
               aria-label="Apply for free beta access"
               className="w-full bg-white text-brand font-semibold px-6 py-4 rounded-lg hover:bg-white/90 transition-colors text-base disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              {loading ? 'Submitting…' : 'Apply for Free Beta Access'}
+              {loading ? 'Submitting…' : 'Apply for Early Access'}
             </button>
 
             <p className="text-white/60 text-sm text-center leading-relaxed">
-              Beta access is limited and by approval. We&apos;re looking for active service business
-              owners who will use TaskRight with real customers and share honest feedback as we build.
+              Early access is limited and by approval. We&apos;re looking for active service business
+              owners who will use TaskRight and share honest feedback to help us refine our product.
               <br />
               <span className="mt-2 inline-block">✓ No spam. Unsubscribe anytime. &nbsp;✓ Your data is safe and secure.</span>
             </p>

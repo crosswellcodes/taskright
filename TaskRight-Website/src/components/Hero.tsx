@@ -6,20 +6,19 @@ export default function Hero() {
           Now accepting early access requests
         </div>
         <h1 className="text-4xl sm:text-5xl font-bold text-text leading-tight mb-6">
-          The Service Management App for Small Business Owners
+          Other service apps got complicated. Not TaskRight.
         </h1>
         <p className="text-lg text-text-muted leading-relaxed mb-10 max-w-2xl mx-auto">
-          TaskRight is built for growing cleaning, lawn care, and service businesses
-          that need smarter communication — customers, staff, and business owners all
-          on the same page. Without the enterprise price tag. We&apos;re looking for
-          founding business owners to help us get it right.
+          Your customers, your team, and your jobs finally in sync — built for cleaning,
+          lawn care, and home service businesses that need real tools without the enterprise
+          overhead.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
           <a
             href="#early-access"
             className="bg-brand hover:bg-brand-dark text-white font-semibold px-8 py-3.5 rounded-lg transition-colors text-base"
           >
-            Apply for Free Beta Access
+            Apply for Early Access
           </a>
           <a
             href="#app-showcase"
@@ -29,7 +28,7 @@ export default function Hero() {
           </a>
         </div>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6 text-sm text-text-muted">
-          <span>✓ Free forever for early adopters</span>
+          <span>✓ Two plans — Monthly and Yearly</span>
           <span>✓ No credit card required</span>
           <span>✓ Help shape the product</span>
         </div>

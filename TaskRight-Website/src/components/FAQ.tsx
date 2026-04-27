@@ -1,13 +1,18 @@
 const faqs = [
   {
-    question: "How much does TaskRight cost?",
+    question: "What Does TaskRight Do?",
     answer:
-      "Early access members get free forever access. Once we launch publicly, pricing will be based on the size of your operation — we're not going to charge a 10-customer business the same as a 75-customer one. If TaskRight isn't the right fit for your situation, we'll tell you that upfront rather than waste your time. Beta participants lock in their free tier — no expiration, no credit card required.",
+      "TaskRight is built to onboard and manage customer relationships, streamline communication, schedule teams across service calls, and drive efficiency through simple and effective tools.",
   },
   {
-    question: "Is TaskRight better than enterprise service tools?",
+    question: "How many customers or team members can I have?",
     answer:
-      "Enterprise service tools are built for large operations — complex scheduling, routing, invoicing, and team management at enterprise-level price points. TaskRight is built for something different: helping small service businesses manage customer communication and retention without the enterprise price tag or complexity. If you have 10–75 customers and need smarter communication, TaskRight is designed for you.",
+      "Unlimited customers, unlimited team members. One flat price. Our tech cost doesn't increase as you build your business, we won't charge more as you grow.",
+  },
+  {
+    question: "How do I use TaskRight?",
+    answer:
+      "TaskRight is an app right now. Business owners can do all functions from an admin-like view, team members can see their assigned service calls with ease, and customers can get the app — or benefit from our text message mechanisms to get transparency. All simple, all in one place. We have plans to build a web-based tool for business owners. The most value comes from our simple app, so we built that first.",
   },
   {
     question: "What about data security?",
