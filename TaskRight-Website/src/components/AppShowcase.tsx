@@ -208,8 +208,6 @@ function BusinessCustomer({ onViewChange }: { onViewChange?: (v: boolean) => voi
 
   const upcomingServices = [
     { date: 'Mon, Mar 24', cycle: 'Weekly Clean' },
-    { date: 'Thu, Mar 28', cycle: 'Weekly Clean' },
-    { date: 'Mon, Mar 31', cycle: 'Weekly Clean' },
   ];
 
   if (showList) {
@@ -288,7 +286,7 @@ function BusinessCustomer({ onViewChange }: { onViewChange?: (v: boolean) => voi
           <div className="w-1 bg-[#f59e0b] shrink-0" />
           <div className="flex-1 px-2.5 py-2">
             <p className="text-[8px] font-bold text-[#b45309] uppercase tracking-wider mb-1">Customer Notes</p>
-            <p className="text-[9px] text-[#1a1a1a] leading-relaxed">Prefers eco-friendly products. Has a cat — keep the front door closed.</p>
+            <p className="text-[9px] text-[#1a1a1a] leading-relaxed">Gate Code 123. Prefers eco-friendly products.</p>
           </div>
         </div>
 
@@ -315,7 +313,7 @@ function BusinessCustomer({ onViewChange }: { onViewChange?: (v: boolean) => voi
           </p>
           <div className="px-3 py-2">
             <p className="text-[9px] text-gray-400 mb-0.5">Mon, Mar 17</p>
-            <p className="text-[9px] text-[#1a1a1a] leading-relaxed mb-1">"Everything looked great — loved the attention to detail."</p>
+            <p className="text-[9px] text-[#1a1a1a] leading-relaxed mb-1">"Great attention to detail."</p>
             <p className="text-[9px] font-semibold text-[#2563eb]">View full feedback →</p>
           </div>
         </div>
@@ -409,9 +407,9 @@ function BusinessServiceDay() {
 
 function BusinessServiceCycle() {
   const cycles = [
-    { name: 'Weekly Clean',  freq: 'Weekly',    tasks: 6,  deadline: 3 },
-    { name: 'Deep Clean',    freq: 'Monthly',   tasks: 12, deadline: 5 },
-    { name: 'Lawn Care',     freq: 'Biweekly',  tasks: 4,  deadline: 3 },
+    { name: 'Weekly Cycle',    freq: 'Weekly',    tasks: 6,  deadline: 3 },
+    { name: 'Monthly Cycle',   freq: 'Monthly',   tasks: 12, deadline: 5 },
+    { name: 'Quarterly Cycle', freq: 'Every 3 months',  tasks: 4,  deadline: 3 },
   ];
 
   return (
@@ -1017,8 +1015,8 @@ const businessScreens: Screen[] = [
     render: () => <BusinessServiceDay />,
     hotspots: [
       { title: 'Service summary card',  description: 'The blue card shows the service date, cycle name, and a live count of how many customers have submitted their task selections vs. still pending.',  top: '12%', left: '2%' },
-      { title: 'Submission status pill', description: 'Each customer row shows their submission status — green Submitted when tasks are locked in, amber Pending when they still need to select.',             top: '27%', left: '42%' },
-      { title: 'Assignment pill',        description: 'Tap the pill on the right to assign a team member (green) or a group (purple) to that customer\'s service. Gray means unassigned.',                   top: '27%', left: '72%' },
+      { title: 'Submission status pill', description: 'Each customer row shows their submission status — green Submitted when tasks are locked in, amber Pending when they still need to select.',             top: '30%', left: '42%' },
+      { title: 'Assignment pill',        description: 'Tap the pill on the right to assign a team member (green) or a group (purple) to that customer\'s service. Gray means unassigned.',                   top: '30%', left: '72%' },
     ],
   },
   {
@@ -1060,7 +1058,7 @@ const customerScreens: Screen[] = [
     calHotspots: [],
     hotspots: [
       { title: 'Next Service card',       description: 'Tap the blue card to see your selected tasks or the full task list for the service.', top: '12%', left: '38%' },
-      { title: 'Submitted badge',         description: 'Once you\'ve submitted tasks, a green badge confirms your selection is locked in. The pills on the right show the first name and last initial of each team member assigned to your service call.',    top: '10%', left: '78%' },
+      { title: 'Submitted badge',         description: 'Once you\'ve submitted tasks, a green badge confirms your selection is locked in. The pills on the right show the first name and last initial of each team member assigned to your service call.',    top: '12%', left: '83%' },
       { title: 'List View button',        description: 'Open a scrollable list of all upcoming service dates with status and hours for each.', top: '32%', left: '62%' },
       { title: 'Inline calendar',         description: 'Your scheduled service dates are marked right on the calendar — green means tasks are submitted, blue means they\'re still pending.', top: '44%', left: '12%' },
     ],
@@ -1089,7 +1087,6 @@ const customerScreens: Screen[] = [
     label: 'Confirmed',
     render: () => <CustomerSuccess />,
     hotspots: [
-      { title: 'Confirmation',      description: 'The green checkmark confirms your selection was received by your service provider.',   top: '28%', left: '55%' },
       { title: 'Locked in message', description: 'Your tasks are set — the team will arrive knowing exactly what needs to be done.',     top: '55%', left: '2%' },
       { title: 'Back to Home',      description: 'Returns to your My Service screen, now showing the ✓ Submitted badge on your card.',  top: '69%', left: '2%' },
     ],
@@ -1180,7 +1177,7 @@ export default function AppShowcase() {
           <h2 className="text-3xl font-bold text-text mb-4">See TaskRight in action</h2>
           <p className="text-text-muted text-lg max-w-xl mx-auto">
             Explore the Business Owner, Team Member, and Customer Experience.{' '}
-            Tap the numbered circles on the screen to learn what each part does.
+            Click the blue dots on the screen to learn what each part does.
           </p>
         </div>
 
@@ -1238,13 +1235,11 @@ export default function AppShowcase() {
                     key={i}
                     onClick={() => toggleHotspot(i)}
                     style={{ top: h.top, left: h.left }}
-                    className={`absolute w-7 h-7 rounded-full text-white text-xs font-bold
-                      flex items-center justify-center ring-2 ring-white cursor-pointer z-30
+                    className={`absolute w-4 h-4 rounded-full ring-2 ring-white cursor-pointer z-30
                       transition-all duration-150
-                      ${activeHotspot === i ? 'bg-brand ring-brand/40' : 'bg-[#1d4ed8]'}`}
-                  >
-                    {i + 1}
-                  </button>
+                      ${activeHotspot === i ? 'bg-success scale-110' : 'bg-brand animate-pulse'}`}
+                    aria-label={h.title}
+                  />
                 ))}
               </div>
             </div>
@@ -1268,18 +1263,16 @@ export default function AppShowcase() {
                   ✕
                 </button>
 
-                {/* Number + title */}
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="w-8 h-8 rounded-full bg-brand text-white text-sm font-bold flex items-center justify-center shrink-0">
-                    {(activeHotspot ?? 0) + 1}
-                  </span>
+                {/* Title */}
+                <div className="flex items-center gap-2.5 mb-3">
+                  <span className="w-3 h-3 rounded-full bg-success shrink-0" />
                   <p className="font-bold text-text text-base leading-tight pr-6">
                     {activeHotspotData.title}
                   </p>
                 </div>
 
                 {/* Description */}
-                <p className="text-text-muted text-sm leading-relaxed pl-11">
+                <p className="text-text-muted text-sm leading-relaxed pl-5.5">
                   {activeHotspotData.description}
                 </p>
 
@@ -1303,9 +1296,9 @@ export default function AppShowcase() {
                 <div className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center mx-auto mb-3">
                   <span className="text-brand font-bold text-sm">?</span>
                 </div>
-                <p className="text-sm font-semibold text-text mb-1">Tap a numbered circle</p>
+                <p className="text-sm font-semibold text-text mb-1">Click a blue dot</p>
                 <p className="text-xs text-text-muted">
-                  Click any number on the screen to see a description of that feature.
+                  Click any blue dot on the screen to see a description of that feature.
                 </p>
               </div>
             )}

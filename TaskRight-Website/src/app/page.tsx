@@ -4,6 +4,7 @@ import Problem from '@/components/Problem';
 import Features from '@/components/Features';
 import HowItWorks from '@/components/HowItWorks';
 import AppShowcase from '@/components/AppShowcase';
+import Pricing from '@/components/Pricing';
 import FounderStory from '@/components/FounderStory';
 import FAQ from '@/components/FAQ';
 import EarlyAccessForm from '@/components/EarlyAccessForm';
@@ -19,6 +20,7 @@ export default function Home() {
         <Problem />
         <Features />
         <HowItWorks />
+        <Pricing />
         <FounderStory />
         <FAQ />
         <EarlyAccessForm />
