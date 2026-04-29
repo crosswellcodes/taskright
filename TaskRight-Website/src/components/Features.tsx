@@ -9,7 +9,7 @@ const features = [
   {
     icon: "📲",
     ariaLabel: "Phone with notification icon",
-    title: "Automated SMS Reminders",
+    title: "Automated Text Message Reminders",
     description:
       "Three days before service, customers get a reminder. They confirm or update their preferences without calling you.",
   },

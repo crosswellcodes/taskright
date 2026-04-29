@@ -13,9 +13,9 @@ const steps = [
   },
   {
     number: "3",
-    title: "Invite your customers",
+    title: "Get your customers involved",
     description:
-      "Customers receive their upcoming service details, pick the tasks they want done, and you show up fully prepared.",
+      "Customers get their upcoming service details and pick the tasks they want done — through the app or by text message. Either way, you show up fully prepared.",
   },
 ];
 
