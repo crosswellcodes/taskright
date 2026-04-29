@@ -110,21 +110,6 @@ export default async function BlogPostPage(
             {/* Sidebar */}
             <aside className="space-y-6">
 
-              {/* About TaskRight */}
-              <div className="bg-white rounded-2xl border border-border p-6">
-                <h3 className="font-bold text-text mb-2">About TaskRight</h3>
-                <p className="text-text-muted text-sm leading-relaxed mb-4">
-                  TaskRight is a service management app built for small cleaning, lawn care,
-                  and home service businesses. We&apos;re in beta — founding members get free access forever.
-                </p>
-                <a
-                  href="/#early-access"
-                  className="block text-center bg-brand hover:bg-brand-dark text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors"
-                >
-                  Apply for Beta Access
-                </a>
-              </div>
-
               {/* Related posts */}
               {related.length > 0 && (
                 <div className="bg-white rounded-2xl border border-border p-6">

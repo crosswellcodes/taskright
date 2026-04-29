@@ -178,6 +178,121 @@ export const POSTS: BlogPost[] = [
     content: `This post is coming soon. Check back after launch for the full article.`,
   },
   {
+    slug: 'service-business-operations-how-to-keep-everyone-in-sync',
+    title: 'Service Business Operations: How to Keep Your Team and Customers in Sync',
+    description: 'Operational disconnects — not bad work — are what slow down small service businesses. Here\'s the blueprint for keeping your business owner, team, and customers connected.',
+    date: '2026-04-28',
+    readingTime: '7 min read',
+    category: 'Operations',
+    excerpt: 'Most service business breakdowns aren\'t about the work — they\'re about disconnected information. Here\'s the operational blueprint that fixes it.',
+    published: true,
+    content: `
+<p>Running a small service business means managing three groups at once — your operations, your team, and your customers. The work itself often isn't the problem. The breakdown happens in the space between those three groups: information that doesn't transfer, preferences that don't get passed on, status that nobody can see in real time.</p>
+
+<p>Research on operational bottlenecks consistently points to the same root cause: 58% of bottlenecks in small businesses stem from system inefficiency, not workload volume. Most service businesses don't fail because they have too much work. They struggle because the information needed to do that work well doesn't reach the right people at the right time.</p>
+
+<h2>The Three-Person Problem</h2>
+
+<p>Every service business has three distinct groups whose coordination determines how well the operation runs.</p>
+
+<p>The <strong>business owner</strong> holds most of the operational context. They know which customers have specific preferences, which jobs are scheduled for which days, which team members are assigned to each route. The challenge is that this knowledge rarely lives anywhere accessible — it exists in their head, in text threads, in memory.</p>
+
+<p>The <strong>team member</strong> shows up to do the work without the full picture. They know the address and the general job. What they often don't know: the access instructions, the customer's specific preferences, whether there's a dog, which products to avoid. That information exists somewhere — it just didn't make it to them before they arrived.</p>
+
+<p>The <strong>customer</strong> is largely in the dark. They booked a service and they know someone is coming. They don't know what tasks are planned, who is showing up, or whether the feedback they gave last time was heard. That uncertainty is uncomfortable — and over time, it erodes trust.</p>
+
+<h2>Where the Breakdowns Happen</h2>
+
+<p>The operational failures in service businesses aren't dramatic. They're quiet and cumulative.</p>
+
+<p>A customer mentions a gate code when they first sign up. That note lives in a text thread. Months later, a team member is assigned to that job for the first time and has no idea. They spend five minutes trying to reach the owner for instructions. The job gets done, but the customer noticed — and trust slips.</p>
+
+<p>A business owner knows three customers have service on Thursday. The team member assigned knows they have Thursday jobs but isn't clear on the order or the address for one of them. A quick coordination text gets sent at 7am, which wakes the owner up. This happens every week.</p>
+
+<p>These aren't failures of effort — they're failures of information flow. Research confirms that manual coordination processes like these consume between 30 and 60 minutes per employee per day. Across a small team, that adds up fast, and it compounds as the customer list grows.</p>
+
+<h2>What Staying in Sync Actually Looks Like</h2>
+
+<p>The solution isn't more communication — it's structured communication. Each group in your operation has specific information needs, and meeting those consistently is what keeps the workflow clean.</p>
+
+<div style="background:#f8fafc;border:1.5px solid #e5e7eb;border-radius:16px;padding:2rem 1.5rem;margin:2.5rem 0;">
+  <p style="text-align:center;font-weight:700;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 1.5rem 0;">How TaskRight Keeps Everyone Connected</p>
+  <svg viewBox="0 0 560 370" xmlns="http://www.w3.org/2000/svg" style="max-width:560px;width:100%;margin:0 auto;display:block;">
+
+    <!-- Business Owner -->
+    <rect x="205" y="20" width="150" height="55" rx="10" fill="white" stroke="#e5e7eb" stroke-width="1.5"/>
+    <text x="280" y="45" text-anchor="middle" fill="#1a1a1a" font-family="system-ui,-apple-system,sans-serif" font-weight="700" font-size="12">Business Owner</text>
+    <text x="280" y="62" text-anchor="middle" fill="#6b7280" font-family="system-ui,-apple-system,sans-serif" font-size="10">Manages jobs, team &amp; customers</text>
+
+    <!-- TaskRight center -->
+    <rect x="205" y="145" width="150" height="60" rx="10" fill="#2563eb"/>
+    <text x="280" y="170" text-anchor="middle" fill="white" font-family="system-ui,-apple-system,sans-serif" font-weight="700" font-size="13">TaskRight</text>
+    <text x="280" y="188" text-anchor="middle" fill="rgba(255,255,255,0.75)" font-family="system-ui,-apple-system,sans-serif" font-size="11">Service Platform</text>
+
+    <!-- Team Member -->
+    <rect x="20" y="280" width="155" height="60" rx="10" fill="white" stroke="#e5e7eb" stroke-width="1.5"/>
+    <text x="97" y="305" text-anchor="middle" fill="#1a1a1a" font-family="system-ui,-apple-system,sans-serif" font-weight="700" font-size="12">Team Member</text>
+    <text x="97" y="322" text-anchor="middle" fill="#6b7280" font-family="system-ui,-apple-system,sans-serif" font-size="10">Jobs, tasks &amp; directions</text>
+
+    <!-- Customer -->
+    <rect x="385" y="280" width="155" height="60" rx="10" fill="#f0fdf4" stroke="#10b981" stroke-width="1.5"/>
+    <text x="462" y="305" text-anchor="middle" fill="#1a1a1a" font-family="system-ui,-apple-system,sans-serif" font-weight="700" font-size="12">Customer</text>
+    <text x="462" y="322" text-anchor="middle" fill="#6b7280" font-family="system-ui,-apple-system,sans-serif" font-size="10">Service details &amp; selections</text>
+
+    <!-- Line: Business Owner to TaskRight -->
+    <line x1="280" y1="75" x2="280" y2="145" stroke="#bfdbfe" stroke-width="2" stroke-dasharray="5,3"/>
+
+    <!-- Line: TaskRight to Team Member -->
+    <line x1="222" y1="205" x2="97" y2="280" stroke="#bfdbfe" stroke-width="2" stroke-dasharray="5,3"/>
+
+    <!-- Line: TaskRight to Customer -->
+    <line x1="338" y1="205" x2="462" y2="280" stroke="#6ee7b7" stroke-width="2" stroke-dasharray="5,3"/>
+
+    <!-- Label: via App (Business Owner line) -->
+    <rect x="291" y="100" width="52" height="18" rx="4" fill="#eff6ff"/>
+    <text x="317" y="113" text-anchor="middle" fill="#2563eb" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="600">via App</text>
+
+    <!-- Label: via App (Team Member line) -->
+    <rect x="100" y="228" width="52" height="18" rx="4" fill="#eff6ff"/>
+    <text x="126" y="241" text-anchor="middle" fill="#2563eb" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="600">via App</text>
+
+    <!-- Label: App or SMS (Customer line) -->
+    <rect x="365" y="228" width="84" height="18" rx="4" fill="#f0fdf4"/>
+    <text x="407" y="241" text-anchor="middle" fill="#059669" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="600">App or SMS</text>
+
+    <!-- Legend -->
+    <line x1="168" y1="356" x2="193" y2="356" stroke="#bfdbfe" stroke-width="2" stroke-dasharray="5,3"/>
+    <text x="200" y="360" fill="#9ca3af" font-family="system-ui,-apple-system,sans-serif" font-size="10">App only</text>
+    <line x1="270" y1="356" x2="295" y2="356" stroke="#6ee7b7" stroke-width="2" stroke-dasharray="5,3"/>
+    <text x="302" y="360" fill="#9ca3af" font-family="system-ui,-apple-system,sans-serif" font-size="10">App or SMS</text>
+
+  </svg>
+</div>
+
+<p>The business owner needs a central view: which customers have upcoming service, which tasks are confirmed, which team members are assigned, and what's still pending. That visibility replaces the mental overhead of tracking everything manually.</p>
+
+<p>The team member needs job-specific details before they arrive: address with directions, customer notes, the specific tasks confirmed for that visit, and a clear way to mark the job complete when it's done.</p>
+
+<p>The customer needs to feel informed and in control: a heads-up before service, a way to confirm the tasks they want done, and a feedback channel afterward. The key word is <em>optional</em> — not every customer will download an app, and they shouldn't have to.</p>
+
+<h2>The SMS Option Isn't a Compromise — It's a Feature</h2>
+
+<p>One of the most common failure points in service business software is adoption friction. A new system works if everyone uses it. But customers are not employees — you can't require them to download an app and learn a new interface just to receive their cleaning or lawn service.</p>
+
+<p>What works is a system that meets customers where they are. For tech-comfortable customers, an app with full visibility into their service history, task selections, and upcoming visits is excellent. For customers who prefer not to manage another app, text message integration achieves the same outcome — a confirmation before service, task selection via SMS, and feedback via text after the visit.</p>
+
+<p>The operational result is identical either way: the business owner sees confirmed selections, the team member arrives knowing exactly what to do, and the customer feels heard. The delivery mechanism is flexible — the information flow is not.</p>
+
+<h2>The System Is the Product</h2>
+
+<p>There's a useful reframe buried in operational research: fixing the process matters more than adding people to a broken system. A service business with 30 customers doesn't need more staff to manage coordination overhead — it needs a system that eliminates that overhead in the first place.</p>
+
+<p>When information flows correctly — customer preferences captured once and accessible always, team members briefed before every visit, customers informed without manual effort from the owner — the operational layer becomes invisible. Business owners spend less time on coordination. Team members do better work because they're better informed. Customers stay longer because they feel looked after.</p>
+
+<p>The businesses that retain the most customers and scale most cleanly are the ones that built the information flow first, and added people into it second. The system is the product — and getting it right compounds over time.</p>
+    `.trim(),
+  },
+  {
     slug: 'midwest-service-business-customer-retention',
     title: 'Customer Retention for Midwest Service Businesses: What Actually Works',
     description: 'Midwest service businesses face unique challenges around seasonal demand, customer loyalty, and local competition. Here\'s what retention strategies actually work in this market.',
