@@ -6,12 +6,12 @@ export default function Hero() {
           Now accepting early access requests
         </div>
         <h1 className="text-4xl sm:text-5xl font-bold text-text leading-tight mb-6">
-          Other service apps got complicated. Not TaskRight.
+          Your customers, your team, and your jobs — all in sync, all the time.
         </h1>
         <p className="text-lg text-text-muted leading-relaxed mb-10 max-w-2xl mx-auto">
-          Your customers, your team, and your jobs finally in sync — built for cleaning,
-          lawn care, and home service businesses that need real tools without the enterprise
-          overhead.
+          Built for residential cleaning, lawn care, and home service businesses that need
+          a tool for connecting teams, managing relationships, and logistics without the
+          enterprise bloat.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
           <a
