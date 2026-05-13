@@ -108,8 +108,58 @@ export const POSTS: BlogPost[] = [
     readingTime: '6 min read',
     category: 'Customer Retention',
     excerpt: 'Acquiring a new customer costs 5x more than keeping one. Here are the retention strategies that actually work for small service businesses.',
-    published: false,
-    content: `This post is coming soon. Check back after launch for the full article.`,
+    published: true,
+    content: `
+<p>Most service business owners don't know they're losing a customer until it's already done. There's no complaint, no confrontation, no signal. The customer just requests service cancellation. By the time you're notified they've moved on — and they've probably already told a few people why.</p>
+
+<p>This is the defining churn pattern in service businesses: the quick quit. Customers rarely leave because of a single catastrophic failure. They leave because of small, repeated friction that never got addressed — and because nobody at the business seemed to notice or care.</p>
+
+<h2>Why the Math Makes Retention the Priority</h2>
+
+<p>The business case for keeping a customer over acquiring one is well-established. Research consistently puts the cost of winning a new customer at five times the cost of keeping an existing one. For service businesses, the gap is likely wider. Earning a new cleaning or lawn care customer requires marketing spend, a consultation or walkthrough, onboarding time, and several visits before the relationship stabilizes. A retained customer requires none of that — they just keep booking.</p>
+
+<p>Retention also compounds. A customer who stays for three years instead of one doesn't just generate three times the revenue — they refer more, complain less, and require less management time as the relationship matures. The economics of a service business with strong retention look fundamentally different from one with high churn, even at the same customer count.</p>
+
+<h2>The Real Reasons Customers Leave</h2>
+
+<p>When customers do give a reason for leaving — which is rare — they tend to cite price or a move. These are often proxies for something else. The underlying reasons are almost always operational.</p>
+
+<p><strong>Inconsistency.</strong> The job that gets done well when the owner is on-site and done passably when they're not. The team member who knows the customer's preferences and the one who doesn't. Service businesses live and die on consistency — customers who can't predict what they're getting eventually find someone more predictable.</p>
+
+<p><strong>Feeling unheard.</strong> A customer mentions they'd like the kitchen prioritized. Nothing changes. They mention it again. Still nothing. They stop mentioning it because it's easier to look for someone else than to keep having the same conversation. Customer feedback that doesn't visibly influence the service is worse than no feedback mechanism at all — it signals that their input doesn't matter.</p>
+
+<p><strong>Communication gaps.</strong> No confirmation before service. No heads-up when something changes. No follow-up after a visit that didn't go well. Customers who feel like they're in the dark about their own service eventually lose confidence in the business managing it.</p>
+
+<p><strong>The first problem, handled badly.</strong> Every service relationship will eventually have a problem — a missed task, a scheduling error, a team member who had a bad day. How that moment is handled determines whether the customer leaves or becomes more loyal. Customers who experience a problem that gets resolved quickly and genuinely often have stronger retention than customers who never had an issue at all.</p>
+
+<h2>What a Retention System Actually Looks Like</h2>
+
+<p>The businesses that retain customers at high rates don't do it through exceptional charisma or luck. They do it through systems — specific, repeatable behaviors that happen regardless of who is on-site or which team member handles the job.</p>
+
+<p>The challenge is that most of the tools marketed to service businesses make building those systems harder than it needs to be. Our market research into how small service businesses are currently managing retention reveals a consistent pattern: owners are spending more time managing their software than managing their customers.</p>
+
+<p>Take automation. Many service business owners are currently cobbling together 10 to 15 custom Zapier workflows just to handle basic triggers — a new client onboarding sequence, a follow-up after a completed visit, a lead coming in from an ad. The automation exists, technically. But it's fragile, expensive per trigger, and requires ongoing maintenance that most small business owners don't have capacity for. When it breaks, customer communication breaks with it.</p>
+
+<p>Financial visibility is another persistent gap. Owners who want to understand projected revenue by day or week — a basic question for any service business — are frequently forced into manual exports and spreadsheet work. The schedule exists in their platform. The revenue picture doesn't. That disconnect means decisions about staffing, capacity, and growth are being made with incomplete information, which eventually surfaces as retention problems when service quality slips under pressure.</p>
+
+<p>Client communication — the most directly retention-relevant capability — is often the most manual. Declining a request, managing a waitlist, reaching back out to a customer whose quote was never approved: these are the moments that determine whether a customer relationship continues or quietly ends. When the tools to handle them require custom workflow builds or just don't exist, most owners default to doing nothing. Customers notice.</p>
+
+<p>The underlying problem isn't that service businesses don't want retention systems. It's that the tools available either don't address the right problems or solve them in ways that create new ones. Retention shouldn't require a software integration project. It should be a natural output of how the business runs day to day.</p>
+
+<h2>The Feedback Loop Most Businesses Skip</h2>
+
+<p>Post-service feedback is the most underused retention tool in the service industry. Most businesses either don't collect it at all, or collect it in a way that never makes it back to the person doing the work.</p>
+
+<p>Effective feedback has two properties: it's tied to a specific visit, and it's visible to the people who can act on it. A five-star rating with no context is interesting. A three-star rating from a customer who says "the back bathroom was rushed this time" is actionable. The difference between those two outcomes is whether your collection mechanism captures enough context to do something with it.</p>
+
+<p>When customers see that their feedback changes what happens on the next visit, they stop being passive users of your service and start feeling like partners in it. That shift in relationship is one of the most reliable drivers of long-term retention.</p>
+
+<h2>Retention Compounds — So Does the Opposite</h2>
+
+<p>High churn forces a business to run just to stay in place. Every marketing dollar goes toward replacing customers you already had, not growing the base you worked to build. A business with strong retention builds on itself — one with weak retention starts over, quietly, every month.</p>
+
+<p>The fix isn't complicated. Know what your customers want, make sure your team knows it too, communicate before and after every service, and close the loop when something goes wrong. The businesses that do those four things consistently don't spend much time worrying about churn — because their customers don't have much reason to leave.</p>
+    `.trim(),
   },
   {
     slug: 'why-enterprise-service-software-isnt-built-for-you',
