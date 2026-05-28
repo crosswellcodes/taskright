@@ -63,7 +63,7 @@ export default function BlogHubPage() {
                 href="/#early-access"
                 className="inline-block bg-brand hover:bg-brand-dark text-white font-semibold px-6 py-3 rounded-lg transition-colors"
               >
-                Apply for Beta Access
+                Get Early Access
               </a>
             </div>
           ) : (

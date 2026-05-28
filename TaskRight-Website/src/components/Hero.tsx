@@ -2,9 +2,6 @@ export default function Hero() {
   return (
     <section className="bg-bg py-24 px-6">
       <div className="max-w-3xl mx-auto text-center">
-        <div className="inline-block bg-brand/10 text-brand text-sm font-semibold px-4 py-1.5 rounded-full mb-6">
-          Now accepting early access requests
-        </div>
         <h1 className="text-4xl sm:text-5xl font-bold text-text leading-tight mb-6">
           Your customers, your team, and your jobs — all in sync, all the time.
         </h1>
@@ -15,10 +12,10 @@ export default function Hero() {
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
           <a
-            href="#early-access"
-            className="bg-brand hover:bg-brand-dark text-white font-semibold px-8 py-3.5 rounded-lg transition-colors text-base"
+            href="/signup"
+            className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-8 py-3.5 rounded-lg transition-colors text-base"
           >
-            Apply for Early Access
+            Get TaskRight
           </a>
           <a
             href="#app-showcase"

@@ -1,28 +1,20 @@
 const features = [
   {
-    icon: "✓",
-    ariaLabel: "Checkmark icon",
     title: "Capture Customer Preferences",
     description:
       "Customers select their preferred service options before each visit. You remember exactly what they want — no more re-explaining every time.",
   },
   {
-    icon: "📲",
-    ariaLabel: "Phone with notification icon",
     title: "Automated Text Message Reminders",
     description:
       "Three days before service, customers get a reminder. They confirm or update their preferences without calling you.",
   },
   {
-    icon: "⭐",
-    ariaLabel: "Star icon",
     title: "Collect Customer Feedback",
     description:
       "After every service, customers rate their experience and can leave comments. Understand what's working before you lose them.",
   },
   {
-    icon: "💰",
-    ariaLabel: "Money icon",
     title: "Affordable Pricing",
     description:
       "No enterprise price tag for features you don't need. TaskRight is built for businesses with 10–75 customers, not 500 — and priced to match the size of your operation.",
@@ -48,13 +40,6 @@ export default function Features() {
               key={f.title}
               className="bg-surface rounded-xl p-8 border border-border"
             >
-              <div
-                className="w-10 h-10 bg-brand/10 rounded-lg flex items-center justify-center text-brand font-bold text-lg mb-5"
-                role="img"
-                aria-label={f.ariaLabel}
-              >
-                {f.icon}
-              </div>
               <h3 className="text-lg font-bold text-text mb-2">{f.title}</h3>
               <p className="text-text-muted leading-relaxed">{f.description}</p>
             </div>

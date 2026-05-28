@@ -5,20 +5,45 @@ import { useState, useEffect } from 'react';
 type Hotspot = {
   title: string;
   description: string;
-  top: string;
-  left: string;
+  top?: string;
+  left?: string;
+};
+
+type RenderParams = {
+  onCalViewChange?: (v: boolean) => void;
+  activeHotspot?: number | null;
+  onHotspotTap?: (i: number) => void;
 };
 
 type Screen = {
   label: string;
-  render: (onCalViewChange?: (v: boolean) => void) => React.ReactNode;
+  render: (params?: RenderParams) => React.ReactNode;
   hotspots: Hotspot[];
   calHotspots?: Hotspot[];
+  embedsHotspots?: boolean;
 };
+
+// ─── Shared hotspot dot ───────────────────────────────────────────────────────
+
+function HotspotDot({ index, activeHotspot, onHotspotTap }: {
+  index: number;
+  activeHotspot?: number | null;
+  onHotspotTap?: (i: number) => void;
+}) {
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onHotspotTap?.(index); }}
+      className={`w-4 h-4 rounded-full ring-2 ring-white cursor-pointer z-30 transition-all duration-150 shrink-0 ${
+        activeHotspot === index ? 'bg-[#10b981] scale-110' : 'bg-[#2563eb] animate-pulse'
+      }`}
+      aria-label={`Hotspot ${index + 1}`}
+    />
+  );
+}
 
 // ─── Business screen mocks ────────────────────────────────────────────────────
 
-function BusinessDashboard({ onViewChange }: { onViewChange?: (v: boolean) => void }) {
+function BusinessDashboard({ onViewChange, activeHotspot, onHotspotTap }: { onViewChange?: (v: boolean) => void; activeHotspot?: number | null; onHotspotTap?: (i: number) => void; }) {
   const [calView, setCalView] = useState(false);
   function toggle(v: boolean) { setCalView(v); onViewChange?.(v); }
 
@@ -66,7 +91,7 @@ function BusinessDashboard({ onViewChange }: { onViewChange?: (v: boolean) => vo
       </div>
 
       {/* List / Calendar toggle */}
-      <div className="flex gap-1.5 px-3 pt-2 pb-0.5">
+      <div className="flex items-center gap-1.5 px-3 pt-2 pb-0.5">
         <button
           onClick={() => toggle(false)}
           className={`text-[10px] font-bold px-3 py-1 rounded-full border transition-all ${
@@ -79,6 +104,7 @@ function BusinessDashboard({ onViewChange }: { onViewChange?: (v: boolean) => vo
             calView ? 'bg-white shadow-sm text-[#1a1a1a] border-gray-100' : 'text-gray-400 border-transparent'
           }`}
         >Calendar</button>
+        <HotspotDot index={0} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />
       </div>
 
       <p className="text-[9px] text-[#2563eb]/60 text-center pb-1 italic font-medium tracking-wide">↑ Interactive — try the toggle</p>
@@ -90,7 +116,10 @@ function BusinessDashboard({ onViewChange }: { onViewChange?: (v: boolean) => vo
           <div className="flex items-center justify-between px-1 mb-1">
             <span className="text-[10px] text-[#2563eb] font-bold">‹</span>
             <span className="text-[10px] font-bold text-[#1a1a1a]">March 2026</span>
-            <span className="text-[10px] text-[#2563eb] font-bold">›</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-[#2563eb] font-bold">›</span>
+              <HotspotDot index={1} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />
+            </div>
           </div>
 
           {/* Day-of-week headers */}
@@ -123,13 +152,15 @@ function BusinessDashboard({ onViewChange }: { onViewChange?: (v: boolean) => vo
           </div>
 
           {/* Legend */}
-          <div className="flex gap-3 px-1 mt-2 mb-1.5">
+          <div className="flex items-center gap-3 px-1 mt-2 mb-1.5">
             {[['#2563eb','Pending'],['#f59e0b','Mixed'],['#10b981','All submitted']].map(([color, label]) => (
               <div key={label} className="flex items-center gap-1">
                 <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
                 <span className="text-[8px] text-gray-400">{label}</span>
               </div>
             ))}
+            <div className="flex-1" />
+            <HotspotDot index={2} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />
           </div>
 
           {/* Upcoming list */}
@@ -147,14 +178,17 @@ function BusinessDashboard({ onViewChange }: { onViewChange?: (v: boolean) => vo
       ) : (
         /* ── List view ── */
         <div className="flex-1 overflow-hidden px-3 space-y-2">
-          {days.map((d) => {
+          {days.map((d, idx) => {
             const pct = d.total > 0 ? Math.round((d.submitted / d.total) * 100) : 0;
             const color = barColor(d.submitted, d.total);
             return (
               <div key={d.date} className="bg-white rounded-xl px-3 py-2.5 border border-gray-100">
-                <div className="mb-1.5">
-                  <p className="text-xs font-bold text-[#1a1a1a]">{d.date}</p>
-                  <p className="text-[10px] text-gray-400">{d.cycle}</p>
+                <div className="flex items-start justify-between mb-1.5">
+                  <div>
+                    <p className="text-xs font-bold text-[#1a1a1a]">{d.date}</p>
+                    <p className="text-[10px] text-gray-400">{d.cycle}</p>
+                  </div>
+                  {idx === 0 && <HotspotDot index={1} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />}
                 </div>
                 <div className="flex gap-3 mb-1.5">
                   <div className="text-center">
@@ -174,8 +208,11 @@ function BusinessDashboard({ onViewChange }: { onViewChange?: (v: boolean) => vo
                     <p className="text-[9px] text-gray-400">Rate</p>
                   </div>
                 </div>
-                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
+                  </div>
+                  {idx === 0 && <HotspotDot index={2} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />}
                 </div>
               </div>
             );
@@ -186,7 +223,7 @@ function BusinessDashboard({ onViewChange }: { onViewChange?: (v: boolean) => vo
   );
 }
 
-function BusinessCustomer({ onViewChange }: { onViewChange?: (v: boolean) => void }) {
+function BusinessCustomer({ onViewChange, activeHotspot, onHotspotTap }: { onViewChange?: (v: boolean) => void; activeHotspot?: number | null; onHotspotTap?: (i: number) => void; }) {
   const [showList, setShowList] = useState(false);
 
   function setList(v: boolean) { setShowList(v); onViewChange?.(v); }
@@ -269,9 +306,10 @@ function BusinessCustomer({ onViewChange }: { onViewChange?: (v: boolean) => voi
             <p className="text-sm font-bold text-white leading-tight">Nancy Fancy</p>
             <p className="text-[10px] text-white/70 mt-0.5">(555) 391-2847</p>
           </div>
-          <span className="text-[10px] font-semibold text-white border border-white/50 rounded-lg px-2.5 py-1 shrink-0">
-            Details
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-semibold text-white border border-white/50 rounded-lg px-2.5 py-1 shrink-0">Details</span>
+            <HotspotDot index={0} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />
+          </div>
         </div>
         {/* Address / Get Directions */}
         <div className="bg-white/15 rounded-lg px-3 py-2">
@@ -285,16 +323,20 @@ function BusinessCustomer({ onViewChange }: { onViewChange?: (v: boolean) => voi
         <div className="flex bg-[#fffbeb] rounded-xl border border-gray-100 overflow-hidden">
           <div className="w-1 bg-[#f59e0b] shrink-0" />
           <div className="flex-1 px-2.5 py-2">
-            <p className="text-[8px] font-bold text-[#b45309] uppercase tracking-wider mb-1">Customer Notes</p>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[8px] font-bold text-[#b45309] uppercase tracking-wider">Customer Notes</p>
+              <HotspotDot index={1} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />
+            </div>
             <p className="text-[9px] text-[#1a1a1a] leading-relaxed">Gate Code 123. Prefers eco-friendly products.</p>
           </div>
         </div>
 
         {/* Assigned Cycles */}
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-          <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wider px-3 pt-2 pb-1.5 border-b border-gray-100">
-            Assigned Cycles
-          </p>
+          <div className="flex items-center justify-between px-3 pt-2 pb-1.5 border-b border-gray-100">
+            <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Assigned Cycles</p>
+            <HotspotDot index={2} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />
+          </div>
           <div className="flex items-center justify-between px-3 py-1.5 border-b border-[#f3f4f6]">
             <span className="text-[10px] font-semibold text-[#1a1a1a]">Weekly Clean</span>
             <span className="text-[10px] text-gray-400">2.5h / visit</span>
@@ -308,9 +350,10 @@ function BusinessCustomer({ onViewChange }: { onViewChange?: (v: boolean) => voi
 
         {/* Recent Feedback */}
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-          <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wider px-3 pt-2 pb-1.5 border-b border-gray-100">
-            Recent Feedback
-          </p>
+          <div className="flex items-center justify-between px-3 pt-2 pb-1.5 border-b border-gray-100">
+            <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Recent Feedback</p>
+            <HotspotDot index={3} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />
+          </div>
           <div className="px-3 py-2">
             <p className="text-[9px] text-gray-400 mb-0.5">Mon, Mar 17</p>
             <p className="text-[9px] text-[#1a1a1a] leading-relaxed mb-1">"Great attention to detail."</p>
@@ -318,11 +361,35 @@ function BusinessCustomer({ onViewChange }: { onViewChange?: (v: boolean) => voi
           </div>
         </div>
 
+        {/* Messages */}
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <div className="flex items-center justify-between px-3 pt-2 pb-1.5 border-b border-gray-100">
+            <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Messages</p>
+            <HotspotDot index={4} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />
+          </div>
+          <div className="px-3 py-2 space-y-1.5">
+            <div className="flex justify-end">
+              <div className="bg-[#2563eb] rounded-xl rounded-br-sm px-2.5 py-1.5 max-w-[78%]">
+                <p className="text-[9px] text-white leading-relaxed">Your cleaning is Mon, March 24. Reply C to confirm.</p>
+                <p className="text-[8px] text-white/60 text-right mt-0.5">Mar 21 · 9:14 AM</p>
+              </div>
+            </div>
+            <div className="flex justify-start">
+              <div className="bg-[#e5e7eb] rounded-xl rounded-bl-sm px-2.5 py-1.5 max-w-[78%]">
+                <p className="text-[9px] text-[#1a1a1a] leading-relaxed">Key under the mat!</p>
+                <p className="text-[8px] text-gray-400 mt-0.5">Mar 21 · 9:31 AM</p>
+              </div>
+            </div>
+            <p className="text-[9px] font-semibold text-[#2563eb] pt-0.5">View full thread →</p>
+          </div>
+        </div>
+
         {/* Upcoming Services */}
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-          <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wider px-3 pt-2 pb-1.5 border-b border-gray-100">
-            Upcoming Services
-          </p>
+          <div className="flex items-center justify-between px-3 pt-2 pb-1.5 border-b border-gray-100">
+            <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Upcoming Services</p>
+            <HotspotDot index={5} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />
+          </div>
           {upcomingServices.map((s, i) => (
             <div
               key={s.date}
@@ -405,7 +472,7 @@ function BusinessServiceDay() {
   );
 }
 
-function BusinessServiceCycle() {
+function BusinessServiceCycle({ activeHotspot, onHotspotTap }: { activeHotspot?: number | null; onHotspotTap?: (i: number) => void; }) {
   const cycles = [
     { name: 'Weekly Cycle',    freq: 'Weekly',    tasks: 6,  deadline: 3 },
     { name: 'Monthly Cycle',   freq: 'Monthly',   tasks: 12, deadline: 5 },
@@ -421,13 +488,14 @@ function BusinessServiceCycle() {
 
       {/* Cycle cards */}
       <div className="flex-1 overflow-y-auto px-3 pt-3 space-y-2 pb-16">
-        {cycles.map((c) => (
+        {cycles.map((c, idx) => (
           <div key={c.name} className="bg-white rounded-xl px-3 py-2.5 border border-gray-100 flex items-center justify-between">
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-semibold text-[#1a1a1a]">{c.name}</p>
-              <p className="text-[9px] text-gray-400 mt-0.5 capitalize">
-                {c.freq} · {c.tasks} tasks
-              </p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-[10px] font-semibold text-[#1a1a1a]">{c.name}</p>
+                {idx === 0 && <HotspotDot index={0} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />}
+              </div>
+              <p className="text-[9px] text-gray-400 capitalize mt-0.5">{c.freq} · {c.tasks} tasks</p>
               <p className="text-[9px] text-gray-300 mt-0.5">
                 Deadline: {c.deadline}d before service
               </p>
@@ -442,15 +510,16 @@ function BusinessServiceCycle() {
 
       {/* New Cycle FAB */}
       <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-3 pt-2 pb-3">
-        <div className="bg-[#2563eb] rounded-xl py-2.5 text-center">
+        <div className="bg-[#2563eb] rounded-xl py-2.5 flex items-center justify-center gap-2">
           <p className="text-white text-[10px] font-semibold">+ New Cycle</p>
+          <HotspotDot index={1} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />
         </div>
       </div>
     </div>
   );
 }
 
-function BusinessTeam() {
+function BusinessTeam({ activeHotspot, onHotspotTap }: { activeHotspot?: number | null; onHotspotTap?: (i: number) => void; }) {
   const [tab, setTab] = useState<'members' | 'groups'>('members');
 
   useEffect(() => {
@@ -488,25 +557,34 @@ function BusinessTeam() {
       </div>
       <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
         {tab === 'members' ? (
-          members.map((m) => (
+          members.map((m, idx) => (
             <div key={m.name} className="bg-white rounded-xl px-3 py-2.5 border border-gray-100 flex items-center gap-2.5">
               <div className="w-7 h-7 rounded-full bg-[#dbeafe] flex items-center justify-center shrink-0">
                 <span className="text-[10px] font-bold text-[#2563eb]">{m.initials}</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-[#1a1a1a] truncate">{m.name}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs font-semibold text-[#1a1a1a] truncate">{m.name}</p>
+                  {idx === 0 && <HotspotDot index={0} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />}
+                </div>
                 <p className="text-[10px] text-gray-400">{m.phone}</p>
                 <p className="text-[10px] text-[#2563eb]">{m.groups}</p>
               </div>
-              <span className="bg-[#eff6ff] text-[#2563eb] text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap">{m.hours} hrs/wk</span>
+              <div className="flex items-center gap-1.5">
+                <span className="bg-[#eff6ff] text-[#2563eb] text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap">{m.hours} hrs/wk</span>
+                {idx === 0 && <HotspotDot index={1} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />}
+              </div>
             </div>
           ))
         ) : (
-          groups.map((g) => (
+          groups.map((g, idx) => (
             <div key={g.name} className="bg-white rounded-xl px-3 py-2.5 border border-gray-100">
               <div className="flex items-center justify-between mb-1.5">
                 <p className="text-xs font-bold text-[#1a1a1a]">{g.name}</p>
-                <span className="text-[10px] text-gray-400">{g.members.length} member{g.members.length !== 1 ? 's' : ''}</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-gray-400">{g.members.length} member{g.members.length !== 1 ? 's' : ''}</span>
+                  {idx === 0 && <HotspotDot index={2} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />}
+                </div>
               </div>
               <p className="text-[10px] text-gray-400">{g.members.join(' · ')}</p>
             </div>
@@ -529,7 +607,7 @@ function BusinessTeam() {
 
 // ─── Customer screen mocks ────────────────────────────────────────────────────
 
-function CustomerMyService({ onViewChange }: { onViewChange?: (v: boolean) => void }) {
+function CustomerMyService({ onViewChange, activeHotspot, onHotspotTap }: { onViewChange?: (v: boolean) => void; activeHotspot?: number | null; onHotspotTap?: (i: number) => void; }) {
   const [showList, setShowList] = useState(false);
 
   function setList(v: boolean) { setShowList(v); onViewChange?.(v); }
@@ -607,8 +685,14 @@ function CustomerMyService({ onViewChange }: { onViewChange?: (v: boolean) => vo
         {/* Blue Next Service card */}
         <div className="mx-3 mt-2 rounded-2xl bg-[#2563eb] p-3 mb-2">
           <div className="flex items-center justify-between mb-1.5">
-            <p className="text-[10px] text-white/70">Next Service</p>
-            <span className="text-[10px] font-bold text-[#86efac] bg-white/10 border border-white/20 px-2 py-0.5 rounded-full">✓ Submitted</span>
+            <div className="flex items-center gap-1.5">
+              <p className="text-[10px] text-white/70">Next Service</p>
+              <HotspotDot index={0} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-bold text-[#86efac] bg-white/10 border border-white/20 px-2 py-0.5 rounded-full">✓ Submitted</span>
+              <HotspotDot index={1} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />
+            </div>
           </div>
           <div className="flex gap-2">
             <div className="flex-1">
@@ -626,9 +710,10 @@ function CustomerMyService({ onViewChange }: { onViewChange?: (v: boolean) => vo
 
         {/* List View button */}
         <div className="mx-3 mb-1">
-          <button onClick={() => setList(true)} className="w-full border-2 border-[#2563eb] rounded-xl px-4 py-2 text-center">
+          <div role="button" tabIndex={0} onClick={() => setList(true)} onKeyDown={(e) => e.key === 'Enter' && setList(true)} className="w-full border-2 border-[#2563eb] rounded-xl px-4 py-2 flex items-center justify-center gap-2 cursor-pointer">
             <p className="text-[#2563eb] text-[11px] font-semibold">List View of Upcoming Services</p>
-          </button>
+            <HotspotDot index={2} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />
+          </div>
         </div>
         <p className="text-[9px] text-[#2563eb]/60 text-center pb-1 italic font-medium tracking-wide">↑ Interactive — try the list view</p>
 
@@ -638,7 +723,10 @@ function CustomerMyService({ onViewChange }: { onViewChange?: (v: boolean) => vo
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-[11px] text-gray-400 font-medium px-1">‹</span>
             <p className="text-[10px] font-bold text-[#1a1a1a]">March 2026</p>
-            <span className="text-[11px] text-gray-400 font-medium px-1">›</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-gray-400 font-medium px-1">›</span>
+              <HotspotDot index={3} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />
+            </div>
           </div>
           {/* Day labels */}
           <div className="grid grid-cols-7 mb-0.5">
@@ -679,8 +767,8 @@ function CustomerMyService({ onViewChange }: { onViewChange?: (v: boolean) => vo
 
 function CustomerNextService() {
   const submittedTasks = [
-    { name: 'Bathroom cleaning', mins: 45 },
-    { name: 'Dusting surfaces',  mins: 20 },
+    { name: 'Bathroom cleaning' },
+    { name: 'Dusting surfaces' },
   ];
   return (
     <div className="flex flex-col h-full bg-[#f5f5f5]">
@@ -709,13 +797,11 @@ function CustomerNextService() {
           <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Your Selections</p>
           <div className="space-y-1">
             {submittedTasks.map((t, i) => (
-              <div key={t.name} className={`flex items-center justify-between px-2 py-2 ${i > 0 ? 'border-t border-gray-100' : ''}`}>
+              <div key={t.name} className={`px-2 py-2 ${i > 0 ? 'border-t border-gray-100' : ''}`}>
                 <p className="text-[10px] font-medium text-[#1a1a1a]">{t.name}</p>
-                <p className="text-[10px] font-medium text-gray-400">{t.mins} min</p>
               </div>
             ))}
           </div>
-          <p className="text-[9px] text-gray-400 mt-2 text-right">65 / 180 min used</p>
         </div>
 
         {/* Edit button */}
@@ -730,53 +816,65 @@ function CustomerNextService() {
 }
 
 function CustomerTaskPicker() {
-  const tasks = [
-    { name: 'Bathroom cleaning', mins: 45, checked: true },
-    { name: 'Vacuum all rooms',  mins: 30, checked: false },
-    { name: 'Kitchen deep clean',mins: 60, checked: false },
-    { name: 'Dusting surfaces',  mins: 20, checked: false },
+  const taskNames = [
+    'Bathroom cleaning',
+    'Vacuum all rooms',
+    'Kitchen deep clean',
+    'Dusting surfaces',
   ];
-  const used = 45;
-  const total = 180;
-  const remaining = total - used;
-  const pct = Math.round((used / total) * 100);
-  const checkedCount = tasks.filter(t => t.checked).length;
+  const [ranked, setRanked] = useState<string[]>([]);
+
+  function toggleRank(name: string) {
+    setRanked(prev =>
+      prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
+    );
+  }
+
+  const allRanked = ranked.length === taskNames.length;
+
   return (
     <div className="flex flex-col h-full bg-[#f5f5f5]">
       {/* Header */}
       <div className="px-4 pt-2 pb-2 bg-white border-b border-gray-100 shrink-0">
-        <p className="text-[10px] text-gray-400 mb-0.5">Select Tasks</p>
+        <p className="text-[10px] text-gray-400 mb-0.5">Prioritize Tasks</p>
         <p className="text-sm font-bold text-[#1a1a1a]">ABC Cleaning Co.</p>
       </div>
 
-      {/* Time budget bar */}
-      <div className="px-3 py-2 bg-white border-b border-gray-100 shrink-0">
-        <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-1">
-          <div className="h-full bg-[#2563eb] rounded-full" style={{ width: `${pct}%` }} />
-        </div>
-        <p className="text-[9px] text-gray-400">
-          {used} / {total} min used · <span className="text-[#2563eb] font-semibold">{remaining} min remaining</span>
-        </p>
+      {/* Instruction strip */}
+      <div className="px-3 py-1.5 bg-white border-b border-gray-100 shrink-0">
+        <p className="text-[9px] text-gray-400 leading-relaxed">Tap tasks in the order you want them done — most important first.</p>
+        <p className="text-[9px] text-[#2563eb]/60 italic font-medium tracking-wide pt-0.5">↓ Interactive — try it</p>
       </div>
 
       {/* Task list */}
       <div className="flex-1 overflow-y-auto px-3 pt-2 space-y-1.5 pb-14">
-        {tasks.map((t) => (
-          <div key={t.name} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border ${t.checked ? 'bg-[#eff6ff] border-[#2563eb]' : 'bg-white border-gray-100'}`}>
-            <p className={`text-xs flex-1 ${t.checked ? 'font-semibold text-[#2563eb]' : 'text-[#1a1a1a]'}`}>{t.name}</p>
-            <p className="text-[10px] text-gray-400 mr-1.5">{t.mins} min</p>
-            <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 border-2 ${t.checked ? 'bg-[#2563eb] border-[#2563eb]' : 'border-gray-300'}`}>
-              {t.checked && <span className="text-white text-[10px] font-bold">✓</span>}
-            </div>
-          </div>
-        ))}
+        {taskNames.map((name) => {
+          const rank = ranked.indexOf(name);
+          const isRanked = rank !== -1;
+          return (
+            <button
+              key={name}
+              onClick={() => toggleRank(name)}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition-all ${
+                isRanked ? 'bg-[#eff6ff] border-[#2563eb]' : 'bg-white border-gray-100'
+              }`}
+            >
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 border-2 transition-all ${
+                isRanked ? 'bg-[#2563eb] border-[#2563eb]' : 'border-gray-300'
+              }`}>
+                {isRanked && <span className="text-white text-[9px] font-bold">{rank + 1}</span>}
+              </div>
+              <p className={`text-xs flex-1 ${isRanked ? 'font-semibold text-[#2563eb]' : 'text-[#1a1a1a]'}`}>{name}</p>
+            </button>
+          );
+        })}
       </div>
 
       {/* Submit footer */}
       <div className="absolute bottom-0 left-0 right-0 px-3 pb-3 pt-2 bg-white border-t border-gray-100">
-        <div className="bg-[#2563eb] rounded-xl px-4 py-2.5 text-center">
+        <div className={`rounded-xl px-4 py-2.5 text-center transition-colors ${allRanked ? 'bg-[#2563eb]' : 'bg-[#93c5fd]'}`}>
           <p className="text-white text-xs font-semibold">
-            Review Selection ({checkedCount} {checkedCount === 1 ? 'task' : 'tasks'})
+            {allRanked ? 'Submit Priorities' : `${ranked.length} of ${taskNames.length} ranked`}
           </p>
         </div>
       </div>
@@ -801,7 +899,7 @@ function CustomerSuccess() {
   );
 }
 
-function CustomerHistory() {
+function CustomerHistory({ activeHotspot, onHotspotTap }: { activeHotspot?: number | null; onHotspotTap?: (i: number) => void; }) {
   const pastServices = [
     { date: 'Mon, Mar 17', cycle: 'Weekly Clean', tasks: 3, ref: 28, rated: true },
     { date: 'Mon, Mar 10', cycle: 'Weekly Clean', tasks: 2, ref: 21, rated: true },
@@ -813,21 +911,30 @@ function CustomerHistory() {
         <p className="text-sm font-bold text-[#1a1a1a]">Service History</p>
       </div>
       <div className="flex-1 overflow-y-auto px-3 pt-3 space-y-2 pb-4">
-        {pastServices.map((s) => (
+        {pastServices.map((s, idx) => (
           <div key={s.ref} className="bg-white rounded-xl px-3 py-2.5 border border-gray-100">
             <div className="flex items-start justify-between mb-1">
-              <div>
-                <p className="text-[10px] font-bold text-[#1a1a1a]">{s.date}</p>
-                <p className="text-[9px] text-gray-400">{s.cycle}</p>
+              <div className="flex items-center gap-1.5">
+                <div>
+                  <p className="text-[10px] font-bold text-[#1a1a1a]">{s.date}</p>
+                  <p className="text-[9px] text-gray-400">{s.cycle}</p>
+                </div>
+                {idx === 0 && <HotspotDot index={0} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />}
               </div>
-              {s.rated
-                ? <span className="text-[9px] font-bold text-[#065f46] bg-[#d1fae5] px-1.5 py-0.5 rounded-full shrink-0">★ Rated</span>
-                : <span className="text-[9px] font-bold text-[#2563eb] bg-[#eff6ff] px-1.5 py-0.5 rounded-full shrink-0">Rate</span>
-              }
+              <div className="flex items-center gap-1.5 shrink-0">
+                {s.rated
+                  ? <span className="text-[9px] font-bold text-[#065f46] bg-[#d1fae5] px-1.5 py-0.5 rounded-full">★ Rated</span>
+                  : <span className="text-[9px] font-bold text-[#2563eb] bg-[#eff6ff] px-1.5 py-0.5 rounded-full">Rate</span>
+                }
+                {idx === 0 && <HotspotDot index={1} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />}
+              </div>
             </div>
             <div className="flex items-center justify-between mt-1">
               <p className="text-[9px] text-gray-400">{s.tasks} tasks completed</p>
-              <p className="text-[9px] text-gray-300">Ref #{s.ref}</p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-[9px] text-gray-300">Ref #{s.ref}</p>
+                {idx === 0 && <HotspotDot index={2} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />}
+              </div>
             </div>
           </div>
         ))}
@@ -914,7 +1021,7 @@ function TeamMemberMyJobs() {
   );
 }
 
-function TeamMemberJobDetail() {
+function TeamMemberJobDetail({ activeHotspot, onHotspotTap }: { activeHotspot?: number | null; onHotspotTap?: (i: number) => void; }) {
   const [checked, setChecked] = useState([true, false, false, false]);
   const tasks = [
     { name: 'Vacuum all rooms',   mins: 30 },
@@ -934,7 +1041,10 @@ function TeamMemberJobDetail() {
         <p className="text-sm font-extrabold text-white leading-tight mb-0.5">Nancy Fancy</p>
         <p className="text-[10px] text-[#bfdbfe] mb-0.5">Weekly Clean</p>
         <p className="text-[10px] text-[#dbeafe] font-medium mb-2">Monday, March 24, 2026</p>
-        <span className="text-[9px] font-bold text-white bg-white/20 px-2.5 py-0.5 rounded-full">Open</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[9px] font-bold text-white bg-white/20 px-2.5 py-0.5 rounded-full">Open</span>
+          <HotspotDot index={0} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto bg-[#f5f5f5] px-3 pt-2.5 space-y-2 pb-3">
@@ -944,8 +1054,11 @@ function TeamMemberJobDetail() {
             <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Address</p>
             <p className="text-[10px] font-medium text-[#1a1a1a]">214 Elm St, Chicago, IL</p>
           </div>
-          <div className="bg-[#2563eb] rounded-lg px-2 py-1 shrink-0">
-            <p className="text-white text-[9px] font-bold">Get Directions</p>
+          <div className="flex items-center gap-1.5">
+            <div className="bg-[#2563eb] rounded-lg px-2 py-1 shrink-0">
+              <p className="text-white text-[9px] font-bold">Get Directions</p>
+            </div>
+            <HotspotDot index={1} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />
           </div>
         </div>
 
@@ -953,16 +1066,20 @@ function TeamMemberJobDetail() {
         <div className="flex bg-[#fffbeb] rounded-xl border border-gray-100 overflow-hidden">
           <div className="w-1 bg-[#f59e0b] shrink-0" />
           <div className="flex-1 px-2.5 py-2">
-            <p className="text-[8px] font-bold text-[#b45309] uppercase tracking-wider mb-1">Customer Notes</p>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[8px] font-bold text-[#b45309] uppercase tracking-wider">Customer Notes</p>
+              <HotspotDot index={2} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />
+            </div>
             <p className="text-[9px] text-[#1a1a1a] leading-relaxed">Use the side entrance. The dog is friendly.</p>
           </div>
         </div>
 
         {/* Tasks */}
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-          <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wider px-3 pt-2 pb-1.5 border-b border-gray-100">
-            Tasks ({doneCount}/{tasks.length})
-          </p>
+          <div className="flex items-center justify-between px-3 pt-2 pb-1.5 border-b border-gray-100">
+            <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Tasks ({doneCount}/{tasks.length})</p>
+            <HotspotDot index={3} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />
+          </div>
           {tasks.map((t, i) => (
             <button
               key={t.name}
@@ -984,8 +1101,9 @@ function TeamMemberJobDetail() {
           <div className="h-7 bg-[#fafafa] rounded-lg border border-gray-200 px-2 py-1 mb-2 flex items-center">
             <p className="text-[9px] text-gray-300">Gate code, access notes…</p>
           </div>
-          <div className="bg-[#10b981] rounded-xl py-2 text-center">
+          <div className="bg-[#10b981] rounded-xl py-2 flex items-center justify-center gap-2">
             <p className="text-white text-[10px] font-bold">Mark Service Complete</p>
+            <HotspotDot index={4} activeHotspot={activeHotspot} onHotspotTap={onHotspotTap} />
           </div>
         </div>
       </div>
@@ -998,7 +1116,8 @@ function TeamMemberJobDetail() {
 const businessScreens: Screen[] = [
   {
     label: 'Dashboard',
-    render: (onViewChange) => <BusinessDashboard onViewChange={onViewChange} />,
+    render: (p) => <BusinessDashboard onViewChange={p?.onCalViewChange} activeHotspot={p?.activeHotspot} onHotspotTap={p?.onHotspotTap} />,
+    embedsHotspots: true,
     hotspots: [
       { title: 'List / Calendar toggle', description: 'Switch between a scrollable card list and a full month calendar — the same toggle available in the real app.', top: '13%', left: '0%' },
       { title: 'Service date tile',      description: 'Each tile represents an upcoming service date. The four numbers show: Total customers scheduled, Done (submitted their task selections), Pending (haven\'t selected yet), and Rate (the overall submission percentage for that day).', top: '46%', left: '0%' },
@@ -1007,7 +1126,7 @@ const businessScreens: Screen[] = [
     calHotspots: [
       { title: 'List / Calendar toggle', description: 'Switch between a scrollable card list and a full month calendar — the same toggle available in the real app.', top: '13%', left: '0%' },
       { title: 'Service date dots',      description: 'Colored dots mark every scheduled service date — blue when no customers have selected yet, amber when selections are mixed, green when all customers have submitted.', top: '52%', left: '55%' },
-      { title: 'Color legend',           description: 'The legend below the calendar explains what each dot color represents so you can read your full schedule status at a glance.', top: '76%', left: '2%' },
+      { title: 'Color Legend / Service Quick List', description: 'The legend translates each dot color — blue means no selections yet, amber means mixed, green means all submitted. Below the calendar, a quick list surfaces your nearest upcoming service dates without leaving the view.', top: '76%', left: '2%' },
     ],
   },
   {
@@ -1021,28 +1140,31 @@ const businessScreens: Screen[] = [
   },
   {
     label: 'Customer',
-    render: (onViewChange) => <BusinessCustomer onViewChange={onViewChange} />,
+    render: (p) => <BusinessCustomer onViewChange={p?.onCalViewChange} activeHotspot={p?.activeHotspot} onHotspotTap={p?.onHotspotTap} />,
+    embedsHotspots: true,
     calHotspots: [],
     hotspots: [
       { title: 'Get Directions',         description: 'The customer\'s address is stored on their profile and tappable right from the header — opens Maps so your team can navigate without copying anything out of a text.', top: '19%', left: '2%' },
       { title: 'Customer Notes',         description: 'Any notes you\'ve added to the customer profile are shown here — preferences, access instructions, anything the team needs to know before arriving.', top: '30%', left: '2%' },
       { title: 'Assigned Cycles',        description: 'Every service cycle assigned to this customer is listed with its hours per visit. Add or adjust cycles at any time — changes take effect on the next scheduled service.', top: '53%', left: '2%' },
       { title: 'Recent Feedback',        description: 'The latest feedback from this customer surfaces right on their profile. Tap to read the full response — so you always know where you stand before their next visit.', top: '65%', left: '2%' },
-      { title: 'Upcoming service rows',  description: 'Each upcoming service date is tappable — opens the Service Call detail view with the submission status, assignment, deadline, and a reschedule option for that single visit.', top: '83%', left: '2%' },
+      { title: 'Messages',               description: 'A preview of the most recent messages with this customer — both automated reminders and manual replies. Tap View full thread to open the two-way SMS conversation.', top: '76%', left: '2%' },
+      { title: 'Upcoming service rows',  description: 'Each upcoming service date is tappable — opens the Service Call detail view with the submission status, assignment, deadline, and a reschedule option for that single visit.', top: '90%', left: '2%' },
     ],
   },
   {
     label: 'Service Cycle',
-    render: () => <BusinessServiceCycle />,
+    render: (p) => <BusinessServiceCycle activeHotspot={p?.activeHotspot} onHotspotTap={p?.onHotspotTap} />,
+    embedsHotspots: true,
     hotspots: [
-      { title: 'Service cycle card',   description: 'Each card represents a named service cycle — with its frequency, how many tasks are attached, and the selection deadline. Tap Edit to adjust it at any time.', top: '10%', left: '2%' },
-      { title: 'Task & frequency info', description: 'The frequency sets how often this cycle repeats (weekly, biweekly, monthly). Tasks are the menu of work items customers can choose from during their selection window.', top: '22%', left: '48%' },
-      { title: '+ New Cycle',          description: 'Create a new service cycle — define the name, frequency, deadline window, and which tasks belong to it. Cycles are then assigned to individual customers.', top: '92%', left: '20%' },
+      { title: 'Service cycle card', description: 'Each card represents a named service cycle — with its frequency, how many tasks are attached, and the selection deadline. Tap Edit to adjust it at any time.', top: '10%', left: '2%' },
+      { title: '+ New Cycle',        description: 'Create a new service cycle — define the name, frequency, deadline window, and which tasks belong to it. Cycles are then assigned to individual customers.', top: '92%', left: '20%' },
     ],
   },
   {
     label: 'My Team',
-    render: () => <BusinessTeam />,
+    render: (p) => <BusinessTeam activeHotspot={p?.activeHotspot} onHotspotTap={p?.onHotspotTap} />,
+    embedsHotspots: true,
     hotspots: [
       { title: 'Team member row', description: 'Add staff by name — each member appears here with their group assignment.',           top: '6%', left: '48%' },
       { title: 'Group badge',     description: 'Members belong to named groups for faster bulk scheduling and assignment.',           top: '25%', left: '65%' },
@@ -1054,7 +1176,8 @@ const businessScreens: Screen[] = [
 const customerScreens: Screen[] = [
   {
     label: 'My Service',
-    render: (onViewChange) => <CustomerMyService onViewChange={onViewChange} />,
+    render: (p) => <CustomerMyService onViewChange={p?.onCalViewChange} activeHotspot={p?.activeHotspot} onHotspotTap={p?.onHotspotTap} />,
+    embedsHotspots: true,
     calHotspots: [],
     hotspots: [
       { title: 'Next Service card',       description: 'Tap the blue card to see your selected tasks or the full task list for the service.', top: '12%', left: '38%' },
@@ -1077,10 +1200,9 @@ const customerScreens: Screen[] = [
     label: 'Select Tasks',
     render: () => <CustomerTaskPicker />,
     hotspots: [
-      { title: 'Time budget bar',  description: 'Your available time is shown as a budget — select tasks until it\'s filled.',           top: '12%', left: '50%' },
-      { title: 'Selected task',    description: 'Checked tasks are confirmed for your upcoming service and shown in green.',              top: '18%', left: '78%' },
-      { title: 'Unselected task',  description: 'Tap any task to add it to your selection — the time counter updates instantly.',        top: '55%', left: '78%' },
-      { title: 'Review button',    description: 'When your selection is ready, review the full summary before confirming.',              top: '86%', left: '30%' },
+      { title: 'Ranked task',      description: 'Tap a task to assign it the next priority number. Tap it again to remove it and shift the others down — your list stays in order automatically.', top: '18%', left: '78%' },
+      { title: 'Unranked task',    description: 'Tasks you haven\'t ranked yet. Tap any of them to add them to your priority list at the next available position.',                                top: '55%', left: '78%' },
+      { title: 'Submit button',    description: 'The button shows your ranking progress and activates once every task has a number. Your priority order goes straight to your service team.',     top: '86%', left: '30%' },
     ],
   },
   {
@@ -1093,7 +1215,8 @@ const customerScreens: Screen[] = [
   },
   {
     label: 'History',
-    render: () => <CustomerHistory />,
+    render: (p) => <CustomerHistory activeHotspot={p?.activeHotspot} onHotspotTap={p?.onHotspotTap} />,
+    embedsHotspots: true,
     hotspots: [
       { title: 'Past service card',  description: 'Every completed service is listed here — date, cycle name, task count, and the reference number that links to the business owner\'s record.', top: '5%', left: '55%' },
       { title: 'Rate badge',         description: 'After a service is complete, you\'ll see a prompt to rate it. Once submitted, the badge shows ★ Rated so you know your feedback was received.', top: '17%', left: '67%' },
@@ -1122,7 +1245,8 @@ const teamMemberScreens: Screen[] = [
   },
   {
     label: 'Job Detail',
-    render: () => <TeamMemberJobDetail />,
+    render: (p) => <TeamMemberJobDetail activeHotspot={p?.activeHotspot} onHotspotTap={p?.onHotspotTap} />,
+    embedsHotspots: true,
     hotspots: [
       { title: 'Job header',            description: 'The blue card shows the customer name, service cycle, date, and Open/Completed status — everything needed to know before you arrive.',                              top: '5%', left: '2%' },
       { title: 'Address & Directions',  description: 'The customer\'s address is pulled directly from their profile. Tap Get Directions and it opens in Maps — no copying addresses out of a text thread.',              top: '27%', left: '2%' },
@@ -1227,10 +1351,10 @@ export default function AppShowcase() {
               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-5 bg-[#1a1a1a] rounded-b-xl z-20" />
               {/* Screen */}
               <div className="h-[560px] bg-[#f5f5f5] pt-6 relative overflow-hidden">
-                {current.render(handleDashViewChange)}
+                {current.render({ onCalViewChange: handleDashViewChange, activeHotspot, onHotspotTap: toggleHotspot })}
 
-                {/* Hotspot circles */}
-                {hotspots.map((h, i) => (
+                {/* Hotspot circles — skipped for screens that embed their own dots */}
+                {!current.embedsHotspots && hotspots.map((h, i) => (
                   <button
                     key={i}
                     onClick={() => toggleHotspot(i)}

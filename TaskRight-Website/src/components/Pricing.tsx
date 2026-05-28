@@ -28,7 +28,7 @@ export default function Pricing() {
                 Monthly
               </p>
               <div className="flex items-end gap-1 mb-1">
-                <span className="text-5xl font-bold text-text">$29</span>
+                <span className="text-5xl font-bold text-text">$35</span>
                 <span className="text-text-muted text-lg mb-2">/mo</span>
               </div>
               <p className="text-text-muted text-sm mt-2">
@@ -65,14 +65,14 @@ export default function Pricing() {
                 Yearly
               </p>
               <div className="flex items-end gap-1 mb-1">
-                <span className="text-5xl font-bold text-white">$290</span>
+                <span className="text-5xl font-bold text-white">$350</span>
                 <span className="text-white/60 text-lg mb-2">/yr</span>
               </div>
               <p className="text-white/60 text-sm mt-2">
-                $24.17/mo, billed annually
+                $29.17/mo, billed annually
               </p>
               <p className="text-white font-semibold text-sm mt-1">
-                Save $58 vs monthly
+                Save $70 vs monthly
               </p>
             </div>
             <ul className="space-y-3 mb-8 flex-1">

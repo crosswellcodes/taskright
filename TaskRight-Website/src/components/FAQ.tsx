@@ -17,7 +17,7 @@ const faqs = [
   {
     question: "What about data security?",
     answer:
-      "Data privacy and security are a priority in our build. Beta testers will be notified of all security features and data handling practices before launch. We will never sell your customer data.",
+      "Data privacy and security are a priority in our build. Early Access members will be notified of all security features and data handling practices before launch. We will never sell your customer data.",
   },
   {
     question: "Can I use TaskRight for my type of service business?",
@@ -27,7 +27,7 @@ const faqs = [
   {
     question: "When is TaskRight launching?",
     answer:
-      "We're actively building and targeting a public launch in Q3/Q4 2026. Beta testers get first access and will have direct input on the features we prioritize. Apply now to secure your spot.",
+      "We're actively building and targeting a public launch in Q3/Q4 2026. Early Access members get first access and will have direct input on the features we prioritize. Apply now to secure your spot.",
   },
 ];
 
@@ -40,7 +40,7 @@ export default function FAQ() {
             Frequently Asked Questions
           </h2>
           <p className="text-text-muted text-lg">
-            Everything you need to know before applying for beta access.
+            Everything you need to know before signing up for early access.
           </p>
         </div>
         <div className="space-y-4">

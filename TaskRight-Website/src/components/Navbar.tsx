@@ -11,10 +11,10 @@ export default function Navbar() {
             Blog
           </a>
           <a
-            href="#early-access"
-            className="bg-brand hover:bg-brand-dark text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
+            href="/signup"
+            className="bg-orange-600 hover:bg-orange-700 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
           >
-            Apply for Early Access
+            Get TaskRight
           </a>
         </div>
       </div>

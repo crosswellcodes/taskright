@@ -4,6 +4,7 @@ import Problem from '@/components/Problem';
 import Features from '@/components/Features';
 import HowItWorks from '@/components/HowItWorks';
 import AppShowcase from '@/components/AppShowcase';
+import PersonaCards from '@/components/PersonaCards';
 import Pricing from '@/components/Pricing';
 import FounderStory from '@/components/FounderStory';
 import FAQ from '@/components/FAQ';
@@ -16,6 +17,7 @@ export default function Home() {
       <Navbar />
       <main>
         <Hero />
+        <PersonaCards />
         <AppShowcase />
         <Problem />
         <Features />

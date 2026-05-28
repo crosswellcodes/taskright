@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   // 53 chars — fits Google SERP display without truncation
   title: "TaskRight — Service Management App for Small Business",
   description:
-    "TaskRight is the affordable customer communication tool for small cleaning and lawn care businesses. Capture preferences, send reminders, collect feedback. Apply for free beta access.",
+    "TaskRight is the affordable customer communication tool for small cleaning and lawn care businesses. Capture preferences, send reminders, collect feedback. Apply for early access.",
   alternates: {
     canonical: "https://taskrightpro.com/",
   },
@@ -123,7 +123,7 @@ const faqPageSchema = {
       name: "How much does TaskRight cost?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Early access members get free forever access. Once we launch publicly, pricing will start at $29–99/month depending on business size. Beta participants lock in their free tier — no expiration, no credit card required.",
+        text: "TaskRight is $35/month or $350/year (2 months free). Early Access members lock in this founding rate for life as long as they stay subscribed — no price increases, no upgrade tiers.",
       },
     },
     {
@@ -139,7 +139,7 @@ const faqPageSchema = {
       name: "What about data security?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Data privacy and security are a priority in our build. Beta testers will be notified of all security features and data handling practices before launch. We will never sell your customer data.",
+        text: "Data privacy and security are a priority in our build. Early Access members will be notified of all security features and data handling practices before launch. We will never sell your customer data.",
       },
     },
     {
@@ -155,7 +155,7 @@ const faqPageSchema = {
       name: "When is TaskRight launching?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "We're actively building and targeting a public launch in Q3/Q4 2026. Beta testers get first access and will have direct input on the features we prioritize. Apply now to secure your spot.",
+        text: "We're actively building and targeting a public launch in Q3/Q4 2026. Early Access members get first access and will have direct input on the features we prioritize. Apply now to secure your spot.",
       },
     },
   ],

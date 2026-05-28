@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { track } from '@vercel/analytics';
 
 const businessTypes = [
@@ -95,24 +96,37 @@ export default function EarlyAccessForm() {
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-10">
           <h2 className="text-3xl font-bold text-white mb-4">
-            Get Free Access to TaskRight through Early Access Signup
+            Get Access to TaskRight through Early Access Signup
           </h2>
           <p className="text-white/75 text-lg leading-relaxed">
             TaskRight is built for small cleaning, lawn care, and home service businesses
             that need smarter customer communication without the enterprise price tag.
             Sign up and your free tier access is yours to keep — no credit card, no commitment,
-            no expiration. Beta spots are limited. We review every application personally.
+            no expiration. Early Access spots are limited. We review every application personally.
           </p>
         </div>
 
         {submitted ? (
           <div className="bg-white/10 rounded-2xl px-8 py-10 text-center">
-            <div className="text-4xl mb-4">✓</div>
-            <h3 className="text-white font-bold text-xl mb-2">Application received.</h3>
-            <p className="text-white/70 leading-relaxed">
-              We review every submission personally and will be in touch within a few days.
-              If you&apos;re a fit, you&apos;ll get first access — free, forever.
+            <div className="w-14 h-14 bg-white/15 rounded-full flex items-center justify-center mx-auto mb-5">
+              <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h3 className="text-white font-bold text-xl mb-2">You&apos;re in.</h3>
+            <p className="text-white/80 leading-relaxed mb-6">
+              We review every application personally and will be in touch within a few days.
+              Early access spots are limited — you&apos;re ahead of the line.
             </p>
+            <div className="border-t border-white/20 pt-6">
+              <p className="text-white/60 text-sm mb-3">Want to lock in your account now?</p>
+              <Link
+                href="/signup"
+                className="inline-block bg-white text-brand font-semibold px-6 py-2.5 rounded-lg text-sm hover:bg-white/90 transition-colors"
+              >
+                Complete registration →
+              </Link>
+            </div>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -218,8 +232,8 @@ export default function EarlyAccessForm() {
             <button
               type="submit"
               disabled={loading}
-              aria-label="Apply for free beta access"
-              className="w-full bg-white text-brand font-semibold px-6 py-4 rounded-lg hover:bg-white/90 transition-colors text-base disabled:opacity-70 disabled:cursor-not-allowed"
+              aria-label="Apply for early access"
+              className="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold px-6 py-4 rounded-lg transition-colors text-base disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {loading ? 'Submitting…' : 'Apply for Early Access'}
             </button>

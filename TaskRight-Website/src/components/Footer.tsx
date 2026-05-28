@@ -28,7 +28,7 @@ export default function Footer() {
             <ul className="space-y-2">
               <li>
                 <a href="#early-access" className="text-white/50 hover:text-white/80 text-sm transition-colors">
-                  Apply for Beta Access
+                  Get Early Access
                 </a>
               </li>
               <li>
