@@ -40,8 +40,8 @@ export default function TermsOfServicePage() {
               <p className="mt-4">
                 If you do not agree to these Terms, do not use the Service. If you have questions,
                 contact us at{' '}
-                <a href="mailto:hello@taskrightpro.com" className="text-brand hover:underline">
-                  hello@taskrightpro.com
+                <a href="mailto:support@taskrightpro.com" className="text-brand hover:underline">
+                  support@taskrightpro.com
                 </a>.
               </p>
             </div>
@@ -61,7 +61,7 @@ export default function TermsOfServicePage() {
             <Section title="2. Eligibility and Accounts">
               <ul className="list-disc pl-5 space-y-2">
                 <li>You must be at least 18 years old and legally capable of entering into a binding contract to use the Service.</li>
-                <li>You are responsible for maintaining the security of your account credentials. Notify us immediately at hello@taskrightpro.com if you suspect unauthorized access.</li>
+                <li>You are responsible for maintaining the security of your account credentials. Notify us immediately at support@taskrightpro.com if you suspect unauthorized access.</li>
                 <li>One business account per business entity. You may not create accounts on behalf of others without their express authorization.</li>
                 <li>We reserve the right to suspend or terminate accounts that violate these Terms.</li>
               </ul>
@@ -147,8 +147,8 @@ export default function TermsOfServicePage() {
                 collect information from anyone under 18. If we become aware that a user is under 18,
                 we will terminate their account and delete their data promptly. If you believe we have
                 inadvertently collected information from someone under 18, contact us at{' '}
-                <a href="mailto:hello@taskrightpro.com" className="text-brand hover:underline">
-                  hello@taskrightpro.com
+                <a href="mailto:support@taskrightpro.com" className="text-brand hover:underline">
+                  support@taskrightpro.com
                 </a>{' '}
                 and we will address it immediately.
               </p>
@@ -166,7 +166,7 @@ export default function TermsOfServicePage() {
             <Section title="10. Termination">
               <p>
                 Either party may terminate your account at any time. You may delete your account by
-                contacting us at hello@taskrightpro.com. We may suspend or terminate your access if you
+                contacting us at support@taskrightpro.com. We may suspend or terminate your access if you
                 violate these Terms, with or without prior notice depending on the severity of the
                 violation.
               </p>
@@ -202,8 +202,8 @@ export default function TermsOfServicePage() {
               <div className="mt-4 bg-bg rounded-xl p-5 text-sm">
                 <p className="font-semibold text-text">TaskRight</p>
                 <p className="mt-1">
-                  <a href="mailto:hello@taskrightpro.com" className="text-brand hover:underline">
-                    hello@taskrightpro.com
+                  <a href="mailto:support@taskrightpro.com" className="text-brand hover:underline">
+                    support@taskrightpro.com
                   </a>
                 </p>
               </div>

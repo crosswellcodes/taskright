@@ -80,7 +80,7 @@ const organizationSchema = {
   contactPoint: {
     "@type": "ContactPoint",
     contactType: "customer support",
-    email: "hello@taskrightpro.com",
+    email: "support@taskrightpro.com",
   },
   sameAs: [],
 };
