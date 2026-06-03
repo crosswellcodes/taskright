@@ -5,8 +5,14 @@ export default function Navbar() {
         <a href="/" className="text-xl font-bold text-brand hover:text-brand-dark transition-colors">TaskRight</a>
         <div className="flex items-center gap-3">
           <a
+            href="/demo"
+            className="text-text-muted hover:text-text text-sm font-semibold px-4 py-2.5 transition-colors"
+          >
+            Demo
+          </a>
+          <a
             href="/blog/"
-            className="bg-brand hover:bg-brand-dark text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
+            className="text-text-muted hover:text-text text-sm font-semibold px-4 py-2.5 transition-colors"
           >
             Blog
           </a>
