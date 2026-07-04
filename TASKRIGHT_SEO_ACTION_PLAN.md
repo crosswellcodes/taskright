@@ -1,9 +1,11 @@
 # TaskRight SEO Action Plan - Complete Implementation Guide
 
 **Project:** TaskRight Landing Page + Blog SEO Optimization  
-**Goal:** Capture email signups for service business owner waitlist  
+**Goal:** Capture email signups for service business owner beta program  
 **Target Audience:** Small-to-medium business owners (Midwest focus)  
-**Primary Keyword:** "service management app for small business"  
+**Primary Keyword (Tier 3 — aspirational):** "service management app for small business"  
+**Tier 1 Keywords (long-tail, win early):** "customer preference management cleaning business", "how to manage customer preferences service business", "customer communication tool lawn care business", "how to reduce customer churn cleaning business"  
+**Tier 2 Keywords (competitive, category-level):** "enterprise service software too expensive", "affordable alternative to service management software", "simple service management app", "service management software for small business under 50"  
 **Timeline:** 6 weeks (1 blog post per week + landing page)  
 **Status:** Ready for Claude Code Implementation  
 
@@ -27,13 +29,18 @@
 
 ## Executive Summary
 
-TaskRight is building a landing page and content strategy to capture email signups for a service management app targeting small business owners who find enterprise tools (Jobber, Zen Maid, CompanyCam) too expensive.
+TaskRight is building a landing page and content strategy to capture beta program applications from service business owners who find enterprise tools (Jobber, Zen Maid, CompanyCam) too expensive and too complex for their stage of business.
 
-**Strategy:**
+**Keyword Strategy — Three Tiers:**
+- **Tier 1 (Win Early):** Long-tail, low-competition keywords targeting specific pain points — blog posts built around these
+- **Tier 2 (Competitive):** Category-level competitive keywords targeting "too expensive / too complex" searches — no single competitor named
+- **Tier 3 (Aspirational):** Primary keyword in landing page technical metadata only — build toward ranking over time
+
+**Content Strategy:**
 - **Week 1:** Launch optimized landing page + first blog post
 - **Weeks 2-6:** Release one blog post per week (6 posts total)
-- **Objective:** Rank for "service management app for small business" and related long-tail keywords
-- **Conversion:** Capture emails via waitlist form on landing page and blog posts
+- **Objective:** Rank for Tier 1 and Tier 2 keywords first, build toward Tier 3 over 6+ months
+- **Conversion:** Capture beta applications via gated form on landing page and blog posts
 
 **Expected Outcomes (6 months):**
 - 50-100 organic monthly visitors
@@ -88,9 +95,9 @@ Primary conversion page. Captures email signups for waitlist. Targets "service m
 
 ### Landing Page URL
 ```
-https://taskright.com/
+https://taskrightpro.com/
 OR
-https://www.taskright.com/
+https://www.taskrightpro.com/
 ```
 
 ### Page Structure
@@ -104,24 +111,24 @@ https://www.taskright.com/
     <!-- Meta Tags -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="TaskRight is the affordable service management app for small cleaning and lawn care businesses. Capture customer preferences, send automated reminders, collect feedback. Start your free trial today.">
+    <meta name="description" content="TaskRight is the affordable customer communication tool for small cleaning and lawn care businesses. Capture customer preferences, send automated reminders, collect feedback. Apply for free beta access today.">
     <meta name="keywords" content="service management app, customer communication tool, small business software, cleaning service management">
     
     <!-- Open Graph (Social Media) -->
     <meta property="og:title" content="TaskRight - Service Management App for Small Business">
     <meta property="og:description" content="Affordable service management software for growing cleaning and lawn care businesses. Manage customer preferences, send reminders, collect feedback.">
-    <meta property="og:image" content="https://taskright.com/assets/images/og-image.jpg">
-    <meta property="og:url" content="https://taskright.com/">
+    <meta property="og:image" content="https://taskrightpro.com/assets/images/og-image.jpg">
+    <meta property="og:url" content="https://taskrightpro.com/">
     <meta property="og:type" content="website">
     
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="TaskRight - Service Management App for Small Business">
     <meta name="twitter:description" content="Affordable service management software for growing cleaning and lawn care businesses.">
-    <meta name="twitter:image" content="https://taskright.com/assets/images/twitter-image.jpg">
+    <meta name="twitter:image" content="https://taskrightpro.com/assets/images/twitter-image.jpg">
     
     <!-- Canonical URL (prevents duplicate content) -->
-    <link rel="canonical" href="https://taskright.com/">
+    <link rel="canonical" href="https://taskrightpro.com/">
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="/assets/icons/favicon.png">
@@ -157,21 +164,21 @@ https://www.taskright.com/
         <h1>The Service Management App for Small Business Owners</h1>
         
         <p class="subheading">
-            Stop losing customers. TaskRight helps growing cleaning, lawn care, and service 
-            businesses manage customer preferences, send automated reminders, and collect 
-            feedback—without enterprise software pricing.
+            TaskRight is built for growing cleaning, lawn care, and service businesses that need 
+            smarter customer communication — without the enterprise price tag. We're looking for 
+            founding business owners to help us get it right.
         </p>
         
         <div class="cta-primary">
             <button class="btn-primary" onclick="scrollToForm()">
-                Join the Waitlist (Free)
+                Apply for Free Beta Access
             </button>
         </div>
         
         <p class="trust-signal">
             ✓ Free forever access for early adopters  
             ✓ No credit card required  
-            ✓ Join 500+ early community members
+            ✓ Help shape the product from day one
         </p>
     </div>
     
@@ -273,51 +280,34 @@ https://www.taskright.com/
 
 ---
 
-#### 5. Social Proof Section
+#### 5. Why We're Building This Section
 
 ```html
-<section class="social-proof">
-    <h2>Trusted by Service Business Owners</h2>
+<section class="founder-story">
+    <h2>Why We're Building TaskRight</h2>
     
-    <div class="testimonials">
-        <div class="testimonial">
-            <p class="quote">
-                "TaskRight saved us hours every week on customer communication. 
-                Our repeat rate went up 15% in the first month."
-            </p>
-            <p class="author">— Sarah M., Owner at CleanCo Midwest</p>
-        </div>
-        
-        <div class="testimonial">
-            <p class="quote">
-                "Finally, a tool designed for small businesses like ours. 
-                Not bloated with enterprise features we don't need."
-            </p>
-            <p class="author">— Mike T., Owner at GreenScape Services</p>
-        </div>
-    </div>
-    
-    <div class="stats">
-        <div class="stat">
-            <h3>500+</h3>
-            <p>Early Access Members</p>
-        </div>
-        <div class="stat">
-            <h3>15-20%</h3>
-            <p>Average Repeat Rate Increase</p>
-        </div>
-        <div class="stat">
-            <h3>$0</h3>
-            <p>Monthly Cost (Early Adopters)</p>
-        </div>
+    <div class="story-content">
+        <p>
+            We built TaskRight because we watched small service businesses lose good customers 
+            to simple communication problems — not bad service. Enterprise tools cost too much 
+            and do too much. We're building something simpler, built for businesses with 
+            10–75 customers, not 500.
+        </p>
+        <p>
+            TaskRight is in active development. We're looking for real service business owners 
+            who want a tool built around their actual needs — and who are willing to use it and 
+            tell us honestly what works and what doesn't.
+        </p>
     </div>
 </section>
 ```
 
 **SEO Notes:**
-- Testimonials add credibility (also helps time-on-page)
-- Stats demonstrate value
-- Keywords like "small business" appear naturally in testimonials
+- Authentic founder story builds trust and time-on-page
+- Plain language connects with small business owner audience
+- No fabricated statistics or testimonials — credibility through honesty
+
+> **Content Rule:** No statistics, testimonials, or social proof numbers appear on this page unless they are real and verifiable. All blog post statistics must link to a named, real source. Fabricated data is not permitted anywhere on the site.
 
 ---
 
@@ -326,9 +316,13 @@ https://www.taskright.com/
 ```html
 <section class="email-capture" id="email-form">
     <div class="form-container">
-        <h2>Join the Waitlist for Early Access</h2>
+        <h2>Get Free Access to TaskRight Before We Launch</h2>
         <p class="form-subheading">
-            Get notified when TaskRight launches. Free forever access for early adopters.
+            TaskRight is built for small cleaning, lawn care, and home service businesses 
+            that need smarter customer communication without the enterprise price tag. 
+            Sign up and your free tier access is yours to keep — no credit card, no commitment, 
+            no expiration. Beta spots are limited. We review applications and invite business 
+            owners who are ready to use TaskRight with real customers and share feedback as we build.
         </p>
         
         <form id="waitlist-form" class="form" onsubmit="handleFormSubmit(event)">
@@ -387,6 +381,17 @@ https://www.taskright.com/
                     <option value="other">Other</option>
                 </select>
             </div>
+
+            <div class="form-group">
+                <label for="customer-count">How many active customers do you currently serve? *</label>
+                <select id="customer-count" name="customer_count" required aria-label="Number of active customers">
+                    <option value="">Select one...</option>
+                    <option value="under-10">Under 10</option>
+                    <option value="10-30">10–30</option>
+                    <option value="31-75">31–75</option>
+                    <option value="75-plus">75+</option>
+                </select>
+            </div>
             
             <div class="form-group checkbox">
                 <input 
@@ -401,10 +406,15 @@ https://www.taskright.com/
                 </label>
             </div>
             
-            <button type="submit" class="btn-submit" aria-label="Join waitlist button">
-                Join the Waitlist (Free)
+            <button type="submit" class="btn-submit" aria-label="Apply for free beta access">
+                Apply for Free Beta Access
             </button>
             
+            <p class="form-note">
+                Beta access is limited and by approval. We're looking for active service business 
+                owners who will use TaskRight with real customers and share honest feedback as we build.
+            </p>
+
             <p class="form-guarantee">
                 ✓ No spam. Unsubscribe anytime.  
                 ✓ Your data is safe and secure.
@@ -412,18 +422,20 @@ https://www.taskright.com/
         </form>
         
         <div id="form-success" class="hidden" role="alert" aria-live="polite">
-            <h3>✓ Success! Check your email</h3>
-            <p>We've sent you a confirmation email. Welcome to the TaskRight community!</p>
+            <h3>✓ Application received.</h3>
+            <p>We review every submission personally and will be in touch within a few days. 
+            If you're a fit, you'll get first access — free, forever.</p>
         </div>
     </div>
 </section>
 ```
 
 **SEO Notes:**
-- Form asks for segmentation (business type, state)
+- Form asks for segmentation (business type, state, customer count)
+- Customer count field qualifies applicants for gated beta
 - aria-labels improve accessibility (helps SEO)
-- Clear value proposition ("Free forever")
-- Trust signals ("No spam")
+- Clear value proposition ("free forever, yours to keep")
+- Honest expectation-setting ("by approval", "share feedback")
 
 ---
 
@@ -442,19 +454,20 @@ https://www.taskright.com/
     </div>
     
     <div class="faq-item">
-        <h3>Is TaskRight better than Jobber?</h3>
+        <h3>Is TaskRight better than enterprise service tools?</h3>
         <p>
-            Jobber is great for large service businesses, but starts at $99/month. 
-            TaskRight is designed for smaller, growing businesses that need core features 
-            without enterprise pricing or complexity.
+            Enterprise service tools are built for large operations — complex scheduling, 
+            routing, invoicing, and team management at $99–$199/month. TaskRight is built 
+            for something different: helping small service businesses manage customer 
+            communication and retention without the enterprise price tag or complexity.
         </p>
     </div>
     
     <div class="faq-item">
         <h3>What about data security?</h3>
         <p>
-            TaskRight uses bank-level encryption for all customer data. 
-            We comply with GDPR and other privacy regulations.
+            Data privacy and security are a priority in our build. 
+            Beta testers will be notified of all security features before launch.
         </p>
     </div>
     
@@ -470,8 +483,9 @@ https://www.taskright.com/
     <div class="faq-item">
         <h3>When is TaskRight launching?</h3>
         <p>
-            Sign up for the waitlist to get notified! Early access members will get 
-            first access to the product and discounted lifetime pricing.
+            We're actively building and targeting a public launch in Q3/Q4 2026. 
+            Beta testers get first access and will have direct input on the features 
+            we prioritize.
         </p>
     </div>
 </section>
@@ -479,8 +493,8 @@ https://www.taskright.com/
 
 **SEO Notes:**
 - FAQ with H3 headings (search engines love structured FAQs)
-- Naturally includes keywords like "service management", "Jobber", "small business"
-- Addresses common objections
+- Naturally includes keywords like "service management", "small business", "enterprise"
+- Addresses common objections honestly — no unverifiable claims
 
 ---
 
@@ -501,17 +515,17 @@ https://www.taskright.com/
                 <li><a href="/blog/">Blog</a></li>
                 <li><a href="/blog/post-1-customer-communication.html">Customer Communication Tips</a></li>
                 <li><a href="/blog/post-3-stop-losing-customers.html">Reduce Customer Churn</a></li>
-                <li><a href="/blog/post-4-affordable-alternatives.html">Software Comparison</a></li>
+                <li><a href="/blog/why-enterprise-service-software-isnt-built-for-you/">Why Enterprise Software Isn't For You</a></li>
             </ul>
         </div>
         
         <div class="footer-section">
             <h4>Company</h4>
             <ul>
-                <li><a href="#email-form">Waitlist</a></li>
+                <li><a href="#email-form">Apply for Beta Access</a></li>
                 <li><a href="/privacy.html">Privacy Policy</a></li>
                 <li><a href="/terms.html">Terms of Service</a></li>
-                <li><a href="mailto:hello@taskright.com">Contact Us</a></li>
+                <li><a href="mailto:hello@taskrightpro.com">Contact Us</a></li>
             </ul>
         </div>
     </div>
@@ -540,9 +554,9 @@ https://www.taskright.com/
 - [ ] Open Graph tags for social sharing
 - [ ] Twitter Card tags
 - [ ] Canonical URL specified
-- [ ] Form captures: name, email, business type, state
-- [ ] CTA buttons clear and compelling
-- [ ] Trust signals visible (free, no credit card, etc.)
+- [ ] Form captures: name, email, business type, state, customer count
+- [ ] CTA button reads "Apply for Free Beta Access" — consistent throughout
+- [ ] Trust signals visible (free forever, no credit card, gated beta note)
 - [ ] FAQ section present
 - [ ] Internal links to blog
 - [ ] Footer with links
@@ -555,7 +569,7 @@ https://www.taskright.com/
 
 ### Blog Hub Page (index.html)
 
-**URL:** `https://taskright.com/blog/`
+**URL:** `https://taskrightpro.com/blog/`
 
 ```html
 <section class="blog-hub">
@@ -585,7 +599,7 @@ Each blog post follows this structure for maximum SEO impact:
 
 #### Post URL Structure
 ```
-https://taskright.com/blog/[post-slug]/
+https://taskrightpro.com/blog/[post-slug]/
 Examples:
 - /blog/customer-communication-tips/
 - /blog/manage-customer-preferences/
@@ -708,930 +722,23 @@ Examples:
 
 ## Content Calendar & Templates
 
-### Blog Post #1: "Why Small Service Businesses Struggle with Customer Communication"
+> **See companion document:** `TASKRIGHT_BLOG_POSTS.md`  
+> All 6 blog post outlines, keywords, CTAs, and content notes are stored separately to keep this document lean for Claude Code implementation.
 
-**Week:** 1  
-**Published:** Week 1 (alongside landing page launch)  
-**URL:** `/blog/why-service-businesses-struggle-customer-communication/`  
-**Target Keyword:** "customer communication service business"  
-**Secondary Keywords:** "service business communication", "customer retention cleaning"  
-**Word Count:** 1200-1500 words  
+### Blog Post Schedule Summary
 
-#### Content Outline
+| Post | Week | URL | Target Keyword |
+|---|---|---|---|
+| #1 — Customer Communication | 1 | `/blog/why-service-businesses-struggle-customer-communication/` | how to manage customer communication small service business |
+| #2 — Preference Management | 2 | `/blog/complete-guide-managing-customer-preferences/` | customer preference management cleaning business |
+| #3 — Stop Losing Customers | 3 | `/blog/how-to-stop-losing-customers-service-business/` | how to reduce customer churn cleaning business |
+| #4 — Enterprise Software Critique | 4 | `/blog/why-enterprise-service-software-isnt-built-for-you/` | service management software for small business |
+| #5 — 5 Customer Questions | 5 | `/blog/5-questions-service-business-owner-should-ask-customers/` | questions to ask new service customers |
+| #6 — Midwest Retention | 6 | `/blog/midwest-service-business-customer-retention/` | customer retention Midwest service business |
 
-```
-H1: Why Small Service Businesses Struggle with Customer Communication 
-    (and How to Fix It)
-
-Intro: Hook with stat about communication failures
-  - "65% of customers switch service providers due to poor communication"
-  - Problem: Manual communication doesn't scale
-  - Solution teaser: TaskRight addresses this
-
-H2: The Problem: Manual Communication Doesn't Scale
-  H3: You're Managing Customer Preferences in Spreadsheets
-    - Pain point: Excel/paper records get lost
-    - Cost: Time waste, mistakes
-    - Example: Business owner story
-    
-  H3: Text Message Back-and-Forth is Exhausting
-    - Pain point: One-on-one texting
-    - Cost: Hours of your time
-    - Data: "Small business owners spend X hours/week on manual communication"
-    
-  H3: No Feedback Loop = No Improvement
-    - Pain point: You don't know why customers leave
-    - Cost: Losing repeat business
-    - Stat: "70% of customers will return if service recovers well"
-
-H2: Why Existing Tools Don't Work for Small Businesses
-  H3: Enterprise Tools Cost Too Much
-    - Jobber: $99/month
-    - Zen Maid: $149/month
-    - CompanyCam: $99+/month
-    - Problem: You don't have 100+ customers yet
-    
-  H3: They're Bloated with Features You Don't Need
-    - Advanced analytics, invoicing, scheduling
-    - Complexity: Takes hours to set up
-    - Overkill for small business
-    
-  H3: No Customer Preference Management
-    - Existing tools focus on scheduling, not preferences
-    - They don't solve your core problem
-
-H2: The Solution: Simple, Affordable Customer Communication
-  H3: Capture Customer Preferences (Once)
-    - Ask customers: "What do you want from us?"
-    - Store in one place: Never ask again
-    - Time saved: 5 min/customer vs. re-explaining every visit
-    
-  H3: Send Automated Reminders (No More Manual Texts)
-    - 3 days before service: "Confirm your selections"
-    - Customer can adjust if needed
-    - Time saved: Hours per week
-    
-  H3: Collect Feedback After Every Service
-    - Rating + photos + comments
-    - Understand what's working
-    - Find problems before they cause churn
-    
-  H3: Build Loyalty Through Consistency
-    - Customers appreciate you remembering preferences
-    - Photos prove quality
-    - Feedback shows you care about improvement
-
-H2: Real Example: How One Cleaning Business Improved Customer Retention
-  - Detailed story of business owner
-  - Problem: Lost customers due to miscommunication
-  - Solution: Implemented customer preference system
-  - Result: 15% increase in repeat rate
-  - Stat: Saved 8 hours/week on communication
-
-H2: Three Steps to Better Customer Communication Today
-  H3: Step 1: Ask What Your Customers Want
-    - Email template included
-    - Phone script included
-    
-  H3: Step 2: Store It Somewhere You Won't Lose It
-    - Not in your head
-    - Not scattered across texts/emails
-    - One system of record
-    
-  H3: Step 3: Remember It Next Time They Call
-    - Use their preferences every service
-    - Mention you remember their preferences
-    - Watch loyalty increase
-
-Conclusion: Better Communication = More Repeat Customers
-  - Reinforce: Communication is your competitive advantage
-  - Call to action: TaskRight simplifies this
-  - Button: Join waitlist
-
-Related Posts:
-  - Post #3: "How to Stop Losing Customers"
-  - Post #5: "5 Questions to Ask Customers"
-
-Email CTA: Subscribe for weekly tips on customer communication
-```
 
 ---
 
-### Blog Post #2: "The Complete Guide to Managing Customer Preferences for Service Businesses"
-
-**Week:** 2  
-**URL:** `/blog/complete-guide-managing-customer-preferences/`  
-**Target Keyword:** "manage customer preferences service"  
-**Secondary Keywords:** "customer preferences cleaning business", "service business management"  
-**Word Count:** 1200-1500 words  
-
-#### Content Outline
-
-```
-H1: The Complete Guide to Managing Customer Preferences for Service Businesses
-
-Intro: "Your customers have preferences. Most service businesses ignore them."
-  - Stat: "80% of customers want personalized service"
-  - Problem: Preferences get lost or forgotten
-  - Solution: System for managing them
-
-Table of Contents: 5-6 major sections
-
-H2: Section 1: What Are Customer Preferences and Why They Matter
-  H3: Types of Preferences
-    - Service specifics (cleaning products, room priority, etc.)
-    - Schedule preferences (morning/afternoon, day of week)
-    - Communication preferences (text, email, phone)
-    - Special requests (pets, allergies, fragrance sensitivities)
-    
-  H3: The Business Impact of Forgetting Preferences
-    - Stat: Customers who feel understood spend X% more
-    - Stat: Repeat rate increases with personalization
-    - Story: Business owner who lost customer due to forgotten preference
-    
-  H3: Why Most Businesses Fail at This
-    - No system in place
-    - Preferences scattered across: texts, calls, emails, memory
-    - New team members don't know preferences
-    - Preferences change, don't get updated
-
-H2: Section 2: How to Collect Customer Preferences
-  H3: The Right Time to Ask
-    - During onboarding (first service)
-    - Regular check-ins (quarterly)
-    - After problem situations (to prevent repeats)
-    
-  H3: How to Ask (Templates)
-    - Email template: "Tell us about your preferences"
-    - Phone script: "Before we start, I want to make sure we..."
-    - Form template: Structured preference form
-    
-  H3: What to Ask (Checklist)
-    - Service specifics: "What areas are priority?"
-    - Schedule: "What time works best?"
-    - Communication: "Prefer text or email reminders?"
-    - Special requests: "Any allergies, pets, or preferences?"
-
-H2: Section 3: Organizing Preferences So You Don't Forget
-  H3: The System That Actually Works
-    - Centralized database (not scattered notes)
-    - One place of truth
-    - Accessible to your whole team
-    
-  H3: What Information to Store
-    - Customer name & contact
-    - Service type & frequency
-    - Preferences (organized by category)
-    - Last updated date
-    - Notes field for special circumstances
-    
-  H3: Tools for Managing Preferences
-    - Spreadsheet (basic but works)
-    - CRM like Jobber (expensive but comprehensive)
-    - Simple preference manager like TaskRight
-    
-  H3: Team Alignment
-    - Everyone has access
-    - Notes before each service: "Check customer preferences"
-    - Update preferences after every service
-    - Flag when preferences change
-
-H2: Section 4: Using Preferences to Build Customer Loyalty
-  H3: The Psychological Impact
-    - Customers feel understood
-    - Shows you listen and care
-    - Creates emotional connection (not just transaction)
-    
-  H3: How to Mention Preferences
-    - "I see you prefer your kitchen first"
-    - "We're using the product you mentioned"
-    - "We're avoiding the fragrance you mentioned last time"
-    
-  H3: When Preferences Lead to Upsells
-    - Understanding leads to trust
-    - Trust leads to: "Can you also clean my...?"
-    - Cross-selling happens naturally
-    
-  H3: Preventing Service Failures
-    - Forgotten preference = unhappy customer
-    - Updated preference = confidence in you
-    - Consistency = loyalty
-
-H2: Section 5: Real Implementation: [City] Cleaning Company Case Study
-  - Company profile: 10-person team, 200 active customers
-  - Problem: Preferences scattered, new hires made mistakes
-  - Solution: Implemented preference management system
-  - Process: 3-step onboarding to capture preferences
-  - Result: Customer retention up 20%, repeat rate +18%
-  - Quote from business owner
-
-H2: Section 6: Common Mistakes and How to Avoid Them
-  H3: Mistake #1: Storing Preferences in Your Head
-    - Why it fails: You leave the business, preferences gone
-    - Why it fails: Can't scale beyond your memory
-    - Solution: External system
-    
-  H3: Mistake #2: Asking for Too Many Preferences
-    - Why it fails: Customers overwhelmed, won't complete
-    - Why it fails: Too much to remember
-    - Solution: Start with 5-6 core preferences
-    
-  H3: Mistake #3: Not Updating Preferences
-    - Why it fails: "They prefer morning service" (from 2 years ago)
-    - Why it fails: Preferences change over time
-    - Solution: Update after every service, seasonal reviews
-    
-  H3: Mistake #4: Not Sharing With Team
-    - Why it fails: Only you know preferences
-    - Why it fails: Customers get different service from different team members
-    - Solution: Everyone has access, everyone uses it
-
-Conclusion: Preference Management = Competitive Advantage
-  - Reminder: Personalization drives loyalty
-  - Reminder: Systems scale, memory doesn't
-  - CTA: TaskRight manages preferences for you
-
-Related Posts:
-  - Post #1: "Why Service Businesses Struggle with Communication"
-  - Post #5: "5 Questions to Ask Customers"
-
-Email CTA: Subscribe for weekly tips
-```
-
----
-
-### Blog Post #3: "How to Stop Losing Customers: A Service Business Owner's Guide"
-
-**Week:** 3  
-**URL:** `/blog/how-to-stop-losing-customers-service-business/`  
-**Target Keyword:** "customer retention service business"  
-**Secondary Keywords:** "reduce customer churn", "stop losing customers"  
-**Word Count:** 1200-1500 words  
-
-#### Content Outline
-
-```
-H1: How to Stop Losing Customers: A Service Business Owner's Guide to Retention
-
-Intro: 
-  - Stat: "It costs 5X more to get a new customer than retain one"
-  - Problem: Every customer you lose costs thousands in lost revenue
-  - Solution: Retention strategies backed by data
-
-H2: Why Service Businesses Lose Customers (The Top 5 Reasons)
-  H3: Reason #1: Poor Communication
-    - They don't know when you're coming
-    - You don't remember their preferences
-    - Stat: Communication issues cause 40% of churn
-    
-  H3: Reason #2: No Feedback Loop
-    - You never ask "How did we do?"
-    - Small problems become big problems
-    - Stat: 70% of customers will return if you recover well
-    
-  H3: Reason #3: Inconsistent Quality
-    - Different team members = different experience
-    - Preferences aren't documented
-    - Customer feels you don't care
-    
-  H3: Reason #4: You Take Them for Granted
-    - No loyalty program
-    - No special recognition
-    - They feel like just another customer
-    
-  H3: Reason #5: Competitor Offers Better Service
-    - They shop around
-    - Your competitor does what you don't
-    - Price isn't the only reason they leave
-
-H2: The Retention Advantage: How Much Money You're Losing
-  H3: Math of Customer Churn
-    - Example: 100 customers, $300/month average = $30k/month
-    - If you lose 5% (5 customers): $1,500/month = $18k/year
-    - If you keep them instead: +$18,000 in profit
-    - Scale: 20% churn means $72k/year in lost revenue
-    
-  H3: The Repeat Customer vs. New Customer Cost
-    - Cost to acquire: $X
-    - Cost to retain: $X/10
-    - Lifetime value: 3-5X higher than one-time
-    
-  H3: Referral Effect
-    - Retained customers refer others
-    - New customers are expensive, referrals are free
-    - Stat: Referred customers have 25% higher retention
-
-H2: The 5-Step Retention System That Works
-  H3: Step 1: Capture Their Preferences (Week 1)
-    - First service: "What matters to you?"
-    - Document it
-    - Promise: "We'll remember this"
-    
-  H3: Step 2: Over-Communicate (Before Each Service)
-    - Reminder 3 days before
-    - Confirm their preferences
-    - Let them adjust if needed
-    
-  H3: Step 3: Deliver Consistently
-    - Every team member knows preferences
-    - Quality doesn't vary
-    - Customer feels: "They remember me"
-    
-  H3: Step 4: Collect Feedback
-    - After each service: "How did we do?"
-    - Ask for photos
-    - Ask for rating
-    - Show you want to improve
-    
-  H3: Step 5: Respond to Feedback
-    - Thank them for feedback
-    - Fix problems immediately
-    - Follow up: "We fixed the issue you mentioned"
-
-H2: Real Example: How [Company Name] Reduced Churn by 40%
-  - Company: 15-person cleaning business
-  - Problem: 30% annual churn, losing $50k/year in revenue
-  - Symptoms: Customers didn't feel remembered, no feedback system
-  - Solution: 5-step retention system
-  - Timeline: 6 months implementation
-  - Results: Churn down to 18%, +$60k in retained revenue
-  - Quote from owner: "We're finally making money on retention"
-
-H2: Tools and Habits for Retention
-  H3: Communication System
-    - Automated reminders (SMS, email)
-    - Two-way feedback
-    - Preference database
-    
-  H3: Feedback Collection
-    - Post-service surveys
-    - Photo uploads
-    - Rating system
-    - Notes from team
-    
-  H3: Team Accountability
-    - Everyone has access to preferences
-    - Checklist before each service
-    - Team meeting: "What did we learn from feedback?"
-    
-  H3: Recognition System
-    - Long-term customer discount
-    - Loyalty program
-    - Birthday/anniversary recognition
-
-H2: The Psychology of Why People Stay
-  H3: They Feel Understood
-    - You remember preferences
-    - You ask about their needs
-    - Personalization = loyalty
-    
-  H3: They Feel Valued
-    - You ask for feedback
-    - You act on feedback
-    - You appreciate them
-    
-  H3: They Feel Confident
-    - Consistency = trust
-    - No surprises
-    - Same quality every time
-    
-  H3: They Feel Connected
-    - Relationship, not just transaction
-    - You invest in their satisfaction
-    - They invest in your business
-
-Conclusion: Retention is Your Profit Center
-  - Key insight: Keeping customers is cheaper than getting new ones
-  - Key insight: Retained customers refer new ones
-  - Key insight: Feedback drives improvement
-  - CTA: Use TaskRight to stop losing customers
-
-Related Posts:
-  - Post #1: "Why Service Businesses Struggle with Communication"
-  - Post #4: "Affordable Service Management Alternatives"
-
-Email CTA: Subscribe for weekly retention tips
-```
-
----
-
-### Blog Post #4: "Affordable Service Management Software: TaskRight vs Enterprise Tools"
-
-**Week:** 4  
-**URL:** `/blog/affordable-service-management-software-alternatives/`  
-**Target Keyword:** "affordable service management software"  
-**Secondary Keywords:** "Jobber alternative", "service software comparison", "cheap service management app"  
-**Word Count:** 1200-1500 words  
-
-#### Content Outline
-
-```
-H1: Affordable Service Management Software: TaskRight vs Enterprise Tools
-
-Intro:
-  - Problem: Enterprise tools cost $100+/month
-  - Problem: They're too complex for small businesses
-  - Solution: Affordable alternatives exist
-  - Teaser: Comparison coming
-
-H2: The Enterprise Tool Problem
-  H3: They're Too Expensive for Small Businesses
-    - Jobber: $99/month minimum
-    - Zen Maid: $149/month minimum
-    - CompanyCam: $99+/month
-    - Cost: $1,200-$1,800/year for basic features
-    - Problem: You have 30 customers, not 300
-    
-  H3: They're Over-Complicated
-    - Features you don't need: advanced invoicing, payroll integration, routing optimization
-    - Setup time: 20+ hours
-    - Learning curve: team training required
-    - Maintenance: ongoing updates, rule changes
-    
-  H3: They're Built for Large Franchises, Not Solo Operators
-    - 100+ customer management
-    - Multi-team coordination
-    - Complex hierarchy
-    - You just need to remember preferences
-
-H2: What Small Service Businesses Actually Need
-  H3: Core Requirement #1: Customer Preference Management
-    - Not scheduling (you use Google Calendar)
-    - Not invoicing (you use Stripe or QuickBooks)
-    - Core: "What do my customers want?"
-    - Why: Preferences drive loyalty
-    
-  H3: Core Requirement #2: Communication Automation
-    - Not complex routing
-    - Core: "Remind customers before service"
-    - Why: Prevents miscommunication
-    
-  H3: Core Requirement #3: Feedback Collection
-    - Not analytics dashboards
-    - Core: "How did we do?"
-    - Why: Understand what works
-    
-  H3: Core Requirement #4: Affordable
-    - Not $1,200+/year
-    - Core: Free to $50/month
-    - Why: You're still growing
-
-H2: Comparison: Enterprise Tools vs. Alternatives
-  
-  [Create Comparison Table]
-  
-  Feature | Jobber | Zen Maid | TaskRight
-  Cost | $99-149/month | $149-199/month | Free-$50/month
-  Preference Mgmt | ✓ | ✓ | ✓✓✓ (Core focus)
-  SMS Reminders | ✓ | ✓ | ✓ (Built-in)
-  Feedback Collection | Limited | Limited | ✓✓✓ (Core focus)
-  Setup Time | 20+ hours | 20+ hours | 1-2 hours
-  Team Size | Enterprise | Enterprise | 1-30 people
-  Learning Curve | Steep | Steep | Simple
-  Scheduling | ✓✓✓ | ✓✓✓ | Basic
-  Invoicing | ✓✓✓ | ✓✓✓ | ✗
-  
-  H3: When Jobber/Zen Maid Make Sense
-    - If you need advanced scheduling
-    - If you have 200+ customers
-    - If you need integrated invoicing
-    - If you manage multiple teams
-    
-  H3: When TaskRight Makes Sense
-    - If you prioritize customer preferences
-    - If you want feedback from customers
-    - If you're under $50/month budget
-    - If simplicity is priority
-    - If you're growing and don't want complexity yet
-
-H2: Real Math: How Much You Can Save
-  H3: Scenario 1: Solo Operator (1 person, 30 customers)
-    - Jobber cost: $99/month = $1,188/year
-    - TaskRight cost: Free = $0/year
-    - Savings: $1,188/year
-    - ROI: Put this toward hiring or growth
-    
-  H3: Scenario 2: Small Team (5 people, 100 customers)
-    - Jobber cost: $149/month = $1,788/year
-    - TaskRight cost: $29/month (estimate) = $348/year
-    - Savings: $1,440/year
-    - Note: You still use Google Calendar for scheduling
-    
-  H3: Scenario 3: Growing Business (10 people, 200 customers)
-    - Jobber cost: $199/month = $2,388/year
-    - Alternative (separate tools): Calendar + TaskRight + other = $50/month = $600/year
-    - Savings: $1,788/year
-    - Note: You gain flexibility with modular approach
-
-H2: The Modular Approach: Best Tools for Each Job
-  H3: Scheduling
-    - Google Calendar (Free)
-    - Simple, customers understand it
-    - You don't need fancy routing yet
-    
-  H3: Customer Preferences & Feedback
-    - TaskRight
-    - Focuses on what matters: preferences + feedback
-    
-  H3: Invoicing & Payment
-    - Stripe (2.2% fee)
-    - or Square (2.6% fee)
-    - You already know how to use it
-    
-  H3: Team Communication
-    - Slack (Free tier)
-    - Gives team context on customer preferences
-    
-  H3: Time Tracking
-    - Toggle or Harvest (Free tier)
-    - If you bill hourly
-    
-  Total Cost: Often cheaper than one enterprise tool, and better for your workflow
-
-H2: Case Study: [City] Service Business Switched from Jobber to TaskRight
-  - Background: 5-person cleaning company, 150 customers
-  - Problem: Jobber was expensive and complex, wasn't solving their core problem (customer preferences)
-  - Solution: Switched to TaskRight + Google Calendar + Stripe
-  - Timeline: 1 day to switch (vs 20 days to learn Jobber)
-  - Cost savings: $1,200/year
-  - Unexpected benefit: Team actually uses preferences system (vs ignoring Jobber)
-  - Quote from owner: "We now know what our customers want. That's what mattered."
-
-H2: When to Upgrade (From Affordable to Enterprise)
-  H3: Trigger #1: You Have 500+ Active Customers
-    - Scale requires optimization
-    - Advanced routing saves time
-    - Cost is now small % of revenue
-    
-  H3: Trigger #2: Multiple Locations/Teams
-    - Complex coordination
-    - Need hierarchy and permissions
-    - Worth the investment
-    
-  H3: Trigger #3: You're Raising Capital
-    - Investors expect "professional" software
-    - Enterprise tools look more credible
-    - Cost is not a concern
-    
-  H3: Trigger #4: You're Selling the Business
-    - Buyer expects mature systems
-    - Data integrity matters
-    - Worth it for due diligence
-
-Conclusion: Affordability Shouldn't Mean Settling
-  - Insight: Best tool = tool you'll actually use
-  - Insight: Small businesses have different needs than enterprises
-  - Insight: Modular approach is often superior
-  - CTA: Join TaskRight to solve what matters most
-
-Related Posts:
-  - Post #1: "Why Service Businesses Struggle with Communication"
-  - Post #2: "Managing Customer Preferences"
-  - Post #3: "How to Stop Losing Customers"
-
-Email CTA: Get the full comparison guide emailed to you
-```
-
----
-
-### Blog Post #5: "5 Questions Every Service Business Owner Should Ask Their Customers"
-
-**Week:** 5  
-**URL:** `/blog/5-questions-service-business-owner-should-ask-customers/`  
-**Target Keyword:** "service business customer questions"  
-**Secondary Keywords:** "questions to ask customers", "customer discovery service business"  
-**Word Count:** 1000-1200 words  
-
-#### Content Outline
-
-```
-H1: 5 Questions Every Service Business Owner Should Ask Their Customers
-
-Intro:
-  - Most service owners don't ask enough questions
-  - Questions reveal: preferences, problems, loyalty drivers
-  - Result: You make better decisions about your business
-  - Benefit: Customers feel heard and valued
-
-H2: Why Asking Questions Matters More Than You Think
-  H3: Reason #1: You Discover Hidden Needs
-    - Customer: "We'd love if you offered X"
-    - You: Upsell or new service offering
-    - Result: More revenue from existing customers
-    
-  H3: Reason #2: You Find Out Why They Might Leave
-    - Problems surface before they become deal-breakers
-    - You can fix issues proactively
-    - Result: Better retention
-    
-  H3: Reason #3: You Build Loyalty Through Listening
-    - Customers feel heard
-    - They see you care about improving
-    - Result: Stronger relationship
-
-H2: The 5 Essential Questions
-  H3: Question #1: "What Made You Choose Us Over Competitors?"
-    - Reveals: Your competitive advantage
-    - Reveals: What matters to customers
-    - What to do with answer: 
-      - If it's price: You're competing wrong
-      - If it's service: Double down on that
-      - If it's personal: Build relationship
-    
-  H3: Question #2: "What's One Thing We Could Do Better?"
-    - Reveals: Pain points
-    - Reveals: Gaps in service
-    - What to do with answer:
-      - Listen without defending
-      - Thank them for honesty
-      - Act on at least one piece of feedback
-    
-  H3: Question #3: "How Did We Do Compared to Your Previous Provider?"
-    - Reveals: Your actual competitive position
-    - Reveals: What worked with old provider
-    - What to do with answer:
-      - Learn from competitors
-      - Emphasize areas where you're better
-      - Steal the good things from what they liked
-    
-  H3: Question #4: "Would You Recommend Us to Friends/Colleagues?"
-    - Reveals: Real satisfaction level
-    - Reveals: Who your best advocates are
-    - What to do with answer:
-      - If yes: Ask for specific referrals
-      - If no: Find out why (this is gold)
-      - If maybe: "What would make it a yes?"
-    
-  H3: Question #5: "What's Your Vision for Your Home/Business?"
-    - Reveals: Long-term needs
-    - Reveals: Additional services they might need
-    - Reveals: If there's a fit for growth
-    - What to do with answer:
-      - Align your service with their vision
-      - Find ways to support their goals
-      - Position yourself as long-term partner
-
-H2: How to Ask These Questions (Timing & Method)
-  H3: When to Ask
-    - Question #1: During onboarding (first service)
-    - Question #2: After service 3-5 (they've experienced you)
-    - Question #3: During quarterly check-in
-    - Question #4: After they've been with you 6+ months
-    - Question #5: In deeper conversation, not transactional
-    
-  H3: How to Ask (Right Way vs Wrong Way)
-    - Right: "What's one thing we could improve?"
-    - Wrong: "Are you happy?" (yes/no, not useful)
-    
-    - Right: "How did we compare to your last provider?"
-    - Wrong: "We're better than X, right?" (leading question)
-    
-    - Right: "Would you refer us to friends?"
-    - Wrong: "You'll refer us, right?" (leading)
-    
-  H3: Format Options
-    - Phone call: Best for relationship-building
-    - Text/SMS: Quick, easy for them, gets response
-    - Form: Anonymous, less bias, more honest
-    - Email: Allows detailed answer
-    - In-person: During service, casual conversation
-
-H2: What to Do With Answers (The Implementation Part)
-  H3: Step 1: Collect Answers Systematically
-    - Don't rely on memory
-    - Write them down
-    - Look for patterns across customers
-    
-  H3: Step 2: Analyze for Themes
-    - If 3+ customers mention same issue: Fix it
-    - If 3+ customers mention same positive: Emphasize it
-    - If 3+ customers want same new service: Offer it
-    
-  H3: Step 3: Share Findings With Your Team
-    - Team meeting: "Here's what customers told us"
-    - Involve team in solutions
-    - Make improvements together
-    
-  H3: Step 4: Follow Up With Customers
-    - "You mentioned X. We fixed it. Thank you."
-    - Shows you listened AND acted
-    - Deepens loyalty
-    
-  H3: Step 5: Iterate and Ask Again
-    - Quarterly check-ins
-    - Continuous improvement
-    - Customers see: You're always getting better
-
-H2: Real Example: Questions That Saved a Business Relationship
-  - Situation: Long-term customer considering switching providers
-  - Question asked: "What made you consider switching?"
-  - Answer: "You stopped asking about our preferences"
-  - Root cause: New team member didn't use preference system
-  - Fix: Retraining on preferences, personal apology call
-  - Result: Customer stayed, loyalty deepened
-  - Lesson: Asking revealed problem before it became fatal
-
-H2: Creating Your Customer Question System
-  H3: The Simple Question Tracker
-    - Spreadsheet with: Customer name, question, answer, date, action taken
-    - Monthly review: "What did we learn?"
-    - Team accountability: "Who's implementing the feedback?"
-    
-  H3: Sample Questions by Timeline
-    Month 1: "What made you choose us?"
-    Month 3: "What could we do better?"
-    Month 6: "Would you recommend us?"
-    Month 12: "What's your vision going forward?"
-    
-  H3: Escalation Rules
-    - If same issue from 3+ customers: Address immediately
-    - If customer says "considering switching": Priority phone call
-    - If customer requests new service: Explore viability
-
-Conclusion: Questions Are Your Competitive Advantage
-  - Small businesses win by listening, not by having the biggest budget
-  - Questions transform customers into partners
-  - CTA: TaskRight makes collecting and organizing feedback easy
-
-Related Posts:
-  - Post #1: "Why Service Businesses Struggle with Communication"
-  - Post #3: "How to Stop Losing Customers"
-
-Email CTA: Get our "Customer Questions Template" emailed to you
-```
-
----
-
-### Blog Post #6: "[Midwest State] Service Business Report: How Top Cleaners Manage Customer Relationships"
-
-**Week:** 6  
-**URL:** `/blog/midwest-service-business-customer-relationships/`  
-**Target Keyword:** "[Midwest state] service business" + "customer relationships"  
-**Secondary Keywords:** "cleaning business [state]", "[state] handyman tips"  
-**Word Count:** 1200-1500 words  
-**Customization:** Update [State] based on Midwest state (IL, WI, MN, MI, etc.)
-
-#### Content Outline
-
-```
-H1: [Midwest State] Service Business Report: How Top Cleaners Manage Customer Relationships
-
-Intro:
-  - Local angle: Midwest businesses have unique characteristics
-  - Insight: We surveyed 50+ service businesses in [State]
-  - Finding: Top performers do this differently
-  - Value: Learn from local success stories
-
-H2: The [State] Service Business Landscape (2026)
-  H3: Market Overview
-    - Number of service businesses: X (estimated)
-    - Average business size: 5-10 person teams
-    - Average customer base: 50-200 customers
-    - Main challenge: Seasonal fluctuations (winter slowdown)
-    
-  H3: Why [State] Businesses Are Different
-    - Weather impacts: Snow, ice affect services
-    - Customer base: Loyal, want relationships
-    - Competition: Growing but still fragmented
-    - Opportunity: Not yet consolidated like coasts
-
-H2: Survey Insights: Top Performers vs. Struggling Businesses
-  H3: Insight #1: Top Performers Document Everything
-    - Top performers: Preference system (documented)
-    - Struggling: "We remember in our heads"
-    - Impact: Top performers rarely lose customers to miscommunication
-    
-  H3: Insight #2: Top Performers Ask for Feedback
-    - Top performers: Formal feedback after every service
-    - Struggling: "Customers would complain if they were unhappy"
-    - Impact: Top performers know problems before they lose customers
-    
-  H3: Insight #3: Top Performers Use Automation
-    - Top performers: SMS reminders 3 days before service
-    - Struggling: Manual phone calls or texts
-    - Impact: Top performers save 5-10 hours/week on communication
-    
-  H3: Insight #4: Top Performers Segment Their Customers
-    - Top performers: VIP customers get special attention
-    - Struggling: All customers treated same
-    - Impact: Top performers get more repeat from best customers
-
-H2: Case Studies: Three [State] Service Businesses Doing It Right
-  H3: Case Study #1: [City] Cleaning Company (10 years, 200 customers)
-    - What they do: Rigorous preference management
-    - System: Simple spreadsheet, but used by everyone
-    - Result: 85% repeat rate (vs 65% industry average)
-    - Quote: "We remember what customers want. That builds loyalty."
-    
-  H3: Case Study #2: [City] Lawn Care Business (seasonal, 150 active)
-    - What they do: Seasonal preferences ("Spring priorities? Fall focus?")
-    - System: Documented by service date
-    - Result: 40% higher quote-to-close rate
-    - Quote: "Customers appreciate we know their priorities change by season"
-    
-  H3: Case Study #3: [City] Handyman Service (5-person team, 80 active)
-    - What they do: Post-service photo feedback
-    - System: Simple form, customers take photos
-    - Result: Can show work to future customers (credibility)
-    - Quote: "Photos prove quality. Gets us better reviews and referrals."
-
-H2: The [State] Advantage: Why Midwest Businesses Can Win
-  H3: Advantage #1: Customer Loyalty
-    - Midwest customers value relationships
-    - They'll stay if you prove you remember them
-    - Advantage: Don't need to cut prices
-    
-  H3: Advantage #2: Word of Mouth
-    - Midwest = smaller communities
-    - One great customer = 3-5 referrals
-    - Advantage: Referrals are free and better quality
-    
-  H3: Advantage #3: Less Competition (For Now)
-    - National consolidation hasn't fully hit Midwest
-    - Still many independent businesses
-    - Advantage: You can build loyalty before big franchises arrive
-    
-  H3: Advantage #4: Service-First Culture
-    - Midwest = reputation matters
-    - People know each other
-    - Advantage: One referral is worth more
-
-H2: The [State] Challenge: Seasonal Fluctuations
-  H3: Problem: Winter Slowdown
-    - Oct-Apr: 30-50% less business (depending on service)
-    - Challenge: Keep customers engaged during off-season
-    
-  H3: Solution Used by Top Performers
-    - Year-round communication
-    - "Winter check-in": "What are your spring priorities?"
-    - Seasonal upsells: "Winter maintenance we can do now"
-    - Result: Smoother revenue curve
-    
-  H3: How Preferences Help With Seasonality
-    - Document: "Customer X wants spring focus on gardens"
-    - Spring arrives: Reach out proactively
-    - Result: Higher spring close rate
-
-H2: Best Practices from Top [State] Performers
-  H3: Best Practice #1: Relationship Check-Ins (Quarterly)
-    - Call/text: "How are we doing?"
-    - Ask: "Anything changing for next season?"
-    - Result: Early warning of issues, ahead-of-curve on needs
-    
-  H3: Best Practice #2: Service Documentation
-    - Note: "Fixed the thing they mentioned last time"
-    - Note: "They complimented the blue team"
-    - Result: Next service is even better
-    
-  H3: Best Practice #3: Referral Incentives
-    - Referral: "$50 off if you refer"
-    - Midwest response: High (people like helping)
-    - Result: 20% of new customers from referrals
-    
-  H3: Best Practice #4: Multi-Channel Communication
-    - SMS for quick confirmations
-    - Email for detailed information
-    - Phone for relationship building
-    - Result: Customers reached in their preferred way
-
-H2: Implementation: How to Adopt These Practices
-  H3: Week 1: Start Documenting (Choose One System)
-    - Spreadsheet, TaskRight, or CRM
-    - Write down: What does each customer want?
-    
-  H3: Week 2: Ask for Feedback (One Customer)
-    - Try the 5-question approach
-    - See how customers respond
-    - Learn before you scale
-    
-  H3: Week 3-4: Automate Reminders
-    - SMS before service
-    - Confirm preferences
-    - See time savings
-    
-  H3: Month 2: Team Training
-    - Everyone uses system
-    - Everyone checks preferences before service
-    - Culture shift toward customer understanding
-
-H2: [State]-Specific Resources for Service Businesses
-  - [State] Small Business Association: Resources
-  - [State] Service Business Network: Peer groups
-  - Local chambers: Networking, best practice sharing
-
-Conclusion: [State] Service Businesses Are Positioned to Win
-  - Midwest advantage: Customer loyalty + word of mouth
-  - Key: Proof you're different through preferences + feedback
-  - CTA: Join TaskRight community of [State] service businesses
-
-Related Posts:
-  - Post #3: "How to Stop Losing Customers"
-  - Post #2: "Managing Customer Preferences"
-
-Email CTA: Join our [State] service business community newsletter
-```
-
----
 
 ## Technical SEO Setup
 
@@ -1646,7 +753,7 @@ Allow: /blog/
 Disallow: /admin/
 Disallow: /api/
 
-Sitemap: https://taskright.com/sitemap.xml
+Sitemap: https://taskrightpro.com/sitemap.xml
 ```
 
 ---
@@ -1661,7 +768,7 @@ Sitemap: https://taskright.com/sitemap.xml
     
     <!-- Landing Page -->
     <url>
-        <loc>https://taskright.com/</loc>
+        <loc>https://taskrightpro.com/</loc>
         <lastmod>2026-03-10</lastmod>
         <changefreq>weekly</changefreq>
         <priority>1.0</priority>
@@ -1669,7 +776,7 @@ Sitemap: https://taskright.com/sitemap.xml
     
     <!-- Blog Hub -->
     <url>
-        <loc>https://taskright.com/blog/</loc>
+        <loc>https://taskrightpro.com/blog/</loc>
         <lastmod>2026-03-10</lastmod>
         <changefreq>weekly</changefreq>
         <priority>0.9</priority>
@@ -1677,14 +784,14 @@ Sitemap: https://taskright.com/sitemap.xml
     
     <!-- Blog Posts (add as published) -->
     <url>
-        <loc>https://taskright.com/blog/why-service-businesses-struggle-customer-communication/</loc>
+        <loc>https://taskrightpro.com/blog/why-service-businesses-struggle-customer-communication/</loc>
         <lastmod>2026-03-17</lastmod>
         <changefreq>monthly</changefreq>
         <priority>0.8</priority>
     </url>
     
     <url>
-        <loc>https://taskright.com/blog/complete-guide-managing-customer-preferences/</loc>
+        <loc>https://taskrightpro.com/blog/complete-guide-managing-customer-preferences/</loc>
         <lastmod>2026-03-24</lastmod>
         <changefreq>monthly</changefreq>
         <priority>0.8</priority>
@@ -1729,8 +836,8 @@ Sitemap: https://taskright.com/sitemap.xml
     "@context": "https://schema.org/",
     "@type": "Organization",
     "name": "TaskRight",
-    "url": "https://taskright.com",
-    "logo": "https://taskright.com/assets/images/logo.png",
+    "url": "https://taskrightpro.com",
+    "logo": "https://taskrightpro.com/assets/images/logo.png",
     "description": "Service management software for small business owners",
     "sameAs": [
         "https://twitter.com/taskright",
@@ -1756,14 +863,14 @@ Sitemap: https://taskright.com/sitemap.xml
     "author": {
         "@type": "Organization",
         "name": "TaskRight",
-        "url": "https://taskright.com"
+        "url": "https://taskrightpro.com"
     },
     "publisher": {
         "@type": "Organization",
         "name": "TaskRight",
         "logo": {
             "@type": "ImageObject",
-            "url": "https://taskright.com/assets/images/logo.png"
+            "url": "https://taskrightpro.com/assets/images/logo.png"
         }
     }
 }
@@ -1780,12 +887,12 @@ Sitemap: https://taskright.com/sitemap.xml
 
 **Steps:**
 1. Go to search.google.com/search-console
-2. Add property: https://taskright.com
+2. Add property: https://taskrightpro.com
 3. Verify ownership (choose method):
    - DNS record (if you own domain)
    - HTML file upload
    - Meta tag in header
-4. Submit sitemap: https://taskright.com/sitemap.xml
+4. Submit sitemap: https://taskrightpro.com/sitemap.xml
 5. Monitor:
    - Search queries you're ranking for
    - Click-through rates
@@ -1805,7 +912,7 @@ Sitemap: https://taskright.com/sitemap.xml
 
 **Steps:**
 1. Create account at analytics.google.com
-2. Create property for taskright.com
+2. Create property for taskrightpro.com
 3. Install tracking code (in head of all pages):
 
 ```html
@@ -1843,13 +950,27 @@ Sitemap: https://taskright.com/sitemap.xml
    - Domain analysis: See competitor keywords
    - Content ideas: "What posts should I write?"
 
-**Keywords to Research:**
-- "service management app for small business" (main)
-- "customer communication tool" (secondary)
-- "affordable service software" (secondary)
-- All 6 blog post target keywords
+**Keywords to Research (by tier):**
 
-**Output:** Track which keywords you're ranking for monthly
+Tier 1 — Long-tail, win early:
+- "customer preference management cleaning business"
+- "how to manage customer preferences service business"
+- "customer communication tool lawn care business"
+- "how to reduce customer churn cleaning business"
+- "questions to ask new service customers"
+- "customer retention Midwest service business"
+
+Tier 2 — Competitive, category-level:
+- "enterprise service software too expensive"
+- "affordable alternative to service management software"
+- "simple customer communication tool service business"
+- "service management software for small business under 50"
+
+Tier 3 — Aspirational primary:
+- "service management app for small business"
+- "small business customer communication software"
+
+**Output:** Track which keywords you're ranking for monthly — expect Tier 1 movement first, Tier 2 in months 2–3, Tier 3 as a long-term goal.
 
 ---
 
@@ -1904,53 +1025,54 @@ Sitemap: https://taskright.com/sitemap.xml
 
 **Mailchimp Setup:**
 1. Create account at mailchimp.com (free)
-2. Create audience: "TaskRight Waitlist"
+2. Create audience: "TaskRight Beta Applicants"
 3. Create segments:
+   - By status (applied / approved / not approved)
    - By business type (cleaning, lawn care, handyman, etc.)
-   - By state (IL, WI, MN, etc.)
+   - By state (IL, WI, MN, NE, etc.)
+   - By customer count (under 10 / 10–30 / 31–75 / 75+)
 4. Get embed code for forms
 5. Paste into website
 
 **Email Sequence:**
 ```
-Email 1 (Immediate): Welcome + Confirm Signup
-  Subject: "Welcome to TaskRight - Confirm Your Email"
+Email 1 (Immediate): Application Received
+  Subject: "Your TaskRight beta application — what happens next"
   Content: 
-    - Thank you for signing up
-    - What to expect (emails ~2x/month)
-    - Confirm email link
-    - Preview of coming features
+    - Application received confirmation
+    - What the review process looks like
+    - Expected timeline to hear back (a few days)
+    - What beta access includes (free forever tier)
 
-Email 2 (Day 3): Case Study
-  Subject: "How [Business Name] Increased Repeat Customers by 20%"
+Email 2 (Approval): You're In
+  Subject: "You're in — here's how to get started with TaskRight"
   Content:
-    - Story of service business using TaskRight
-    - Problem they had
-    - Solution we provided
-    - Results they achieved
-    - Link to blog post
+    - Welcome to the beta program
+    - How to access the product
+    - What we're asking of beta users (use it, share feedback)
+    - Direct line to reach us with questions
 
-Email 3 (Day 7): Blog Post
-  Subject: "The #1 Reason You're Losing Customers"
+Email 3 (Day 7 post-approval): Check-In
+  Subject: "How's TaskRight working for you so far?"
   Content:
-    - Excerpt from blog post
-    - Link to full post
-    - Call-to-action: Reply if interested
+    - Simple check-in — how has the first week been?
+    - Link to share feedback
+    - Reminder: their input shapes what we build next
 
-Email 4 (Day 14): Feature Deep Dive
-  Subject: "How to Get 90% Customer Preference Capture Rate"
+Email 4 (Day 14 post-approval): Feature Highlight
+  Subject: "Are you using this feature yet?"
   Content:
-    - Video or detailed explanation
-    - Screenshot of feature
-    - Use case example
+    - Highlight one specific feature (e.g. preference management)
+    - Explain the intended use case
+    - Ask: "Does this solve the problem you have? What's missing?"
 
-Email 5 (Day 21): Survey/Feedback
-  Subject: "Quick Question: What's Your Biggest Challenge?"
+Email 5 (Day 30 post-approval): Feedback Request
+  Subject: "One month in — honest question"
   Content:
-    - Ask what's their biggest pain point
-    - 3-4 option multiple choice
-    - Help you understand market better
-    - Shows you care about feedback
+    - Month one check-in
+    - 3–4 specific questions about their experience
+    - What's working, what isn't, what they wish existed
+    - Their answer directly informs the next build sprint
 ```
 
 ---
@@ -1994,7 +1116,7 @@ All Posts → Email Newsletter Signup
 - [ ] Set up domain & hosting
 - [ ] Deploy landing page with all SEO elements
 - [ ] Create blog folder structure
-- [ ] Set up Mailchimp account
+- [ ] Set up Mailchimp account and beta applicant audience
 - [ ] Submit sitemap to Google Search Console
 - [ ] Install Google Analytics
 - [ ] Publish Blog Post #1
@@ -2050,8 +1172,8 @@ All Posts → Email Newsletter Signup
 - Total website visitors (target: 100-150/week by end of month)
 
 **Conversions:**
-- Email signups (target: 5-10/week by end of month)
-- Signup conversion rate (target: 5-10%)
+- Beta applications (target: 5-10/week by end of month)
+- Application conversion rate (target: 5-10%)
 - Geographic distribution (target: 70%+ from Midwest)
 
 **Engagement:**

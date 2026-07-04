@@ -1,0 +1,13 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "TaskRight-Website",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3001,
+      "autoPort": true,
+      "cwd": "TaskRight-Website"
+    }
+  ]
+}

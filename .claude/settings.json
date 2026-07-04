@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"systemMessage\": \"Doc sync: if code or docs changed this session, start your next session with — Review TaskRight docs per shared/DOC_REGISTRY.md and flag any cross-doc gaps.\"}'"
+          }
+        ]
+      }
+    ]
+  }
+}

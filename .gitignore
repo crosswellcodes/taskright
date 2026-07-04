@@ -150,3 +150,9 @@ storybook-static/
 # Database backups
 *.backup
 *.dump
+
+# Claude Code worktrees (embedded git repos)
+.claude/worktrees/
+
+# Runtime MMS upload artifacts
+backend/uploads/
