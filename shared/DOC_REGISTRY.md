@@ -79,7 +79,10 @@
 **Convention:** Each file is self-contained. When a feature ships, update HANDOFF.md (DB tables, pending work) and API_REFERENCE.md (new endpoints). The spec file stays as the design record.
 **Files:**
 - `shared/specs/JOB_COSTING.md` — Job costing equation, cost categories + chart of accounts codes, geo-fencing infrastructure (geocoding, arrival/departure events), per-job and per-customer profitability views. Migrations 017–018.
-- `shared/specs/REVIEW_REQUESTS.md` — SMS review request flow, no-auth `/review/[token]` page, review_tokens table, feedback source tracking, opt-out model. Migrations 019. Depends on geo-fencing from JOB_COSTING.md.
+- `shared/specs/JOB_COSTING_DATA_GAPS.md` — Pre-UI data-model decisions (manual vs auto labor, price population, team-job scope), migration `019_job_costing_integrity` (constraints/indexes/backfill), and the unbuilt service/API layer. Must be cleared before job-costing UI work. Depends on JOB_COSTING.md.
+- `shared/specs/REVIEW_REQUESTS.md` — SMS review request flow, no-auth `/review/[token]` page, review_tokens table, feedback source tracking, opt-out model. Depends on geo-fencing from JOB_COSTING.md.
+
+> ⚠️ Migration-number collision: `JOB_COSTING_DATA_GAPS.md` claims `019` (job costing integrity) and `REVIEW_REQUESTS.md` previously also claimed `019`. Resolution: job-costing integrity takes **019** (it must land before UI and before review requests, which depends on geofencing); **REVIEW_REQUESTS migration is now 020**. Confirm the actual next free number at implementation time (018 is the current highest that exists).
 
 ---
 

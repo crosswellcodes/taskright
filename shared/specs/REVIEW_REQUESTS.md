@@ -170,4 +170,5 @@ Customers are asked at the same frequency as their service — weekly customers 
 ---
 
 ## Migrations
-- `019_review_tokens.js` — `review_tokens` table, `feedbacks.source` column (default `'in_app'`), `customers.review_requests_opted_out` column (default `false`)
+- `020_review_tokens.js` — `review_tokens` table, `feedbacks.source` column (default `'in_app'`), `customers.review_requests_opted_out` column (default `false`)
+  - **Note:** renumbered from `019` → `020`. Migration `019_job_costing_integrity` is reserved for the job-costing data-model gaps (see `JOB_COSTING_DATA_GAPS.md`), which must land first. Confirm the next free number at implementation time.
