@@ -610,6 +610,9 @@ Empty array is valid: `{ "selectedTaskIds": [] }` — interpreted as "no specifi
 #### Update Team Member
 **PUT** `/businesses/:businessId/team-members/:memberId`
 
+**Request Body** (all fields optional): `{ name, phoneNumber, weeklyHours, hourlyRate }`
+`hourlyRate` (decimal, nullable) feeds job-costing labor: labor `amount = hoursActual × hourlyRate` (0.00 if null). Returned as `teamMember.hourlyRate`.
+
 #### Delete Team Member
 **DELETE** `/businesses/:businessId/team-members/:memberId`
 
@@ -726,6 +729,72 @@ Empty array is valid: `{ "selectedTaskIds": [] }` — interpreted as "no specifi
   }
 }
 ```
+
+---
+
+### Job Costing (Business View)
+
+All routes require `authenticate` + `requireBusiness`. A "job" is a `selection_cycle`. Added 2026-07-04 (see `shared/specs/JOB_COSTING.md` and `JOB_COSTING_DATA_GAPS.md`).
+
+#### Get Cost Categories
+**GET** `/businesses/:businessId/cost-categories`
+
+Returns the four GAAP system defaults (`business_id = null`, codes 4000/5000/5100/5200) plus this business's custom categories. Response: `{ success, categories: [{ id, business_id, code, name, type, is_system }] }`.
+
+#### Set / Override Job Price
+**PATCH** `/businesses/:businessId/jobs/:selectionCycleId/price`
+
+Body: `{ price }` — non-negative number or `null`. Also the ad-hoc-job path (Rule 5). Cycles otherwise pre-fill `price` from the customer's `price_per_visit` at creation time (Rule 4). Response: `{ success, selectionCycle }`.
+
+#### Set Assignment Recurring Price
+**PATCH** `/businesses/:businessId/customers/:customerId/assignments/:assignmentId`
+
+Body: `{ pricePerVisit }` — non-negative number or `null`. Sets `customer_cycle_assignments.price_per_visit`, which future cycle generation copies into new jobs' `price`. Response: `{ success, assignment }`.
+
+#### Get Job Costs (per-job payload)
+**GET** `/businesses/:businessId/jobs/:selectionCycleId/costs`
+
+**Response (200)**:
+```json
+{
+  "success": true,
+  "costs": {
+    "selectionCycleId": 10,
+    "serviceDate": "2026-07-11T00:00:00.000Z",
+    "status": "open",
+    "price": 200,
+    "estimatedHours": 1.5,
+    "laborLines": [
+      { "costId": 4, "teamMemberId": 1, "memberName": "Bob",
+        "hoursActual": 2, "hourlyRate": 20, "amount": 40, "source": "auto" }
+    ],
+    "materialsAmount": 50,
+    "overheadAmount": 30,
+    "totalCost": 120,
+    "marginDollars": 80,
+    "marginPercent": 40
+  }
+}
+```
+`estimatedHours` (Rule 7) = Σ `tasks.time_allotment_minutes` for the selected tasks ÷ 60, computed at query time. When `price` is null, `marginDollars`/`marginPercent` are `null` (Rule 3 — UI shows "Price not set"). `source` is `"auto"` (geofence-tracked) or `"manual"` (owner-corrected).
+
+#### Add Cost Line (manual)
+**POST** `/businesses/:businessId/jobs/:selectionCycleId/costs`
+
+Body: `{ costCategoryId, amount, teamMemberId?, hoursActual? }`. Always stamps `source='manual'`. Labor-type categories **require** `teamMemberId` + `hoursActual`; non-labor categories must omit them (400 otherwise). Duplicate labor line for the same member+job → 409 (Rule 6). Response (201): `{ success, data }`.
+
+#### Update Cost Line
+**PATCH** `/businesses/:businessId/jobs/:selectionCycleId/costs/:costId`
+
+Body: `{ amount?, hoursActual? }` (at least one). Marks the row `source='manual'` so a later geofence recompute won't overwrite it (D1). Response: `{ success, data }`.
+
+#### Delete Cost Line
+**DELETE** `/businesses/:businessId/jobs/:selectionCycleId/costs/:costId` → `{ success }`.
+
+#### Customer Profitability (aggregate)
+**GET** `/businesses/:businessId/customers/:customerId/profitability`
+
+Aggregates **completed** cycles only. Response: `{ success, profitability: { totalRevenue, totalCost, totalMarginDollars, totalMarginPercent, completedJobCount, jobs: [{ selectionCycleId, serviceDate, price, totalCost, marginDollars }] } }`.
 
 ---
 
@@ -923,7 +992,11 @@ Not yet implemented. Cron jobs handle scheduling (SMS reminders, auto-repeat sel
 
 ## Database Schema
 
-See `SPEC.md` for full database schema. Migrations 001–015 cover the full schema including:
+See `SPEC.md` for full database schema. Migrations 001–019 cover the full schema including:
 - **013** `messages` table (SMS communication history) + 4 Twilio provisioning columns on `businesses`
 - **014** `join_code` on `businesses` (stable 6-char customer invite code)
 - **015** `pending_sms_action` on `customers`; `customer_note`, `selection_token`, `selection_token_expires_at` on `selection_cycles`
+- **016** A2P 10DLC registration columns on `businesses`
+- **017** job costing: `cost_categories` (+ GAAP seed 4000/5000/5100/5200), `job_costs`; `team_members.hourly_rate`, `customers.lat/lng/geocoded_at`, `customer_cycle_assignments.price_per_visit`, `selection_cycles.price`
+- **018** `geofence_events` (lat/lng nullable for manual clock-in/out)
+- **019** job-costing integrity: `job_costs.source` (`auto|manual`); open-cycle `price` backfill; partial unique index on labor rows (Rule 6); recompute/aggregate indexes; `cost_categories` scope-unique indexes; FK ON DELETE (job_costs → CASCADE/SET NULL, geofence_events → CASCADE)

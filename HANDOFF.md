@@ -1,5 +1,5 @@
 # TaskRight — Handoff Document
-**Last updated: July 3, 2026 (Session 9 — job costing review findings fixed)**
+**Last updated: July 4, 2026 (Session 10 — job-costing data-model gaps cleared; API layer built)**
 
 > Start every new session by reading this file + `shared/API_REFERENCE.md`. Do NOT read SPEC.md unless you need deep schema details — it is 75KB and slow to load.
 
@@ -56,7 +56,7 @@ cd TaskRight-Website && npm run dev  # localhost:3001
 - **Twilio provisioning**: `twilioProvisioningService.js` — fire-and-forget on signup. Creates subaccount → Messaging Service → purchases local number → adds to pool → persists to DB. Status tracked in `businesses.twilio_provisioning_status`.
 - **Inbound webhook**: `routes/webhooks.js` — `POST /api/webhooks/inbound-sms`. Receives Twilio POST, routes by `To` phone → business, `From` phone → customer, stores in `messages` table. Returns `<Response/>` immediately, processes async.
 - **Cron jobs**: `jobs/selection-reminders.js`, `jobs/auto-repeat.js` — fully wired with per-business SMS routing. Dormant until Twilio credentials are active.
-- **Test suite**: 70/70 passing (`npm test`, uses `task_app_test` DB)
+- **Test suite**: 94/94 passing (`npm test`, uses `task_app_test` DB)
 
 ### Database Schema (PostgreSQL 18, Knex)
 Migration files: `backend/migrations/001_initial_schema.js` through `016_a2p_registration.js` (all run on both `task_app_db` and `task_app_test`).
@@ -303,8 +303,21 @@ React Navigation requires all params to be plain serializable data. Functions ca
   - Geofence endpoint: `POST /api/team-members/:id/jobs/:selectionCycleId/geofence` in `teamMembers.js`. Validates `eventType`/`method`, writes to `geofence_events`, auto-creates `job_costs` labor line on departure (upserts if second departure fires — Business Rule 6).
   - `getJobDetail()` now returns `customerLat`/`customerLng` in the job detail response.
   - Mobile geo-fence: `JobDetailScreen` uses `@react-native-community/geolocation` foreground watchPosition (100m radius, 15s interval). Arrival/departure POSTed automatically via Haversine check. Manual Clock In / Clock Out buttons shown when `lat`/`lng` is null or location permission denied.
-  - **Not yet built:** job costing views on ServiceCallDetailScreen/CustomerDetailScreen, team member rate endpoint, price endpoint, customer profitability aggregate endpoint, cost categories GET endpoint.
-  - **⚠️ NEXT STEP before any job-costing UI — clear the data-model gaps: `shared/specs/JOB_COSTING_DATA_GAPS.md`.** Resolve decisions D1–D3 (manual-vs-auto labor, price population per Rule 4, team-assigned job scope), then migration `019_job_costing_integrity` (source column, price backfill, Rule-6 unique index, perf indexes, FK delete behavior), then build the service/API layer (ordered by which decision each endpoint depends on). Only then start UI. This sequencing exists to limit UI rework.
+  - **Data-model gaps CLEARED + API layer built (Session 10, July 4, 2026)** — `shared/specs/JOB_COSTING_DATA_GAPS.md` is fully resolved. 94/94 tests passing (`backend/src/__tests__/jobCosting.test.js`).
+    - **Decisions:** D1 → `job_costs.source` (`auto|manual`); D2 → creation-time price copy + open-cycle backfill; D3 → individual-only labor for v1 (team-assigned jobs show price/materials/overhead, empty labor table; Option A tracked as follow-up).
+    - **Migration `019_job_costing_integrity`** (run on both `task_app_db` and `task_app_test`): `job_costs.source`; open-cycle `price` backfill from `price_per_visit`; partial unique index `job_costs (selection_cycle_id, team_member_id, cost_category_id) WHERE team_member_id IS NOT NULL` (Rule 6); indexes `geofence_events (selection_cycle_id, team_member_id, occurred_at)` + `job_costs (selection_cycle_id)`; `cost_categories` scope-unique indexes; FK ON DELETE — `job_costs.selection_cycle_id` CASCADE, `job_costs.team_member_id` SET NULL (preserve $ history), `geofence_events.*` CASCADE.
+    - **Service/API layer built** (routes in `businesses.js`, logic in `businessService.js`):
+      - `GET /businesses/:id/cost-categories`
+      - `PATCH /businesses/:id/jobs/:selectionCycleId/price`
+      - `PATCH /businesses/:id/customers/:customerId/assignments/:assignmentId` (sets `price_per_visit`)
+      - `POST` / `PATCH` / `DELETE /businesses/:id/jobs/:selectionCycleId/costs[/:costId]` (manual lines; stamp `source='manual'`; labor-shape validation; Rule-6 409)
+      - `GET /businesses/:id/jobs/:selectionCycleId/costs` (price, labor lines w/ source, materials, overhead, totalCost, margin$/%, estimatedHours)
+      - `GET /businesses/:id/customers/:customerId/profitability` (completed cycles only)
+      - `PUT /businesses/:id/team-members/:memberId` extended to accept `hourlyRate` (existing endpoint, not a new PATCH).
+      - `recordGeofenceEvent()` recompute now **skips `source='manual'`** rows (D1 guard); `generateUpcomingSelectionCycles()` copies `price_per_visit → price` at creation (D2).
+      - Test helper `truncateAllTables()` now re-seeds the GAAP `cost_categories` system rows (TRUNCATE…CASCADE was wiping them).
+    - **Not yet built:** job-costing **UI** on ServiceCallDetailScreen (per-job section) + CustomerDetailScreen (profitability card). See `shared/specs/JOB_COSTING.md` "UI Additions".
+  - **⚠️ NEXT STEP: build the job-costing UI** against the now-settled API contract (see `shared/specs/JOB_COSTING.md` UI Additions + API endpoints above). Data model and endpoints are final.
 - **Review Requests** — `shared/specs/REVIEW_REQUESTS.md`. New table: `review_tokens`. New columns: `feedbacks.source`, `customers.review_requests_opted_out`. Migration **020** (`019` reserved for job-costing integrity — see `JOB_COSTING_DATA_GAPS.md`). Triggered by geo-fence departure; sends SMS immediately with `/review/[token]` link.
 
 ### Open Questions / Future Decisions

@@ -24,6 +24,19 @@ async function truncateAllTables() {
       businesses
     RESTART IDENTITY CASCADE
   `);
+
+  // cost_categories FK-references businesses, so TRUNCATE ... CASCADE above wipes
+  // the migration's seeded GAAP system rows. Restore them so job-costing logic
+  // (labor category lookup, etc.) has its system defaults.
+  const seeded = await knex('cost_categories').whereNull('business_id').first();
+  if (!seeded) {
+    await knex('cost_categories').insert([
+      { business_id: null, code: 4000, name: 'Service Revenue',      type: 'revenue',   is_system: true },
+      { business_id: null, code: 5000, name: 'Direct Labor',         type: 'labor',     is_system: true },
+      { business_id: null, code: 5100, name: 'Materials / Supplies', type: 'materials', is_system: true },
+      { business_id: null, code: 5200, name: 'Job Overhead',         type: 'overhead',  is_system: true },
+    ]);
+  }
 }
 
 // ─── TEST FACTORIES ───────────────────────────────────────────────────────────

@@ -914,11 +914,12 @@ router.put('/:businessId/team-members/:memberId', requireBusiness, async (req, r
   try {
     const businessId = parseInt(req.params.businessId);
     const memberId = parseInt(req.params.memberId);
-    const { name, phoneNumber, weeklyHours } = req.body;
+    const { name, phoneNumber, weeklyHours, hourlyRate } = req.body;
     const updates = {};
     if (name !== undefined) updates.name = name;
     if (phoneNumber !== undefined) updates.phoneNumber = phoneNumber;
     if (weeklyHours !== undefined) updates.weeklyHours = parseInt(weeklyHours, 10);
+    if (hourlyRate !== undefined) updates.hourlyRate = hourlyRate === null ? null : parseFloat(hourlyRate);
     const updated = await businessService.updateTeamMember(memberId, businessId, updates);
     return res.status(200).json({
       success: true,
@@ -927,6 +928,7 @@ router.put('/:businessId/team-members/:memberId', requireBusiness, async (req, r
         name: updated.name,
         phoneNumber: updated.phone_number,
         weeklyHours: updated.weekly_hours,
+        hourlyRate: updated.hourly_rate,
       },
     });
   } catch (error) {
@@ -1354,6 +1356,190 @@ router.patch('/:businessId/kyc', requireBusiness, async (req, res) => {
   } catch (err) {
     console.error('KYC route error:', err);
     return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
+  }
+});
+
+// ─── JOB COSTING ─────────────────────────────────────────────────────────────
+
+// Shared error mapper for job-costing routes.
+function handleCostError(res, err, context) {
+  if (err.code === 'NOT_FOUND') {
+    return res.status(404).json({ success: false, error: err.message, code: 'NOT_FOUND' });
+  }
+  if (err.code === 'VALIDATION_ERROR') {
+    return res.status(400).json({ success: false, error: err.message, code: 'VALIDATION_ERROR' });
+  }
+  if (err.code === 'ALREADY_EXISTS') {
+    return res.status(409).json({ success: false, error: err.message, code: 'ALREADY_EXISTS' });
+  }
+  console.error(`${context} error:`, err);
+  return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
+}
+
+// Validate a dollar/number field: finite and >= 0. Returns { ok, value }.
+function parseMoney(raw) {
+  if (raw === null) return { ok: true, value: null };
+  const n = typeof raw === 'number' ? raw : parseFloat(raw);
+  if (!Number.isFinite(n) || n < 0) return { ok: false };
+  return { ok: true, value: n };
+}
+
+/**
+ * GET /api/businesses/:businessId/cost-categories
+ * System defaults + this business's custom categories.
+ */
+router.get('/:businessId/cost-categories', requireBusiness, async (req, res) => {
+  try {
+    const businessId = parseInt(req.params.businessId);
+    const categories = await businessService.getCostCategories(businessId);
+    return res.status(200).json({ success: true, categories });
+  } catch (err) {
+    return handleCostError(res, err, 'Get cost categories');
+  }
+});
+
+/**
+ * PATCH /api/businesses/:businessId/jobs/:selectionCycleId/price
+ * Set or override a job's price (also the ad hoc path — Rule 5).
+ */
+router.patch('/:businessId/jobs/:selectionCycleId/price', requireBusiness, async (req, res) => {
+  try {
+    const businessId = parseInt(req.params.businessId);
+    const selectionCycleId = parseInt(req.params.selectionCycleId);
+    const { price } = req.body;
+    const parsed = parseMoney(price);
+    if (!parsed.ok) {
+      return res.status(400).json({ success: false, error: 'price must be a non-negative number or null', code: 'VALIDATION_ERROR' });
+    }
+    const updated = await businessService.setJobPrice(businessId, selectionCycleId, parsed.value);
+    return res.status(200).json({ success: true, selectionCycle: updated });
+  } catch (err) {
+    return handleCostError(res, err, 'Set job price');
+  }
+});
+
+/**
+ * PATCH /api/businesses/:businessId/customers/:customerId/assignments/:assignmentId
+ * Set the recurring price-per-visit on a cycle assignment (feeds D2 going forward).
+ */
+router.patch('/:businessId/customers/:customerId/assignments/:assignmentId', requireBusiness, async (req, res) => {
+  try {
+    const businessId = parseInt(req.params.businessId);
+    const customerId = parseInt(req.params.customerId);
+    const assignmentId = parseInt(req.params.assignmentId);
+    const { pricePerVisit } = req.body;
+    const parsed = parseMoney(pricePerVisit);
+    if (!parsed.ok) {
+      return res.status(400).json({ success: false, error: 'pricePerVisit must be a non-negative number or null', code: 'VALIDATION_ERROR' });
+    }
+    const updated = await businessService.setAssignmentPrice(businessId, customerId, assignmentId, parsed.value);
+    return res.status(200).json({ success: true, assignment: updated });
+  } catch (err) {
+    return handleCostError(res, err, 'Set assignment price');
+  }
+});
+
+/**
+ * GET /api/businesses/:businessId/jobs/:selectionCycleId/costs
+ * Full per-job costing payload: price, labor lines, materials, overhead, totals, margin.
+ */
+router.get('/:businessId/jobs/:selectionCycleId/costs', requireBusiness, async (req, res) => {
+  try {
+    const businessId = parseInt(req.params.businessId);
+    const selectionCycleId = parseInt(req.params.selectionCycleId);
+    const costs = await businessService.getJobCosts(businessId, selectionCycleId);
+    return res.status(200).json({ success: true, costs });
+  } catch (err) {
+    return handleCostError(res, err, 'Get job costs');
+  }
+});
+
+/**
+ * POST /api/businesses/:businessId/jobs/:selectionCycleId/costs
+ * Manual entry/correction of a cost line (materials, overhead, or manual labor).
+ */
+router.post('/:businessId/jobs/:selectionCycleId/costs', requireBusiness, async (req, res) => {
+  try {
+    const businessId = parseInt(req.params.businessId);
+    const selectionCycleId = parseInt(req.params.selectionCycleId);
+    const { costCategoryId, amount, teamMemberId, hoursActual } = req.body;
+    if (costCategoryId == null) {
+      return res.status(400).json({ success: false, error: 'costCategoryId is required', code: 'VALIDATION_ERROR' });
+    }
+    const parsedAmount = parseMoney(amount);
+    if (!parsedAmount.ok || parsedAmount.value === null) {
+      return res.status(400).json({ success: false, error: 'amount must be a non-negative number', code: 'VALIDATION_ERROR' });
+    }
+    const line = await businessService.addJobCost(businessId, selectionCycleId, {
+      costCategoryId: parseInt(costCategoryId),
+      amount: parsedAmount.value,
+      teamMemberId: teamMemberId != null ? parseInt(teamMemberId) : null,
+      hoursActual: hoursActual != null ? parseFloat(hoursActual) : null,
+    });
+    return res.status(201).json({ success: true, data: line });
+  } catch (err) {
+    return handleCostError(res, err, 'Add job cost');
+  }
+});
+
+/**
+ * PATCH /api/businesses/:businessId/jobs/:selectionCycleId/costs/:costId
+ * Correct a cost line's amount (and hours for labor). Marks the row manual (D1).
+ */
+router.patch('/:businessId/jobs/:selectionCycleId/costs/:costId', requireBusiness, async (req, res) => {
+  try {
+    const businessId = parseInt(req.params.businessId);
+    const selectionCycleId = parseInt(req.params.selectionCycleId);
+    const costId = parseInt(req.params.costId);
+    const { amount, hoursActual } = req.body;
+    const updates = {};
+    if (amount !== undefined) {
+      const parsed = parseMoney(amount);
+      if (!parsed.ok || parsed.value === null) {
+        return res.status(400).json({ success: false, error: 'amount must be a non-negative number', code: 'VALIDATION_ERROR' });
+      }
+      updates.amount = parsed.value;
+    }
+    if (hoursActual !== undefined) {
+      updates.hoursActual = hoursActual === null ? null : parseFloat(hoursActual);
+    }
+    if (updates.amount === undefined && updates.hoursActual === undefined) {
+      return res.status(400).json({ success: false, error: 'Provide amount and/or hoursActual', code: 'VALIDATION_ERROR' });
+    }
+    const line = await businessService.updateJobCost(businessId, selectionCycleId, costId, updates);
+    return res.status(200).json({ success: true, data: line });
+  } catch (err) {
+    return handleCostError(res, err, 'Update job cost');
+  }
+});
+
+/**
+ * DELETE /api/businesses/:businessId/jobs/:selectionCycleId/costs/:costId
+ */
+router.delete('/:businessId/jobs/:selectionCycleId/costs/:costId', requireBusiness, async (req, res) => {
+  try {
+    const businessId = parseInt(req.params.businessId);
+    const selectionCycleId = parseInt(req.params.selectionCycleId);
+    const costId = parseInt(req.params.costId);
+    await businessService.deleteJobCost(businessId, selectionCycleId, costId);
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    return handleCostError(res, err, 'Delete job cost');
+  }
+});
+
+/**
+ * GET /api/businesses/:businessId/customers/:customerId/profitability
+ * Aggregate over COMPLETED cycles only.
+ */
+router.get('/:businessId/customers/:customerId/profitability', requireBusiness, async (req, res) => {
+  try {
+    const businessId = parseInt(req.params.businessId);
+    const customerId = parseInt(req.params.customerId);
+    const data = await businessService.getCustomerProfitability(businessId, customerId);
+    return res.status(200).json({ success: true, profitability: data });
+  } catch (err) {
+    return handleCostError(res, err, 'Get customer profitability');
   }
 });
 

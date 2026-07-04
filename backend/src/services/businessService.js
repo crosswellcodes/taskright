@@ -425,6 +425,15 @@ function addDays(date, n) {
 }
 
 async function generateUpcomingSelectionCycles(customerId, serviceCycle, startDate, dayOfWeek = null) {
+  // D2 (Business Rule 4): pre-fill each cycle's price from the customer's
+  // recurring price for this cycle so job-costing margins aren't "Price not set"
+  // on first load. Null when no price is set yet; owner can override per job.
+  const assignment = await knex('customer_cycle_assignments')
+    .where('customer_id', customerId)
+    .where('service_cycle_id', serviceCycle.id)
+    .first();
+  const pricePerVisit = assignment ? assignment.price_per_visit : null;
+
   let currentDate;
 
   if (dayOfWeek !== null) {
@@ -462,6 +471,7 @@ async function generateUpcomingSelectionCycles(customerId, serviceCycle, startDa
         service_date: serviceDate,
         submission_deadline: submissionDeadline,
         status: 'open',
+        price: pricePerVisit,
         created_at: knex.raw('CURRENT_TIMESTAMP'),
         updated_at: knex.raw('CURRENT_TIMESTAMP')
       });
@@ -876,6 +886,7 @@ async function updateTeamMember(memberId, businessId, updates) {
       name: updates.name !== undefined ? updates.name : row.name,
       phone_number: updates.phoneNumber !== undefined ? updates.phoneNumber : row.phone_number,
       weekly_hours: updates.weeklyHours !== undefined ? updates.weeklyHours : row.weekly_hours,
+      hourly_rate: updates.hourlyRate !== undefined ? updates.hourlyRate : row.hourly_rate,
       updated_at: knex.raw('CURRENT_TIMESTAMP'),
     })
     .returning('*');
@@ -1461,11 +1472,16 @@ async function recordGeofenceEvent(teamMemberId, selectionCycleId, { eventType, 
           .first();
 
         if (existing) {
-          await knex('job_costs').where('id', existing.id).update({
-            amount,
-            hours_actual: hoursActual,
-            updated_at: knex.raw('CURRENT_TIMESTAMP'),
-          });
+          // D1: never let an auto recompute clobber an owner's manual
+          // correction. A late/duplicate departure leaves the manual row as-is.
+          if (existing.source !== 'manual') {
+            await knex('job_costs').where('id', existing.id).update({
+              amount,
+              hours_actual: hoursActual,
+              updated_at: knex.raw('CURRENT_TIMESTAMP'),
+            });
+            laborCostCreated = true;
+          }
         } else {
           await knex('job_costs').insert({
             selection_cycle_id: selectionCycleId,
@@ -1473,16 +1489,318 @@ async function recordGeofenceEvent(teamMemberId, selectionCycleId, { eventType, 
             amount,
             team_member_id: teamMemberId,
             hours_actual: hoursActual,
+            source: 'auto',
             created_at: knex.raw('CURRENT_TIMESTAMP'),
             updated_at: knex.raw('CURRENT_TIMESTAMP'),
           });
+          laborCostCreated = true;
         }
-        laborCostCreated = true;
       }
     }
   }
 
   return { event, laborCostCreated };
+}
+
+// ─── JOB COSTING ─────────────────────────────────────────────────────────────
+
+const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
+// Verify a selection cycle belongs to this business (via service_cycles) and
+// return the cycle row. Mirrors the ownership check in rescheduleSelectionCycle.
+async function assertCycleOwnedByBusiness(selectionCycleId, businessId) {
+  const cycle = await knex('selection_cycles as sc')
+    .join('service_cycles as svc', 'sc.service_cycle_id', 'svc.id')
+    .where('sc.id', selectionCycleId)
+    .where('svc.business_id', businessId)
+    .select('sc.*')
+    .first();
+  if (!cycle) {
+    const err = new Error('Job not found');
+    err.code = 'NOT_FOUND';
+    err.statusCode = 404;
+    throw err;
+  }
+  return cycle;
+}
+
+// GET /cost-categories — system defaults (business_id NULL) + this business's customs.
+async function getCostCategories(businessId) {
+  return knex('cost_categories')
+    .whereNull('business_id')
+    .orWhere('business_id', businessId)
+    .orderBy('code', 'asc');
+}
+
+// PATCH /jobs/:selectionCycleId/price — set/override job price (Rule 5, ad hoc).
+async function setJobPrice(businessId, selectionCycleId, price) {
+  await assertCycleOwnedByBusiness(selectionCycleId, businessId);
+  const [updated] = await knex('selection_cycles')
+    .where('id', selectionCycleId)
+    .update({ price, updated_at: knex.raw('CURRENT_TIMESTAMP') })
+    .returning('*');
+  return updated;
+}
+
+// PATCH /customers/:customerId/assignments/:assignmentId — set recurring price.
+// Feeds D2: future generateUpcomingSelectionCycles() calls copy this forward.
+async function setAssignmentPrice(businessId, customerId, assignmentId, pricePerVisit) {
+  const assignment = await knex('customer_cycle_assignments as cca')
+    .join('customers as c', 'cca.customer_id', 'c.id')
+    .where('cca.id', assignmentId)
+    .where('cca.customer_id', customerId)
+    .where('c.business_id', businessId)
+    .select('cca.*')
+    .first();
+  if (!assignment) {
+    const err = new Error('Assignment not found');
+    err.code = 'NOT_FOUND';
+    err.statusCode = 404;
+    throw err;
+  }
+  const [updated] = await knex('customer_cycle_assignments')
+    .where('id', assignmentId)
+    .update({ price_per_visit: pricePerVisit, updated_at: knex.raw('CURRENT_TIMESTAMP') })
+    .returning('*');
+  return updated;
+}
+
+// Enforce the spec's labor cross-table rule at the app layer (v1 decision):
+// a labor-type line requires team_member_id + hours_actual; non-labor lines
+// must not carry them.
+async function validateCostLineShape(costCategoryId, businessId, teamMemberId, hoursActual) {
+  const category = await knex('cost_categories')
+    .where('id', costCategoryId)
+    .where(function () { this.whereNull('business_id').orWhere('business_id', businessId); })
+    .first();
+  if (!category) {
+    const err = new Error('Cost category not found');
+    err.code = 'VALIDATION_ERROR';
+    err.statusCode = 400;
+    throw err;
+  }
+  if (category.type === 'labor') {
+    if (teamMemberId == null || hoursActual == null) {
+      const err = new Error('Labor lines require teamMemberId and hoursActual');
+      err.code = 'VALIDATION_ERROR';
+      err.statusCode = 400;
+      throw err;
+    }
+  } else if (teamMemberId != null || hoursActual != null) {
+    const err = new Error('Only labor lines may set teamMemberId/hoursActual');
+    err.code = 'VALIDATION_ERROR';
+    err.statusCode = 400;
+    throw err;
+  }
+  return category;
+}
+
+// POST /costs — manual entry/correction. Always stamps source='manual' (D1).
+async function addJobCost(businessId, selectionCycleId, { costCategoryId, amount, teamMemberId = null, hoursActual = null }) {
+  await assertCycleOwnedByBusiness(selectionCycleId, businessId);
+  await validateCostLineShape(costCategoryId, businessId, teamMemberId, hoursActual);
+
+  // Rule 6: at most one labor row per member+job+category. Surface a clean 409
+  // rather than letting the partial unique index throw a raw DB error.
+  if (teamMemberId != null) {
+    const dup = await knex('job_costs')
+      .where('selection_cycle_id', selectionCycleId)
+      .where('team_member_id', teamMemberId)
+      .where('cost_category_id', costCategoryId)
+      .first();
+    if (dup) {
+      const err = new Error('A labor line already exists for this member on this job');
+      err.code = 'ALREADY_EXISTS';
+      err.statusCode = 409;
+      throw err;
+    }
+  }
+
+  const [row] = await knex('job_costs')
+    .insert({
+      selection_cycle_id: selectionCycleId,
+      cost_category_id: costCategoryId,
+      amount,
+      team_member_id: teamMemberId,
+      hours_actual: hoursActual,
+      source: 'manual',
+      created_at: knex.raw('CURRENT_TIMESTAMP'),
+      updated_at: knex.raw('CURRENT_TIMESTAMP'),
+    })
+    .returning('*');
+  return row;
+}
+
+// PATCH /costs/:costId — correct amount (and hours for labor). Marks manual (D1)
+// so a later auto recompute won't clobber it.
+async function updateJobCost(businessId, selectionCycleId, costId, { amount, hoursActual }) {
+  await assertCycleOwnedByBusiness(selectionCycleId, businessId);
+  const existing = await knex('job_costs')
+    .where('id', costId)
+    .where('selection_cycle_id', selectionCycleId)
+    .first();
+  if (!existing) {
+    const err = new Error('Cost line not found');
+    err.code = 'NOT_FOUND';
+    err.statusCode = 404;
+    throw err;
+  }
+  const updates = { source: 'manual', updated_at: knex.raw('CURRENT_TIMESTAMP') };
+  if (amount !== undefined) updates.amount = amount;
+  if (hoursActual !== undefined) updates.hours_actual = hoursActual;
+  const [row] = await knex('job_costs').where('id', costId).update(updates).returning('*');
+  return row;
+}
+
+// DELETE /costs/:costId
+async function deleteJobCost(businessId, selectionCycleId, costId) {
+  await assertCycleOwnedByBusiness(selectionCycleId, businessId);
+  const deleted = await knex('job_costs')
+    .where('id', costId)
+    .where('selection_cycle_id', selectionCycleId)
+    .delete();
+  if (!deleted) {
+    const err = new Error('Cost line not found');
+    err.code = 'NOT_FOUND';
+    err.statusCode = 404;
+    throw err;
+  }
+  return true;
+}
+
+// Rule 7: estimated hours = sum of time_allotment_minutes over selected tasks,
+// in decimal hours. Derived at query time — never stored.
+async function computeEstimatedHours(selectionCycle) {
+  const selection = await knex('selections')
+    .where('selection_cycle_id', selectionCycle.id)
+    .where('customer_id', selectionCycle.customer_id)
+    .first();
+  if (!selection || !Array.isArray(selection.selected_tasks) || selection.selected_tasks.length === 0) {
+    return 0;
+  }
+  const tasks = await knex('tasks').whereIn('id', selection.selected_tasks);
+  const minutes = tasks.reduce((sum, t) => sum + (t.time_allotment_minutes || 0), 0);
+  return round2(minutes / 60);
+}
+
+// GET /jobs/:selectionCycleId/costs — the full per-job costing payload.
+async function getJobCosts(businessId, selectionCycleId) {
+  const cycle = await assertCycleOwnedByBusiness(selectionCycleId, businessId);
+
+  const lines = await knex('job_costs as jc')
+    .join('cost_categories as cat', 'jc.cost_category_id', 'cat.id')
+    .leftJoin('team_members as tm', 'jc.team_member_id', 'tm.id')
+    .where('jc.selection_cycle_id', selectionCycleId)
+    .select(
+      'jc.id',
+      'jc.amount',
+      'jc.hours_actual',
+      'jc.team_member_id',
+      'jc.source',
+      'cat.type',
+      'tm.name as member_name',
+      'tm.hourly_rate',
+    );
+
+  const laborLines = lines
+    .filter((l) => l.type === 'labor')
+    .map((l) => ({
+      costId: l.id,
+      teamMemberId: l.team_member_id,
+      memberName: l.member_name,
+      hoursActual: l.hours_actual != null ? round2(l.hours_actual) : null,
+      hourlyRate: l.hourly_rate != null ? round2(l.hourly_rate) : null,
+      amount: round2(l.amount),
+      source: l.source,
+    }));
+
+  const materialsAmount = round2(
+    lines.filter((l) => l.type === 'materials').reduce((s, l) => s + Number(l.amount), 0)
+  );
+  const overheadAmount = round2(
+    lines.filter((l) => l.type === 'overhead').reduce((s, l) => s + Number(l.amount), 0)
+  );
+  const laborTotal = round2(laborLines.reduce((s, l) => s + l.amount, 0));
+  const totalCost = round2(laborTotal + materialsAmount + overheadAmount);
+
+  const price = cycle.price != null ? round2(cycle.price) : null;
+  // Rule 3: margin only when price is set; UI renders "Price not set" otherwise.
+  const marginDollars = price != null ? round2(price - totalCost) : null;
+  const marginPercent = price != null && price !== 0 ? round2((marginDollars / price) * 100) : null;
+
+  const estimatedHours = await computeEstimatedHours(cycle);
+
+  return {
+    selectionCycleId: cycle.id,
+    serviceDate: cycle.service_date,
+    status: cycle.status,
+    price,
+    estimatedHours,
+    laborLines,
+    materialsAmount,
+    overheadAmount,
+    totalCost,
+    marginDollars,
+    marginPercent,
+  };
+}
+
+// GET /customers/:customerId/profitability — aggregate over COMPLETED cycles only.
+async function getCustomerProfitability(businessId, customerId) {
+  const customer = await knex('customers')
+    .where('id', customerId)
+    .where('business_id', businessId)
+    .first();
+  if (!customer) {
+    const err = new Error('Customer not found');
+    err.code = 'NOT_FOUND';
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const cycles = await knex('selection_cycles')
+    .where('customer_id', customerId)
+    .where('status', 'completed')
+    .orderBy('service_date', 'asc');
+
+  const cycleIds = cycles.map((c) => c.id);
+  const costRows = cycleIds.length
+    ? await knex('job_costs').whereIn('selection_cycle_id', cycleIds)
+    : [];
+  const costByCycle = {};
+  for (const r of costRows) {
+    costByCycle[r.selection_cycle_id] = (costByCycle[r.selection_cycle_id] || 0) + Number(r.amount);
+  }
+
+  let totalRevenue = 0;
+  let totalCost = 0;
+  const jobs = cycles.map((c) => {
+    const price = c.price != null ? round2(c.price) : null;
+    const cost = round2(costByCycle[c.id] || 0);
+    if (price != null) totalRevenue += price;
+    totalCost += cost;
+    return {
+      selectionCycleId: c.id,
+      serviceDate: c.service_date,
+      price,
+      totalCost: cost,
+      marginDollars: price != null ? round2(price - cost) : null,
+    };
+  });
+
+  totalRevenue = round2(totalRevenue);
+  totalCost = round2(totalCost);
+  const totalMarginDollars = round2(totalRevenue - totalCost);
+  const totalMarginPercent = totalRevenue !== 0 ? round2((totalMarginDollars / totalRevenue) * 100) : null;
+
+  return {
+    totalRevenue,
+    totalCost,
+    totalMarginDollars,
+    totalMarginPercent,
+    completedJobCount: cycles.length,
+    jobs,
+  };
 }
 
 module.exports = {
@@ -1546,6 +1864,15 @@ module.exports = {
   getJobDetail,
   completeJobForTeamMember,
   recordGeofenceEvent,
+  // Job Costing
+  getCostCategories,
+  setJobPrice,
+  setAssignmentPrice,
+  addJobCost,
+  updateJobCost,
+  deleteJobCost,
+  getJobCosts,
+  getCustomerProfitability,
   // SMS keyword helpers
   confirmCustomerSelection,
   generateSelectionToken,

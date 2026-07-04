@@ -1,7 +1,15 @@
 # Job Costing — Data Model & API Gaps (pre-UI)
 
-**Status:** Open. To be cleared **before** any job-costing UI work begins.
+**Status:** ✅ CLEARED (2026-07-04). Decisions D1–D3 made, migration `019_job_costing_integrity` run on both DBs, service/API layer built and tested (94/94). The job-costing UI is now unblocked.
 **Created:** 2026-07-03 (after Session 9 review-findings fixes)
+
+## Resolution summary (2026-07-04)
+
+- **D1 → `job_costs.source`** (`'auto'|'manual'`). Geofence recompute skips `source='manual'`; `POST`/`PATCH /costs` stamp `'manual'`.
+- **D2 → creation-time copy + backfill.** `generateUpcomingSelectionCycles()` copies `customer_cycle_assignments.price_per_visit → selection_cycles.price`; migration 019 backfilled existing **open** cycles.
+- **D3 → Option B (individual-only for v1).** Auto labor requires an individual `service_assignments.team_member_id`. Team-assigned jobs show price/materials/overhead but an empty labor table. Union-with-`team_group_members` (Option A) tracked as a follow-up.
+- **FK ON DELETE:** `job_costs.selection_cycle_id` CASCADE, `job_costs.team_member_id` SET NULL (preserve $ history), `geofence_events.*` CASCADE.
+- **Labor cross-table rule:** enforced app-level in the costs service (`validateCostLineShape`), by decision.
 **Related:** [`JOB_COSTING.md`](JOB_COSTING.md) (feature spec), [`SESSION9_REVIEW_FINDINGS.md`](SESSION9_REVIEW_FINDINGS.md) (fixed), [`REVIEW_REQUESTS.md`](REVIEW_REQUESTS.md) (consumes geofence departure)
 
 ---
@@ -67,24 +75,21 @@ These are not just columns; they are product/model decisions that ripple into th
 
 Encodes the decisions above plus data-integrity / performance hygiene. None of this is UI-blocking on its own, but it should land before the feature is exercised for real.
 
-- [ ] **(from D1)** `job_costs.source varchar(10) NOT NULL DEFAULT 'auto'`.
-- [ ] **(from D2)** Backfill `selection_cycles.price` for existing open cycles from `customer_cycle_assignments.price_per_visit`.
-- [ ] **Enforce Rule 6 at the DB (not just app code):** partial unique index
-      `job_costs (selection_cycle_id, team_member_id, cost_category_id) WHERE team_member_id IS NOT NULL`
-      so duplicate labor rows for the same member+job are impossible.
-- [ ] **Indexes for recompute + aggregates:**
-      `geofence_events (selection_cycle_id, team_member_id, occurred_at)` and `job_costs (selection_cycle_id)`.
-      (The Session 9 recompute pulls all events for a member+job ordered by `occurred_at`; the profitability aggregate scans `job_costs` by cycle.)
-- [ ] **`cost_categories` uniqueness:** the labor lookup assumes a single `code=5000, is_system=true` row.
-      Add unique indexes: system scope on `(code) WHERE business_id IS NULL`; custom scope on `(business_id, code) WHERE business_id IS NOT NULL`.
-- [ ] **FK `ON DELETE` behavior:** currently undefined for `job_costs` and `geofence_events`. Decide cascade vs restrict when a `selection_cycle` or `team_member` is deleted (a member with labor history will otherwise error/orphan).
-- [ ] **Labor cross-table constraint (spec Rule):** "if category type='labor' then `team_member_id`/`hours_actual` non-null" spans two tables and is **not expressible as a plain CHECK**. Decide: DB trigger vs. app-level enforcement in the costs service. (Recommend app-level for v1, documented.)
+- [x] **(from D1)** `job_costs.source varchar(10) NOT NULL DEFAULT 'auto'`.
+- [x] **(from D2)** Backfill `selection_cycles.price` for existing open cycles from `customer_cycle_assignments.price_per_visit`.
+- [x] **Enforce Rule 6 at the DB (not just app code):** partial unique index
+      `job_costs_member_job_category_unique` on `(selection_cycle_id, team_member_id, cost_category_id) WHERE team_member_id IS NOT NULL`.
+- [x] **Indexes for recompute + aggregates:**
+      `geofence_events_member_job_time_idx (selection_cycle_id, team_member_id, occurred_at)` and `job_costs_selection_cycle_idx (selection_cycle_id)`.
+- [x] **`cost_categories` uniqueness:** `cost_categories_system_code_unique (code) WHERE business_id IS NULL`; `cost_categories_business_code_unique (business_id, code) WHERE business_id IS NOT NULL`.
+- [x] **FK `ON DELETE` behavior:** `job_costs.selection_cycle_id` CASCADE, `job_costs.team_member_id` SET NULL, `geofence_events.*` CASCADE. (Keep the derived $ history; drop raw telemetry.)
+- [x] **Labor cross-table constraint (spec Rule):** enforced **app-level** in the costs service (`validateCostLineShape`), by decision. Not a DB trigger for v1.
 
 ---
 
 ## Part 3 — Service / API layer (follows Part 1 decisions)
 
-None of this is built yet. Build **after** D1–D3 so field shapes are final. Ordered by dependency.
+✅ **All built (2026-07-04)** and tested in `backend/src/__tests__/jobCosting.test.js`. Note the team-member rate lives on the existing **PUT** `/team-members/:memberId` (extended to accept `hourlyRate`), not a new PATCH. Ordered by dependency.
 
 1. **`GET /api/businesses/:id/cost-categories`** — system defaults + business customs. No decision dependency; safe to build first.
 2. **`PATCH /api/businesses/:id/team-members/:memberId`** — extend to accept `hourlyRate`. Independent; unblocks labor `amount` being non-zero.
