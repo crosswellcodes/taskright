@@ -1,11 +1,51 @@
 const knex = require('../db');
+const crypto = require('crypto');
+const https = require('https');
+const notificationService = require('./notificationService');
+
+// ─── GEOCODING ───────────────────────────────────────────────────────────────
+
+function geocodeAddress(customerId, address) {
+  if (!address || !process.env.MAPBOX_ACCESS_TOKEN) return;
+  const encoded = encodeURIComponent(address);
+  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?access_token=${process.env.MAPBOX_ACCESS_TOKEN}&country=US&limit=1`;
+  https.get(url, (res) => {
+    let data = '';
+    res.on('data', chunk => { data += chunk; });
+    res.on('end', () => {
+      if (res.statusCode !== 200) {
+        // e.g. 401 expired token, 429 rate limit — body is HTML/error JSON, not
+        // a geocoding result. Log the status + a snippet so the cause is visible.
+        console.error(`Geocode HTTP ${res.statusCode} for customer ${customerId}:`, data.slice(0, 200));
+        return;
+      }
+      try {
+        const json = JSON.parse(data);
+        const feature = json.features && json.features[0];
+        if (!feature) return;
+        const [lng, lat] = feature.center;
+        knex('customers').where('id', customerId).update({
+          lat,
+          lng,
+          geocoded_at: knex.raw('CURRENT_TIMESTAMP'),
+        }).catch(e => console.error('Geocode DB update failed:', e.message));
+      } catch (e) {
+        console.error('Geocode parse failed:', e.message);
+      }
+    });
+  }).on('error', e => console.error('Geocode request failed:', e.message));
+}
 
 // ─── AUTH / BUSINESS ACCOUNT ────────────────────────────────────────────────
+
+function generateJoinCode() {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
 
 /**
  * Create a new business
  */
-async function createBusiness(name, phoneNumber, schedulingFormat = 'date_based') {
+async function createBusiness(name, phoneNumber, schedulingFormat = 'date_based', entityType = 'sole_prop') {
   const existingBusiness = await knex('businesses')
     .where('phone_number', phoneNumber)
     .first();
@@ -17,17 +57,35 @@ async function createBusiness(name, phoneNumber, schedulingFormat = 'date_based'
     throw error;
   }
 
+  // Generate a unique 6-char join code for customer invite links
+  let joinCode;
+  let collision = true;
+  while (collision) {
+    joinCode = generateJoinCode();
+    const existing = await knex('businesses').where('join_code', joinCode).first();
+    collision = !!existing;
+  }
+
   const inserted = await knex('businesses')
     .insert({
       name: name.trim(),
       phone_number: phoneNumber,
       scheduling_format: schedulingFormat,
+      entity_type: entityType,
+      join_code: joinCode,
       created_at: knex.raw('CURRENT_TIMESTAMP'),
       updated_at: knex.raw('CURRENT_TIMESTAMP')
     })
     .returning('*');
 
   return inserted[0];
+}
+
+async function getBusinessByJoinCode(joinCode) {
+  return await knex('businesses')
+    .where('join_code', joinCode.toUpperCase())
+    .select('id', 'name', 'join_code')
+    .first();
 }
 
 async function getBusinessById(id) {
@@ -207,7 +265,13 @@ async function addCustomer(businessId, name, phoneNumber) {
     })
     .returning('*');
 
-  return inserted[0];
+  const customer = inserted[0];
+
+  // No geocoding here: addCustomer never inserts an address, so customer.address
+  // is always null. Geocoding fires from updateCustomerDetails() when an address
+  // is actually set.
+
+  return customer;
 }
 
 async function getCustomersByBusiness(businessId) {
@@ -293,7 +357,14 @@ async function updateCustomerDetails(customerId, data) {
   if (data.address !== undefined) updates.address = data.address || null;
   if (data.notes !== undefined) updates.notes = data.notes || null;
   const updated = await knex('customers').where('id', customerId).update(updates).returning('*');
-  return updated[0];
+  const customer = updated[0];
+
+  // Re-geocode fire-and-forget whenever address changes
+  if (data.address !== undefined && data.address) {
+    geocodeAddress(customerId, data.address);
+  }
+
+  return customer;
 }
 
 // ─── CYCLE ASSIGNMENT ────────────────────────────────────────────────────────
@@ -326,6 +397,25 @@ async function assignCycle(customerId, serviceCycleId, totalHours, startDate, da
   const assignment = inserted[0];
   const serviceCycle = await knex('service_cycles').where('id', serviceCycleId).first();
   await generateUpcomingSelectionCycles(customerId, serviceCycle, startDate, dayOfWeek);
+
+  // Fire-and-forget: welcome SMS — don't block cycle creation on notification success
+  (async () => {
+    try {
+      const [customer, business, firstCycle] = await Promise.all([
+        knex('customers').where('id', customerId).first(),
+        knex('businesses').where('id', serviceCycle.business_id).first(),
+        knex('selection_cycles')
+          .where('customer_id', customerId)
+          .where('service_cycle_id', serviceCycleId)
+          .orderBy('service_date', 'asc')
+          .first()
+      ]);
+      const firstServiceDate = firstCycle ? new Date(firstCycle.service_date).toISOString().split('T')[0] : null;
+      await notificationService.sendWelcomeNotification(business, customer.phone_number, business.name, firstServiceDate);
+    } catch (e) {
+      console.error('Welcome SMS failed:', e.message);
+    }
+  })();
 
   return assignment;
 }
@@ -653,10 +743,34 @@ async function markServiceComplete(selectionCycleId, customerId, notes) {
     .where('id', selectionCycleId)
     .update({ status: 'completed', updated_at: knex.raw('CURRENT_TIMESTAMP') });
 
+  // Fire-and-forget: completion SMS with next service date
+  (async () => {
+    try {
+      const customer = await knex('customers').where('id', customerId).first();
+      const [business, nextCycle] = await Promise.all([
+        knex('businesses').where('id', customer.business_id).first(),
+        knex('selection_cycles')
+          .where('customer_id', customerId)
+          .where('status', 'open')
+          .orderBy('service_date', 'asc')
+          .first()
+      ]);
+      const nextDate = nextCycle ? new Date(nextCycle.service_date).toISOString().split('T')[0] : null;
+      const nextDeadline = nextCycle ? new Date(nextCycle.submission_deadline).toISOString().split('T')[0] : null;
+      await notificationService.sendServiceCompletionNotification(business, customer.phone_number, nextDate, nextDeadline);
+    } catch (e) {
+      console.error('Completion SMS failed:', e.message);
+    }
+  })();
+
   return inserted[0];
 }
 
 // ─── TEAM MEMBERS ─────────────────────────────────────────────────────────────
+
+function generateInviteCode() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
 
 async function addTeamMember(businessId, name, phoneNumber, weeklyHours) {
   const existing = await knex('team_members')
@@ -669,17 +783,62 @@ async function addTeamMember(businessId, name, phoneNumber, weeklyHours) {
     error.statusCode = 409;
     throw error;
   }
+  const inviteCode = generateInviteCode();
   const inserted = await knex('team_members')
     .insert({
       business_id: businessId,
       name: name.trim(),
       phone_number: phoneNumber,
       weekly_hours: weeklyHours,
+      invite_code: inviteCode,
+      invite_accepted: false,
       created_at: knex.raw('CURRENT_TIMESTAMP'),
       updated_at: knex.raw('CURRENT_TIMESTAMP'),
     })
     .returning('*');
   return inserted[0];
+}
+
+async function getTeamMemberByPhone(phoneNumber) {
+  return knex('team_members')
+    .where('phone_number', phoneNumber)
+    .first();
+}
+
+async function acceptTeamMemberInvite(phoneNumber, inviteCode) {
+  const member = await knex('team_members')
+    .where('phone_number', phoneNumber)
+    .first();
+
+  if (!member) {
+    const err = new Error('No team member found with that phone number');
+    err.code = 'TEAM_MEMBER_NOT_FOUND';
+    err.statusCode = 404;
+    throw err;
+  }
+  if (member.invite_accepted) {
+    const err = new Error('Invite already accepted — please log in');
+    err.code = 'INVITE_ALREADY_ACCEPTED';
+    err.statusCode = 409;
+    throw err;
+  }
+  if (member.invite_code !== inviteCode) {
+    const err = new Error('Invalid invite code');
+    err.code = 'INVALID_INVITE_CODE';
+    err.statusCode = 401;
+    throw err;
+  }
+
+  const [updated] = await knex('team_members')
+    .where('id', member.id)
+    .update({
+      invite_accepted: true,
+      invite_code: null,
+      updated_at: knex.raw('CURRENT_TIMESTAMP'),
+    })
+    .returning('*');
+
+  return updated;
 }
 
 async function getTeamMembersByBusiness(businessId) {
@@ -895,11 +1054,443 @@ async function rescheduleSelectionCycle(selectionCycleId, businessId, newService
   return updated;
 }
 
+// ─── TEAM MEMBER JOB VIEWS ────────────────────────────────────────────────────
+
+async function getJobsForTeamMember(teamMemberId) {
+  const today = new Date().toISOString().split('T')[0];
+  return knex('service_assignments as sa')
+    .join('selection_cycles as sc', 'sa.selection_cycle_id', 'sc.id')
+    .join('customers as c', 'sc.customer_id', 'c.id')
+    .join('service_cycles as svc', 'sc.service_cycle_id', 'svc.id')
+    .leftJoin('selections as sel', function() {
+      this.on('sel.selection_cycle_id', 'sc.id')
+          .andOn('sel.customer_id', 'sc.customer_id');
+    })
+    .where('sa.team_member_id', teamMemberId)
+    .where('sc.service_date', '>=', today)
+    .orderBy('sc.service_date', 'asc')
+    .select(
+      'sc.id as selectionCycleId',
+      'sc.service_date as serviceDate',
+      'sc.submission_deadline as submissionDeadline',
+      'sc.status',
+      'c.id as customerId',
+      'c.name as customerName',
+      'c.address as customerAddress',
+      'svc.name as serviceCycleName',
+      'sel.selected_tasks as selectedTasks',
+      'sel.status as selectionStatus',
+    );
+}
+
+async function getJobDetail(teamMemberId, selectionCycleId) {
+  // Verify this team member is assigned to this job
+  const assignment = await knex('service_assignments')
+    .where('team_member_id', teamMemberId)
+    .where('selection_cycle_id', selectionCycleId)
+    .first();
+
+  if (!assignment) {
+    const err = new Error('Job not found or not assigned to this team member');
+    err.code = 'NOT_FOUND';
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const row = await knex('selection_cycles as sc')
+    .join('customers as c', 'sc.customer_id', 'c.id')
+    .join('service_cycles as svc', 'sc.service_cycle_id', 'svc.id')
+    .leftJoin('selections as sel', function() {
+      this.on('sel.selection_cycle_id', 'sc.id')
+          .andOn('sel.customer_id', 'sc.customer_id');
+    })
+    .leftJoin('service_completions as comp', 'comp.selection_cycle_id', 'sc.id')
+    .where('sc.id', selectionCycleId)
+    .select(
+      'sc.id as selectionCycleId',
+      'sc.service_date as serviceDate',
+      'sc.submission_deadline as submissionDeadline',
+      'sc.status',
+      'c.id as customerId',
+      'c.name as customerName',
+      'c.phone_number as customerPhone',
+      'c.address as customerAddress',
+      'c.notes as customerNotes',
+      'c.lat as customerLat',
+      'c.lng as customerLng',
+      'svc.name as serviceCycleName',
+      'sc.customer_note as customerNote',
+      'sel.selected_tasks as selectedTasks',
+      'sel.status as selectionStatus',
+      'comp.completed_at as completedAt',
+      'comp.notes as completionNotes',
+    )
+    .first();
+
+  return row;
+}
+
+async function getServiceCallDetail(businessId, selectionCycleId) {
+  const row = await knex('selection_cycles as sc')
+    .join('customers as c', 'sc.customer_id', 'c.id')
+    .join('service_cycles as svc', 'sc.service_cycle_id', 'svc.id')
+    .leftJoin('selections as sel', function() {
+      this.on('sel.selection_cycle_id', 'sc.id')
+          .andOn('sel.customer_id', 'sc.customer_id');
+    })
+    .leftJoin('service_completions as comp', 'comp.selection_cycle_id', 'sc.id')
+    .leftJoin('service_assignments as sa', 'sa.selection_cycle_id', 'sc.id')
+    .leftJoin('team_members as tm', 'sa.team_member_id', 'tm.id')
+    .leftJoin('teams as t', 'sa.team_id', 't.id')
+    .where('sc.id', selectionCycleId)
+    .where('c.business_id', businessId)
+    .select(
+      'sc.id as selectionCycleId',
+      'sc.service_date as serviceDate',
+      'sc.submission_deadline as submissionDeadline',
+      'sc.status',
+      'c.id as customerId',
+      'c.name as customerName',
+      'svc.name as serviceCycleName',
+      'sel.selected_tasks as selectedTasks',
+      'sel.status as selectionStatus',
+      'comp.completed_at as completedAt',
+      'comp.notes as completionNotes',
+      'tm.id as teamMemberId',
+      'tm.name as teamMemberName',
+      'tm.phone_number as teamMemberPhone',
+      't.id as teamId',
+      't.name as teamName',
+    )
+    .first();
+
+  return row || null;
+}
+
+async function completeJobForTeamMember(teamMemberId, selectionCycleId, notes) {
+  // Verify this team member is assigned to this job
+  const assignment = await knex('service_assignments')
+    .where('team_member_id', teamMemberId)
+    .where('selection_cycle_id', selectionCycleId)
+    .first();
+
+  if (!assignment) {
+    const err = new Error('Job not found or not assigned to this team member');
+    err.code = 'NOT_FOUND';
+    err.statusCode = 404;
+    throw err;
+  }
+
+  // Look up the cycle to get customer_id and check current status
+  const cycle = await knex('selection_cycles').where('id', selectionCycleId).first();
+  if (!cycle) {
+    const err = new Error('Selection cycle not found');
+    err.code = 'NOT_FOUND';
+    err.statusCode = 404;
+    throw err;
+  }
+
+  if (cycle.status === 'completed') {
+    const err = new Error('Service already marked as complete');
+    err.code = 'ALREADY_COMPLETED';
+    err.statusCode = 409;
+    throw err;
+  }
+
+  const existing = await knex('service_completions')
+    .where('selection_cycle_id', selectionCycleId)
+    .first();
+
+  if (existing) {
+    const err = new Error('Service already marked as complete');
+    err.code = 'ALREADY_COMPLETED';
+    err.statusCode = 409;
+    throw err;
+  }
+
+  const [inserted] = await knex('service_completions')
+    .insert({
+      selection_cycle_id: selectionCycleId,
+      customer_id: cycle.customer_id,
+      completed_at: knex.raw('CURRENT_TIMESTAMP'),
+      notes: notes || null,
+      created_at: knex.raw('CURRENT_TIMESTAMP'),
+      updated_at: knex.raw('CURRENT_TIMESTAMP'),
+    })
+    .returning('*');
+
+  await knex('selection_cycles')
+    .where('id', selectionCycleId)
+    .update({ status: 'completed', updated_at: knex.raw('CURRENT_TIMESTAMP') });
+
+  return inserted;
+}
+
+// ─── SMS KEYWORD HELPERS ─────────────────────────────────────────────────────
+
+async function confirmCustomerSelection(customerId) {
+  const cycle = await knex('selection_cycles')
+    .where('customer_id', customerId)
+    .where('status', 'open')
+    .orderBy('service_date', 'asc')
+    .first();
+
+  if (!cycle) return { status: 'no_cycle' };
+
+  const serviceDate = new Date(cycle.service_date).toISOString().split('T')[0];
+
+  const existing = await knex('selections')
+    .where('selection_cycle_id', cycle.id)
+    .where('customer_id', customerId)
+    .first();
+
+  if (existing && existing.status === 'submitted') {
+    return { status: 'already_confirmed', serviceDate };
+  }
+
+  if (existing && existing.status === 'draft') {
+    await knex('selections').where('id', existing.id).update({
+      status: 'submitted',
+      submitted_at: knex.raw('CURRENT_TIMESTAMP'),
+      updated_at: knex.raw('CURRENT_TIMESTAMP'),
+    });
+    return { status: 'confirmed', serviceDate };
+  }
+
+  // No selection yet — auto-repeat from last submitted
+  const previous = await knex('selections')
+    .where('customer_id', customerId)
+    .where('status', 'submitted')
+    .orderBy('submitted_at', 'desc')
+    .first();
+
+  if (!previous) return { status: 'no_previous', serviceDate };
+
+  await knex('selections').insert({
+    selection_cycle_id: cycle.id,
+    customer_id: customerId,
+    selected_tasks: JSON.stringify(Array.isArray(previous.selected_tasks) ? previous.selected_tasks : previous.selected_tasks),
+    selected_total_hours: previous.selected_total_hours,
+    status: 'submitted',
+    submitted_at: knex.raw('CURRENT_TIMESTAMP'),
+    created_at: knex.raw('CURRENT_TIMESTAMP'),
+    updated_at: knex.raw('CURRENT_TIMESTAMP'),
+  });
+
+  return { status: 'confirmed', serviceDate };
+}
+
+async function generateSelectionToken(selectionCycleId) {
+  const token = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+  await knex('selection_cycles').where('id', selectionCycleId).update({
+    selection_token: token,
+    selection_token_expires_at: expiresAt,
+    updated_at: knex.raw('CURRENT_TIMESTAMP'),
+  });
+
+  return token;
+}
+
+async function getSelectionByToken(token) {
+  const cycle = await knex('selection_cycles')
+    .where('selection_token', token)
+    .where('selection_token_expires_at', '>', knex.raw('CURRENT_TIMESTAMP'))
+    .first();
+
+  if (!cycle) return null;
+
+  const customer = await knex('customers').where('id', cycle.customer_id).first();
+  const business = await knex('businesses').where('id', customer.business_id).first();
+
+  const tasks = await knex('tasks as t')
+    .join('task_assignments as ta', 'ta.task_id', 't.id')
+    .where('ta.service_cycle_id', cycle.service_cycle_id)
+    .select('t.id', 't.name', 't.time_allotment_minutes');
+
+  const selection = await knex('selections')
+    .where('selection_cycle_id', cycle.id)
+    .where('customer_id', cycle.customer_id)
+    .first();
+
+  const currentTaskIds = selection && selection.selected_tasks
+    ? (Array.isArray(selection.selected_tasks) ? selection.selected_tasks : JSON.parse(selection.selected_tasks))
+    : tasks.map(t => t.id);
+
+  return {
+    cycleId: cycle.id,
+    serviceDate: new Date(cycle.service_date).toISOString().split('T')[0],
+    businessName: business.name,
+    availableTasks: tasks,
+    currentTaskIds,
+  };
+}
+
+async function submitSelectionByToken(token, selectedTaskIds) {
+  const cycle = await knex('selection_cycles')
+    .where('selection_token', token)
+    .where('selection_token_expires_at', '>', knex.raw('CURRENT_TIMESTAMP'))
+    .first();
+
+  if (!cycle) {
+    throw Object.assign(new Error('Invalid or expired selection link'), { code: 'INVALID_TOKEN', statusCode: 404 });
+  }
+
+  const availableTasks = await knex('tasks as t')
+    .join('task_assignments as ta', 'ta.task_id', 't.id')
+    .where('ta.service_cycle_id', cycle.service_cycle_id)
+    .select('t.id', 't.time_allotment_minutes');
+
+  const availableIds = availableTasks.map(t => t.id);
+  const invalid = selectedTaskIds.filter(id => !availableIds.includes(id));
+  if (invalid.length > 0) {
+    throw Object.assign(new Error('One or more selected tasks are not available for this cycle'), { code: 'INVALID_TASKS', statusCode: 400 });
+  }
+
+  const selectedDetails = availableTasks.filter(t => selectedTaskIds.includes(t.id));
+  const totalMinutes = selectedDetails.reduce((sum, t) => sum + t.time_allotment_minutes, 0);
+  const selectedTotalHours = Math.round((totalMinutes / 60) * 10) / 10;
+
+  const existing = await knex('selections')
+    .where('selection_cycle_id', cycle.id)
+    .where('customer_id', cycle.customer_id)
+    .first();
+
+  if (existing) {
+    await knex('selections').where('id', existing.id).update({
+      selected_tasks: JSON.stringify(selectedTaskIds),
+      selected_total_hours: selectedTotalHours,
+      status: 'submitted',
+      submitted_at: knex.raw('CURRENT_TIMESTAMP'),
+      updated_at: knex.raw('CURRENT_TIMESTAMP'),
+    });
+  } else {
+    await knex('selections').insert({
+      selection_cycle_id: cycle.id,
+      customer_id: cycle.customer_id,
+      selected_tasks: JSON.stringify(selectedTaskIds),
+      selected_total_hours: selectedTotalHours,
+      status: 'submitted',
+      submitted_at: knex.raw('CURRENT_TIMESTAMP'),
+      created_at: knex.raw('CURRENT_TIMESTAMP'),
+      updated_at: knex.raw('CURRENT_TIMESTAMP'),
+    });
+  }
+
+  return { serviceDate: new Date(cycle.service_date).toISOString().split('T')[0] };
+}
+
+// ─── GEOFENCE EVENTS ─────────────────────────────────────────────────────────
+
+async function recordGeofenceEvent(teamMemberId, selectionCycleId, { eventType, occurredAt, lat, lng, method }) {
+  // Verify this team member is actually assigned to this job before recording
+  // events or creating labor costs — matches getJobDetail/completeJobForTeamMember.
+  // The route's requireTeamMember only proves the JWT matches the URL's memberId.
+  const assignment = await knex('service_assignments')
+    .where('team_member_id', teamMemberId)
+    .where('selection_cycle_id', selectionCycleId)
+    .first();
+
+  if (!assignment) {
+    const err = new Error('Job not found or not assigned to this team member');
+    err.code = 'NOT_FOUND';
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const event = await knex('geofence_events')
+    .insert({
+      selection_cycle_id: selectionCycleId,
+      team_member_id: teamMemberId,
+      event_type: eventType,
+      occurred_at: occurredAt,
+      lat,
+      lng,
+      method,
+      created_at: knex.raw('CURRENT_TIMESTAMP'),
+    })
+    .returning('*')
+    .then(rows => rows[0]);
+
+  let laborCostCreated = false;
+
+  if (eventType === 'departure') {
+    // Recompute total on-site hours from the FULL event history for this
+    // member+job, not just the latest interval. Pair each arrival with the
+    // next departure and sum only the durations actually on-site. This is
+    // idempotent — a GPS-jitter re-entry (arrive/depart/arrive/depart) can
+    // neither lose the earlier interval nor double-count on a re-fired event.
+    const events = await knex('geofence_events')
+      .where('team_member_id', teamMemberId)
+      .where('selection_cycle_id', selectionCycleId)
+      .whereIn('event_type', ['arrival', 'departure'])
+      .orderBy('occurred_at', 'asc');
+
+    let totalMsec = 0;
+    let openArrivalMsec = null;
+    for (const ev of events) {
+      if (ev.event_type === 'arrival') {
+        // Latest unpaired arrival wins (a duplicate arrival just resets the clock)
+        openArrivalMsec = new Date(ev.occurred_at).getTime();
+      } else if (ev.event_type === 'departure' && openArrivalMsec != null) {
+        totalMsec += Math.max(0, new Date(ev.occurred_at).getTime() - openArrivalMsec);
+        openArrivalMsec = null;
+      }
+    }
+
+    // Only create/update the labor line if at least one arrival/departure
+    // pair exists. A lone departure with no prior arrival records the event
+    // but leaves labor for the business owner to add manually.
+    const hasPairedInterval = events.some(e => e.event_type === 'arrival');
+    if (hasPairedInterval) {
+      const hoursActual = Math.round((totalMsec / (1000 * 60 * 60)) * 100) / 100;
+
+      const member = await knex('team_members').where('id', teamMemberId).first();
+      const hourlyRate = member ? member.hourly_rate : null;
+      const amount = hourlyRate ? Math.round(hoursActual * parseFloat(hourlyRate) * 100) / 100 : 0.00;
+
+      // Get Direct Labor category id (code 5000)
+      const laborCategory = await knex('cost_categories').where('code', 5000).where('is_system', true).first();
+      if (laborCategory) {
+        // Rule 6: upsert — update if a labor row already exists for this member+job
+        const existing = await knex('job_costs')
+          .where('selection_cycle_id', selectionCycleId)
+          .where('team_member_id', teamMemberId)
+          .where('cost_category_id', laborCategory.id)
+          .first();
+
+        if (existing) {
+          await knex('job_costs').where('id', existing.id).update({
+            amount,
+            hours_actual: hoursActual,
+            updated_at: knex.raw('CURRENT_TIMESTAMP'),
+          });
+        } else {
+          await knex('job_costs').insert({
+            selection_cycle_id: selectionCycleId,
+            cost_category_id: laborCategory.id,
+            amount,
+            team_member_id: teamMemberId,
+            hours_actual: hoursActual,
+            created_at: knex.raw('CURRENT_TIMESTAMP'),
+            updated_at: knex.raw('CURRENT_TIMESTAMP'),
+          });
+        }
+        laborCostCreated = true;
+      }
+    }
+  }
+
+  return { event, laborCostCreated };
+}
+
 module.exports = {
   // Auth
   createBusiness,
   getBusinessById,
   getBusinessByPhone,
+  getBusinessByJoinCode,
   // Tasks
   createTask,
   getTasksByBusiness,
@@ -935,6 +1526,8 @@ module.exports = {
   getTeamMembersByBusiness,
   updateTeamMember,
   deleteTeamMember,
+  getTeamMemberByPhone,
+  acceptTeamMemberInvite,
   // Service Assignments
   getAssignmentsForDate,
   upsertServiceAssignment,
@@ -946,4 +1539,16 @@ module.exports = {
   updateTeamGroup,
   deleteTeamGroup,
   setTeamGroupMembers,
+  // Service Call Detail (business view)
+  getServiceCallDetail,
+  // Team Member Jobs
+  getJobsForTeamMember,
+  getJobDetail,
+  completeJobForTeamMember,
+  recordGeofenceEvent,
+  // SMS keyword helpers
+  confirmCustomerSelection,
+  generateSelectionToken,
+  getSelectionByToken,
+  submitSelectionByToken,
 };
