@@ -13,16 +13,23 @@ function startAutoRepeatJob() {
     console.log('\n🔄 [Auto-Repeat Job] Starting...');
 
     try {
-      // Get all selection cycles that are 1 day away and NOT submitted
+      // Get all selection cycles that are 1 day away and NOT submitted,
+      // joining businesses for per-business SMS routing
       const upcomingServices = await knex('selection_cycles')
         .join('customers', 'selection_cycles.customer_id', '=', 'customers.id')
+        .join('businesses', 'customers.business_id', '=', 'businesses.id')
         .whereRaw(`selection_cycles.service_date = CURRENT_DATE + INTERVAL '1 day'`)
         .where('selection_cycles.status', 'open')
         .select(
           'selection_cycles.id as selection_cycle_id',
           'customers.id as customer_id',
           'customers.phone_number',
-          'selection_cycles.service_date'
+          'selection_cycles.service_date',
+          'businesses.id as business_id',
+          'businesses.name as business_name',
+          'businesses.twilio_subaccount_sid',
+          'businesses.twilio_messaging_service_sid',
+          'businesses.twilio_phone_number'
         );
 
       if (upcomingServices.length === 0) {
@@ -61,12 +68,19 @@ function startAutoRepeatJob() {
             updated_at: knex.raw('CURRENT_TIMESTAMP')
           });
 
-          // Send notification
-          await sendAutoRepeatNotification(
-            service.phone_number,
-            service.service_date.toISOString().split('T')[0]
-          );
+          // Construct the business object expected by sendSMS
+          const business = {
+            id: service.business_id,
+            twilio_subaccount_sid: service.twilio_subaccount_sid,
+            twilio_messaging_service_sid: service.twilio_messaging_service_sid,
+            twilio_phone_number: service.twilio_phone_number,
+          };
 
+          const serviceDate = service.service_date instanceof Date
+            ? service.service_date.toISOString().split('T')[0]
+            : String(service.service_date).split('T')[0];
+
+          await sendAutoRepeatNotification(business, service.phone_number, serviceDate, service.business_name);
           successCount++;
         } catch (error) {
           console.error(`✗ Failed to auto-repeat for customer ${service.customer_id}:`, error.message);

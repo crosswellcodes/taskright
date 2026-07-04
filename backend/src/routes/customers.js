@@ -2,8 +2,10 @@ const express = require('express');
 const router = express.Router();
 const path = require('path');
 const multer = require('multer');
+const knex = require('../db');
 const { authenticate, requireCustomer } = require('../middleware/auth');
 const customerService = require('../services/customerService');
+const notificationService = require('../services/notificationService');
 
 const feedbackStorage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -193,6 +195,22 @@ router.post('/:customerId/feedback', requireCustomer, (req, res) => {
       const feedback = await customerService.submitFeedback(
         customerId, parsedCycleId, feedbackText || null, photoFilenames
       );
+
+      // Fire-and-forget: notify business owner of new feedback
+      (async () => {
+        try {
+          const customer = await knex('customers').where('id', customerId).first();
+          const business = await knex('businesses').where('id', customer.business_id).first();
+          const firstName = customer.name.split(' ')[0];
+          await notificationService.sendSMS(
+            business,
+            business.phone_number,
+            `New feedback from ${firstName}! Open the TaskRight app to review.`
+          );
+        } catch (e) {
+          console.error('Business feedback SMS failed:', e.message);
+        }
+      })();
 
       return res.status(200).json({
         success: true,

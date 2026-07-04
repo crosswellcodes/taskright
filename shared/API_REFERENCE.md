@@ -40,6 +40,28 @@ All endpoints return JSON:
 
 ## Authentication Endpoints
 
+### Send OTP Verification Code
+**POST** `/auth/verify/send`
+
+Used by the web signup flow to verify a phone number before account creation. Powered by Twilio Verify — requires `TWILIO_VERIFY_SERVICE_SID` in backend `.env`.
+
+**Request Body**:
+```json
+{ "phoneNumber": "+14155551234" }
+```
+
+**Response (200)**:
+```json
+{ "success": true }
+```
+
+**Error Responses**:
+- `400` — `VALIDATION_ERROR` — Phone number missing
+- `429` — `RATE_LIMITED` — Too many send attempts for this number
+- `500` — `INTERNAL_ERROR`
+
+---
+
 ### Business Signup
 **POST** `/auth/businesses/signup`
 
@@ -47,9 +69,13 @@ All endpoints return JSON:
 ```json
 {
   "name": "ABC Cleaning Co.",
-  "phoneNumber": "+14155551234"
+  "phoneNumber": "+14155551234",
+  "schedulingFormat": "date_based",
+  "otpCode": "123456"
 }
 ```
+
+`otpCode` is optional. When present (web signup flow), the phone is verified against Twilio Verify before account creation. When absent (mobile app flow), verification is skipped — existing behaviour unchanged.
 
 **Response (201)**:
 ```json
@@ -59,6 +85,8 @@ All endpoints return JSON:
     "id": 1,
     "name": "ABC Cleaning Co.",
     "phoneNumber": "+14155551234",
+    "schedulingFormat": "date_based",
+    "joinCode": "ABC123",
     "createdAt": "2026-03-16T12:00:00Z"
   },
   "token": "eyJhbGc...",
@@ -66,8 +94,11 @@ All endpoints return JSON:
 }
 ```
 
+`joinCode` is a stable 6-character uppercase alphanumeric code. Share with customers as `taskrightpro.com/join/ABC123` so they can self-register. Never changes — no rotation needed at launch scale.
+
 **Error Responses**:
 - `400` — `VALIDATION_ERROR` — Invalid input
+- `400` — `INVALID_OTP` — OTP code wrong or expired (web flow only)
 - `409` — `DUPLICATE_PHONE` — Phone already registered
 - `500` — `INTERNAL_ERROR`
 
@@ -104,6 +135,28 @@ All endpoints return JSON:
 
 ---
 
+### Resolve Business Join Code
+**GET** `/auth/businesses/join/:joinCode`
+
+Pre-signup lookup used by the web customer signup page (`/join/[code]`). Returns business identity so the page can display "You're joining [Business Name]" before the customer enters their details. Case-insensitive.
+
+**No authentication required.**
+
+**Response (200)**:
+```json
+{
+  "success": true,
+  "businessId": 1,
+  "businessName": "ABC Cleaning Co."
+}
+```
+
+**Error Responses**:
+- `404` — `INVALID_JOIN_CODE` — No business with this join code
+- `500` — `INTERNAL_ERROR`
+
+---
+
 ### Customer Signup
 **POST** `/auth/customers/signup`
 
@@ -111,9 +164,17 @@ All endpoints return JSON:
 ```json
 {
   "phoneNumber": "+14155559876",
-  "businessId": 1
+  "businessId": 1,
+  "name": "Sarah Johnson",
+  "otpCode": "123456"
 }
 ```
+
+`name` and `otpCode` are both optional.
+- **Web flow** (`/join/[code]` page): include both — `name` is collected in Step 1, `otpCode` from Twilio Verify in Step 2. Account is only created after OTP is approved.
+- **Mobile flow**: omit both — `businessId` is passed directly, verification is skipped. Existing behaviour unchanged.
+
+If `name` is omitted, the customer's phone number is stored as a placeholder name.
 
 **Response (201)**:
 ```json
@@ -132,6 +193,7 @@ All endpoints return JSON:
 
 **Error Responses**:
 - `400` — `VALIDATION_ERROR` — Invalid input
+- `400` — `INVALID_OTP` — OTP code wrong or expired (web flow only)
 - `404` — `BUSINESS_NOT_FOUND`
 - `409` — `DUPLICATE_CUSTOMER` — Customer already exists for this business
 - `500` — `INTERNAL_ERROR`
@@ -166,6 +228,69 @@ All endpoints return JSON:
 **Error Responses**:
 - `400` — `VALIDATION_ERROR` — Phone not provided
 - `404` — `CUSTOMER_NOT_FOUND`
+- `500` — `INTERNAL_ERROR`
+
+---
+
+### Get Task Selection (Tokenized Link)
+**GET** `/auth/selection/:token`
+
+No-auth endpoint. Called by the `/s/[token]` web page when a customer taps the link texted to them via the `T` SMS keyword. Token is a UUID stored on the `selection_cycles` row with a 7-day expiry.
+
+**No authentication required.**
+
+**Response (200)**:
+```json
+{
+  "success": true,
+  "cycleId": 10,
+  "serviceDate": "2026-05-21",
+  "businessName": "ABC Cleaning Co.",
+  "availableTasks": [
+    { "id": 1, "name": "Bathroom cleaning", "timeAllotmentMinutes": 45 },
+    { "id": 2, "name": "Vacuum all rooms", "timeAllotmentMinutes": 30 }
+  ],
+  "currentTaskIds": [1, 2]
+}
+```
+
+`currentTaskIds` are the task IDs from the most recent submitted selection for this customer. Pre-populates the checklist as a convenience — customer sees their usual preferences already checked.
+
+**Error Responses**:
+- `404` — `INVALID_TOKEN` — Token not found or expired
+
+---
+
+### Submit Task Selection (Tokenized Link)
+**POST** `/auth/selection/:token/submit`
+
+Saves the customer's task choices for the selection cycle. Can be called even if no tasks are selected (empty array is valid — customer is confirming "no specific tasks").
+
+**No authentication required.**
+
+**Request Body**:
+```json
+{
+  "selectedTaskIds": [1, 2]
+}
+```
+
+Empty array is valid: `{ "selectedTaskIds": [] }` — interpreted as "no specific tasks."
+
+**Response (200)**:
+```json
+{
+  "success": true,
+  "serviceDate": "2026-05-21"
+}
+```
+
+**Behavior**: Upserts a `selections` row for the cycle with `status: 'submitted'`. If a selection already exists for this cycle, it is replaced. The cycle's `selection_token` is consumed — the same token cannot be used to resubmit (prevents replay; customer must reply T again to get a new link).
+
+**Error Responses**:
+- `400` — `VALIDATION_ERROR` — `selectedTaskIds` is not an array
+- `400` — `INVALID_TASKS` — One or more task IDs are not available for this cycle
+- `404` — `INVALID_TOKEN` — Token not found or expired
 - `500` — `INTERNAL_ERROR`
 
 ---
@@ -604,6 +729,156 @@ All endpoints return JSON:
 
 ---
 
+## Webhook Endpoints
+
+Twilio posts to these endpoints. They accept `application/x-www-form-urlencoded` (not JSON) and always return `200` with TwiML `<Response/>` to prevent Twilio retries. No JWT authentication — called directly by Twilio.
+
+### Inbound SMS
+**POST** `/webhooks/inbound-sms`
+
+**Authentication**: None (Twilio webhook — see note on signature validation below)
+
+**Request Body** (urlencoded, sent by Twilio):
+```
+To=+14155550100&From=+14155559876&Body=Can+I+reschedule%3F&MessageSid=SM123abc&NumMedia=0
+```
+
+| Field | Description |
+|-------|-------------|
+| `To` | Business's dedicated Twilio phone number |
+| `From` | Customer's phone number |
+| `Body` | SMS message text (may be empty for MMS-only messages) |
+| `MessageSid` | Twilio SID — used for deduplication |
+| `NumMedia` | Count of attached media files (0 for SMS, ≥1 for MMS) |
+| `MediaUrl0` | URL of first media file — requires Twilio Basic auth to fetch |
+| `MediaContentType0` | MIME type of first media file (e.g., `image/jpeg`) |
+
+**Response (200)**:
+```xml
+<Response/>
+```
+
+**Behavior**: Looks up business by `To` phone, customer by `From` + business. Stores inbound message in `messages` table. Unknown callers (no matching customer) are stored with `customer_id = null`. Duplicate `MessageSid` values are silently ignored. For MMS: each `MediaUrl*` is downloaded to `backend/uploads/messages/` with Twilio Basic auth (async, post-response) and the local paths stored in `messages.media_urls` as JSONB. Files served statically at `/uploads/messages/*`.
+
+**SMS Keyword Handling**: After storing the message, if the sender is a known customer and the body is non-empty, the handler processes single-letter keywords:
+
+| Keyword | Action |
+|---------|--------|
+| `C` | Confirm current open selection cycle. Auto-replies with confirmation or contextual guidance. |
+| `T` | Generate a 7-day tokenized link and text it back: `taskrightpro.com/s/<token>`. Customer taps to review/edit tasks in a browser — no app needed. |
+| `D` | Auto-reply that the date change request has been forwarded to the business. |
+| `N` | Set `customers.pending_sms_action = 'note_pending'`, prompt for note content. Next SMS from this customer (any content) is saved as `selection_cycles.customer_note` and state is cleared. |
+| Other | No auto-reply. Message sits in the business thread as a personal customer service touchpoint for the owner. |
+
+Keyword matching is case-insensitive, whitespace-trimmed. The stateful `note_pending` check runs before keyword matching so a customer's note content is never misread as a keyword.
+
+**Note**: Twilio subaccount webhooks are signed with the subaccount's auth token, which TaskRight does not store. Signature validation is currently skipped. See HANDOFF.md Open Questions for production options.
+
+---
+
+## Communication Endpoints
+
+### Get Customer Message Thread
+**GET** `/businesses/:businessId/customers/:customerId/messages`
+
+**Authentication**: Required (Business)
+
+**Query Parameters**:
+| Param | Default | Description |
+|-------|---------|-------------|
+| `limit` | 50 | Max messages to return (capped at 100) |
+| `before` | — | Message `id` for cursor pagination (returns messages older than this id) |
+
+**Response (200)**:
+```json
+{
+  "success": true,
+  "messages": [
+    {
+      "id": 1,
+      "direction": "outbound",
+      "body": "Welcome to ABC Cleaning Co.! Your first service is scheduled for 2026-05-21.",
+      "fromPhone": "+14155550100",
+      "toPhone": "+14155559876",
+      "twilioMessageSid": "SM123abc",
+      "createdAt": "2026-05-14T10:00:00.000Z"
+    },
+    {
+      "id": 2,
+      "direction": "inbound",
+      "body": "Can I reschedule?",
+      "fromPhone": "+14155559876",
+      "toPhone": "+14155550100",
+      "twilioMessageSid": "SM456def",
+      "createdAt": "2026-05-14T10:05:00.000Z",
+      "mediaUrls": null
+    },
+    {
+      "id": 3,
+      "direction": "inbound",
+      "body": "",
+      "fromPhone": "+14155559876",
+      "toPhone": "+14155550100",
+      "twilioMessageSid": "MM789ghi",
+      "createdAt": "2026-05-14T10:10:00.000Z",
+      "mediaUrls": ["/uploads/messages/MM789ghi_0.jpeg"]
+    }
+  ],
+  "pagination": {
+    "hasMore": false,
+    "nextCursor": null
+  }
+}
+```
+
+Messages are returned oldest-first (ready for chat thread display). To page backward, pass `before=<lowest id from previous response>`.
+
+**Error Responses**:
+- `401` — Unauthorized
+- `403` — Business token doesn't match `:businessId`
+- `404` — Customer not found or doesn't belong to this business
+- `500` — `INTERNAL_ERROR`
+
+---
+
+### Send Manual SMS to Customer
+**POST** `/businesses/:businessId/customers/:customerId/messages`
+
+**Authentication**: Required (Business)
+
+**Request Body**:
+```json
+{
+  "body": "Hi Sarah, just a heads up we're running 15 minutes late today."
+}
+```
+
+**Response (201)**:
+```json
+{
+  "success": true,
+  "message": {
+    "id": 42,
+    "direction": "outbound",
+    "body": "Hi Sarah, just a heads up we're running 15 minutes late today.",
+    "fromPhone": "+14155550100",
+    "toPhone": "+14155559876",
+    "twilioMessageSid": "SMabc123",
+    "createdAt": "2026-05-14T15:30:00.000Z"
+  }
+}
+```
+
+**Behavior**: Sends SMS via the business's dedicated Twilio Messaging Service and logs the message to the `messages` table. In dev mode (no Twilio credentials), logs to console and inserts with `twilioMessageSid: null`. Returns the inserted message row so the mobile UI can append it to the thread without refetching.
+
+**Error Responses**:
+- `400` — `VALIDATION_ERROR` — Body is empty
+- `401` — Unauthorized
+- `404` — `CUSTOMER_NOT_FOUND`
+- `500` — `INTERNAL_ERROR`
+
+---
+
 ## Error Codes
 
 | Code | HTTP | Meaning |
@@ -618,6 +893,11 @@ All endpoints return JSON:
 | `UNAUTHORIZED` | 401 | Authentication required or invalid token |
 | `FORBIDDEN` | 403 | Authenticated but not authorized |
 | `INTERNAL_ERROR` | 500 | Server error |
+| `INVALID_OTP` | 400 | OTP code incorrect, expired, or already used |
+| `RATE_LIMITED` | 429 | Too many OTP send attempts for this phone |
+| `INVALID_JOIN_CODE` | 404 | No business found with this join code |
+| `INVALID_TOKEN` | 404 | Task selection token not found or expired |
+| `INVALID_TASKS` | 400 | One or more task IDs not available for the selection cycle |
 
 ---
 
@@ -631,16 +911,19 @@ Currently no rate limiting enforced. Plan to implement:
 
 ## Pagination
 
-Not yet implemented. Future: use `?page=1&limit=20` for list endpoints.
+The `/messages` endpoint uses **cursor pagination**: pass `before=<message id>` to page backward through the thread. All other list endpoints are unpaginated — deferred to Phase 2.
 
 ---
 
 ## WebSocket / Real-Time
 
-Not yet implemented. Cron jobs handle scheduling (SMS reminders, auto-repeat selections).
+Not yet implemented. Cron jobs handle scheduling (SMS reminders, auto-repeat selections). SMS communication goes via Twilio webhooks — see Webhook Endpoints above.
 
 ---
 
 ## Database Schema
 
-See `SPEC.md` for full database schema (9 tables: businesses, customers, tasks, service_cycles, selections, service_completions, feedback, team_members, team_memberships).
+See `SPEC.md` for full database schema. Migrations 001–015 cover the full schema including:
+- **013** `messages` table (SMS communication history) + 4 Twilio provisioning columns on `businesses`
+- **014** `join_code` on `businesses` (stable 6-char customer invite code)
+- **015** `pending_sms_action` on `customers`; `customer_note`, `selection_token`, `selection_token_expires_at` on `selection_cycles`

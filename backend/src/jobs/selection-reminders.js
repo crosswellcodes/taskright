@@ -11,18 +11,24 @@ function startSelectionReminderJob() {
   // Schedule for 11:59 PM every day
   const job = schedule.scheduleJob('59 23 * * *', async () => {
     console.log('\n📨 [Selection Reminder Job] Starting...');
-    
+
     try {
-      // Get all service cycles that are 3 days away
+      // Get all service cycles that are 3 days away, joining businesses for per-business SMS routing
       const upcomingServices = await knex('selection_cycles')
         .join('service_cycles', 'selection_cycles.service_cycle_id', '=', 'service_cycles.id')
         .join('customers', 'selection_cycles.customer_id', '=', 'customers.id')
+        .join('businesses', 'customers.business_id', '=', 'businesses.id')
         .whereRaw(`selection_cycles.service_date = CURRENT_DATE + INTERVAL '3 days'`)
         .where('selection_cycles.status', 'open')
         .select(
           'customers.phone_number',
           'selection_cycles.service_date',
-          'selection_cycles.id as selection_cycle_id'
+          'selection_cycles.id as selection_cycle_id',
+          'businesses.id as business_id',
+          'businesses.name as business_name',
+          'businesses.twilio_subaccount_sid',
+          'businesses.twilio_messaging_service_sid',
+          'businesses.twilio_phone_number'
         );
 
       if (upcomingServices.length === 0) {
@@ -32,17 +38,24 @@ function startSelectionReminderJob() {
 
       console.log(`📬 Found ${upcomingServices.length} customers to remind`);
 
-      // Send reminder to each customer
       let successCount = 0;
       let errorCount = 0;
 
       for (const service of upcomingServices) {
         try {
-          await sendSelectionReminder(
-            service.phone_number,
-            service.service_date.toISOString().split('T')[0], // Format as YYYY-MM-DD
-            3
-          );
+          // Construct the business object expected by sendSMS
+          const business = {
+            id: service.business_id,
+            twilio_subaccount_sid: service.twilio_subaccount_sid,
+            twilio_messaging_service_sid: service.twilio_messaging_service_sid,
+            twilio_phone_number: service.twilio_phone_number,
+          };
+
+          const serviceDate = service.service_date instanceof Date
+            ? service.service_date.toISOString().split('T')[0]
+            : String(service.service_date).split('T')[0];
+
+          await sendSelectionReminder(business, service.phone_number, serviceDate, 3, service.business_name);
           successCount++;
         } catch (error) {
           console.error(`✗ Failed to send reminder to ${service.phone_number}:`, error.message);

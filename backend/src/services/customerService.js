@@ -2,7 +2,7 @@ const knex = require('../db');
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 
-async function createCustomer(businessId, phoneNumber) {
+async function createCustomer(businessId, phoneNumber, name = null) {
   const existingCustomer = await knex('customers')
     .where('business_id', businessId)
     .where('phone_number', phoneNumber)
@@ -19,7 +19,7 @@ async function createCustomer(businessId, phoneNumber) {
     .insert({
       business_id: businessId,
       phone_number: phoneNumber,
-      name: phoneNumber, // Placeholder, can be updated later
+      name: name && name.trim() ? name.trim() : phoneNumber,
       created_at: knex.raw('CURRENT_TIMESTAMP'),
       updated_at: knex.raw('CURRENT_TIMESTAMP')
     })

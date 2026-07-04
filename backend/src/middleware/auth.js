@@ -79,4 +79,29 @@ function requireCustomer(req, res, next) {
   next();
 }
 
-module.exports = { authenticate, requireBusiness, requireCustomer };
+/**
+ * Ensure the authenticated user is a team member and owns the :teamMemberId param
+ */
+function requireTeamMember(req, res, next) {
+  const teamMemberId = parseInt(req.params.teamMemberId);
+
+  if (req.user.type !== 'team_member') {
+    return res.status(403).json({
+      success: false,
+      error: 'Forbidden - team member account required',
+      code: 'FORBIDDEN'
+    });
+  }
+
+  if (req.user.teamMemberId !== teamMemberId) {
+    return res.status(403).json({
+      success: false,
+      error: 'Forbidden - access denied',
+      code: 'FORBIDDEN'
+    });
+  }
+
+  next();
+}
+
+module.exports = { authenticate, requireBusiness, requireCustomer, requireTeamMember };

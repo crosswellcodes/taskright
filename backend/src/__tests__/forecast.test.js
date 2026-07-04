@@ -52,7 +52,7 @@ describe('GET /api/businesses/:businessId/selections', () => {
     expect(firstService.serviceDate).toBeDefined();
     expect(firstService.customerSelectionsStatus.pending).toBe(2);
     expect(firstService.customerSelectionsStatus.submitted).toBe(0);
-    expect(firstService.totalHoursForecast).toBeNull();
+    expect(firstService.totalHours).toBe(4);
   });
 
   it('reflects submitted selections in forecast', async () => {
@@ -87,9 +87,7 @@ describe('GET /api/businesses/:businessId/selections', () => {
     );
     expect(submittedService).toBeDefined();
     expect(submittedService.customerSelectionsStatus.submitted).toBe(1);
-    expect(submittedService.totalHoursForecast).toBe(1);
-    expect(submittedService.tasks[0].taskId).toBe(task.id);
-    expect(submittedService.tasks[0].selectedByCustomers).toBe(1);
+    expect(submittedService.customerSelectionsStatus.pending).toBe(0);
   });
 
   it('returns 401 without token', async () => {

@@ -142,7 +142,7 @@ describe('POST /api/businesses/:businessId/customers/:customerId/assign-cycle', 
     const res = await request(app)
       .post(`/api/businesses/${businessId}/customers/${customer.id}/assign-cycle`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ serviceCycleId: cycle.id, totalHours: 3 });
+      .send({ serviceCycleId: cycle.id, totalHours: 3, startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] });
 
     expect(res.status).toBe(201);
     expect(res.body.assignment.totalHours).toBe(3);
@@ -160,7 +160,7 @@ describe('POST /api/businesses/:businessId/customers/:customerId/assign-cycle', 
     const res = await request(app)
       .post(`/api/businesses/${businessId}/customers/${customer.id}/assign-cycle`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ serviceCycleId: cycle.id, totalHours: 3 });
+      .send({ serviceCycleId: cycle.id, totalHours: 3, startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] });
 
     expect(res.status).toBe(409);
     expect(res.body.code).toBe('ALREADY_ASSIGNED');
@@ -183,7 +183,7 @@ describe('POST /api/businesses/:businessId/customers/:customerId/assign-cycle', 
     const res = await request(app)
       .post(`/api/businesses/${businessId}/customers/${customer.id}/assign-cycle`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ serviceCycleId: 99999, totalHours: 3 });
+      .send({ serviceCycleId: 99999, totalHours: 3, startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] });
 
     expect(res.status).toBe(404);
   });

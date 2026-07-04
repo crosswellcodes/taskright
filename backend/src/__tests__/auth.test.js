@@ -164,3 +164,83 @@ describe('POST /api/auth/customers/login', () => {
     expect(res.body.success).toBe(false);
   });
 });
+
+// ─── BUSINESS JOIN CODE ───────────────────────────────────────────────────────
+
+describe('GET /api/auth/businesses/join/:joinCode', () => {
+  let joinCode;
+
+  beforeEach(async () => {
+    const res = await request(app)
+      .post('/api/auth/businesses/signup')
+      .send({ name: 'CleanCo', phoneNumber: '+15550001111' });
+    joinCode = res.body.business.joinCode;
+  });
+
+  it('returns businessId and businessName for a valid join code', async () => {
+    const res = await request(app).get(`/api/auth/businesses/join/${joinCode}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.businessName).toBe('CleanCo');
+    expect(res.body.businessId).toBeDefined();
+  });
+
+  it('is case-insensitive', async () => {
+    const res = await request(app).get(`/api/auth/businesses/join/${joinCode.toLowerCase()}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  it('returns 404 for an invalid join code', async () => {
+    const res = await request(app).get('/api/auth/businesses/join/INVALID');
+
+    expect(res.status).toBe(404);
+    expect(res.body.success).toBe(false);
+    expect(res.body.code).toBe('INVALID_JOIN_CODE');
+  });
+});
+
+describe('POST /api/auth/businesses/signup — join code', () => {
+  it('returns joinCode in the signup response', async () => {
+    const res = await request(app)
+      .post('/api/auth/businesses/signup')
+      .send({ name: 'TestBiz', phoneNumber: '+15550002222' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.business.joinCode).toBeDefined();
+    expect(res.body.business.joinCode).toHaveLength(6);
+  });
+});
+
+describe('POST /api/auth/customers/signup — with name', () => {
+  it('stores the customer name when provided', async () => {
+    const bizRes = await request(app)
+      .post('/api/auth/businesses/signup')
+      .send({ name: 'CleanCo', phoneNumber: '+15550001111' });
+    const businessId = bizRes.body.business.id;
+
+    const res = await request(app)
+      .post('/api/auth/customers/signup')
+      .send({ phoneNumber: '+14440001111', businessId, name: 'Sarah Johnson' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.customer.phoneNumber).toBe('+14440001111');
+  });
+
+  it('uses phone number as name placeholder when name is omitted', async () => {
+    const bizRes = await request(app)
+      .post('/api/auth/businesses/signup')
+      .send({ name: 'CleanCo', phoneNumber: '+15550001111' });
+    const businessId = bizRes.body.business.id;
+
+    const res = await request(app)
+      .post('/api/auth/customers/signup')
+      .send({ phoneNumber: '+14440001111', businessId });
+
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+  });
+});

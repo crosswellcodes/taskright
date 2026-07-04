@@ -1,8 +1,10 @@
 const express = require('express');
 const router = express.Router();
+const twilio = require('twilio');
 const knex = require('../db');
 const { authenticate, requireBusiness } = require('../middleware/auth');
 const businessService = require('../services/businessService');
+const notificationService = require('../services/notificationService');
 
 // All business routes require authentication + ownership check
 router.use(authenticate);
@@ -138,6 +140,11 @@ router.delete('/:businessId/tasks/:taskId', requireBusiness, async (req, res) =>
     const task = await businessService.getTaskById(taskId);
     if (!task || task.business_id !== businessId) {
       return res.status(404).json({ success: false, error: 'Task not found', code: 'TASK_NOT_FOUND' });
+    }
+
+    const inUse = await knex('task_assignments').where('task_id', taskId).first();
+    if (inUse) {
+      return res.status(409).json({ success: false, error: 'Task is assigned to a service cycle and cannot be deleted', code: 'TASK_IN_USE' });
     }
 
     await businessService.deleteTask(taskId);
@@ -680,6 +687,53 @@ router.post('/:businessId/customers/:customerId/mark-service-complete', requireB
   }
 });
 
+// ─── SERVICE CALL DETAIL ─────────────────────────────────────────────────────
+
+/**
+ * GET /api/businesses/:businessId/selection-cycles/:selectionCycleId
+ * Full detail for a single service call — tasks, team member assignment, completion
+ */
+router.get('/:businessId/selection-cycles/:selectionCycleId', requireBusiness, async (req, res) => {
+  try {
+    const businessId = parseInt(req.params.businessId);
+    const selectionCycleId = parseInt(req.params.selectionCycleId);
+
+    const detail = await businessService.getServiceCallDetail(businessId, selectionCycleId);
+    if (!detail) {
+      return res.status(404).json({ success: false, error: 'Service call not found', code: 'NOT_FOUND' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      serviceCall: {
+        selectionCycleId: detail.selectionCycleId,
+        serviceDate: detail.serviceDate,
+        submissionDeadline: detail.submissionDeadline,
+        status: detail.status,
+        customerId: detail.customerId,
+        customerName: detail.customerName,
+        serviceCycleName: detail.serviceCycleName,
+        selectedTasks: detail.selectedTasks || [],
+        selectionStatus: detail.selectionStatus || null,
+        completedAt: detail.completedAt || null,
+        completionNotes: detail.completionNotes || null,
+        teamMember: detail.teamMemberId ? {
+          id: detail.teamMemberId,
+          name: detail.teamMemberName,
+          phone: detail.teamMemberPhone,
+        } : null,
+        team: detail.teamId ? {
+          id: detail.teamId,
+          name: detail.teamName,
+        } : null,
+      },
+    });
+  } catch (err) {
+    console.error('Get service call detail error:', err);
+    return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
+  }
+});
+
 // ─── RESCHEDULE SELECTION CYCLE ──────────────────────────────────────────────
 
 /**
@@ -697,6 +751,20 @@ router.patch('/:businessId/selection-cycles/:selectionCycleId/reschedule', requi
     }
 
     const updated = await businessService.rescheduleSelectionCycle(selectionCycleId, businessId, newServiceDate);
+
+    // Fire-and-forget: notify customer of new date
+    (async () => {
+      try {
+        const [customer, business] = await Promise.all([
+          knex('customers').where('id', updated.customer_id).first(),
+          knex('businesses').where('id', businessId).first()
+        ]);
+        await notificationService.sendRescheduleNotification(business, customer.phone_number, newServiceDate);
+      } catch (e) {
+        console.error('Reschedule SMS failed:', e.message);
+      }
+    })();
+
     return res.status(200).json({ success: true, selectionCycle: updated });
   } catch (err) {
     if (err.code === 'NOT_FOUND') {
@@ -794,7 +862,9 @@ router.post('/:businessId/team-members', requireBusiness, async (req, res) => {
         name: member.name,
         phoneNumber: member.phone_number,
         weeklyHours: member.weekly_hours,
-        createdAt: member.created_at
+        inviteCode: member.invite_code,
+        inviteAccepted: member.invite_accepted,
+        createdAt: member.created_at,
       }
     });
   } catch (error) {
@@ -1075,6 +1145,214 @@ router.delete('/:businessId/groups/:groupId', requireBusiness, async (req, res) 
     return res.status(200).json({ success: true, message: 'Group deleted' });
   } catch (error) {
     console.error('Delete team group error:', error);
+    return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
+  }
+});
+
+// ─── MESSAGES (communication history) ────────────────────────────────────────
+
+/**
+ * GET /api/businesses/:businessId/customers/:customerId/messages
+ * Paginated SMS thread between business and customer.
+ * Query params: limit (default 50), before (message id, for cursor pagination)
+ */
+router.get('/:businessId/customers/:customerId/messages', requireBusiness, async (req, res) => {
+  try {
+    const businessId = parseInt(req.params.businessId);
+    const customerId = parseInt(req.params.customerId);
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+    const before = req.query.before ? parseInt(req.query.before) : null;
+
+    // Verify this customer belongs to this business
+    const customer = await knex('customers')
+      .where('id', customerId)
+      .where('business_id', businessId)
+      .first();
+
+    if (!customer) {
+      return res.status(404).json({ success: false, error: 'Customer not found', code: 'NOT_FOUND' });
+    }
+
+    let query = knex('messages')
+      .where('business_id', businessId)
+      .where('customer_id', customerId)
+      .orderBy('id', 'desc')
+      .limit(limit);
+
+    if (before) {
+      query = query.where('id', '<', before);
+    }
+
+    const rows = await query;
+
+    // Return oldest-first for display in a chat thread
+    const messages = rows.reverse().map(m => ({
+      id: m.id,
+      direction: m.direction,
+      body: m.body,
+      fromPhone: m.from_phone,
+      toPhone: m.to_phone,
+      twilioMessageSid: m.twilio_message_sid,
+      createdAt: m.created_at,
+      mediaUrls: m.media_urls || null,
+    }));
+
+    const hasMore = rows.length === limit;
+    const nextCursor = hasMore ? rows[0].id : null;
+
+    return res.status(200).json({
+      success: true,
+      messages,
+      pagination: {
+        hasMore,
+        nextCursor,
+      },
+    });
+  } catch (error) {
+    console.error('Get messages error:', error);
+    return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
+  }
+});
+
+/**
+ * POST /api/businesses/:businessId/customers/:customerId/messages
+ * Send a manual free-text SMS to a customer and log it.
+ */
+router.post('/:businessId/customers/:customerId/messages', requireBusiness, async (req, res) => {
+  try {
+    const customerId = parseInt(req.params.customerId);
+    const { body } = req.body;
+
+    if (!body || !body.trim()) {
+      return res.status(400).json({ success: false, error: 'Message body is required', code: 'VALIDATION_ERROR' });
+    }
+
+    const customer = await knex('customers')
+      .where({ id: customerId, business_id: req.business.id })
+      .first();
+    if (!customer) {
+      return res.status(404).json({ success: false, error: 'Customer not found', code: 'CUSTOMER_NOT_FOUND' });
+    }
+
+    const messageBody = body.trim();
+    let twilioSid = null;
+
+    if (req.business.twilio_messaging_service_sid) {
+      const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+      const response = await client.messages.create({
+        messagingServiceSid: req.business.twilio_messaging_service_sid,
+        to: customer.phone_number,
+        body: messageBody,
+      });
+      twilioSid = response.sid;
+    } else {
+      console.log(`📱 [DEV SMS] To ${customer.phone_number}: ${messageBody}`);
+    }
+
+    const [inserted] = await knex('messages').insert({
+      business_id: req.business.id,
+      customer_id: customer.id,
+      direction: 'outbound',
+      body: messageBody,
+      twilio_message_sid: twilioSid,
+      to_phone: customer.phone_number,
+      from_phone: req.business.twilio_phone_number || null,
+    }).returning('*');
+
+    return res.status(201).json({
+      success: true,
+      message: {
+        id: inserted.id,
+        direction: inserted.direction,
+        body: inserted.body,
+        fromPhone: inserted.from_phone,
+        toPhone: inserted.to_phone,
+        twilioMessageSid: inserted.twilio_message_sid,
+        createdAt: inserted.created_at,
+      },
+    });
+  } catch (err) {
+    console.error('Send message error:', err);
+    return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
+  }
+});
+
+// ─── A2P KYC ─────────────────────────────────────────────────────────────────
+
+const { registerA2P } = require('../services/twilioProvisioningService');
+
+/**
+ * PATCH /api/businesses/:businessId/kyc
+ * Save KYC fields and fire A2P 10DLC Trust Hub registration.
+ * EIN (LLC/Corp only) is passed through to Twilio — never stored.
+ */
+router.patch('/:businessId/kyc', requireBusiness, async (req, res) => {
+  try {
+    const {
+      contactFirstName,
+      contactLastName,
+      contactEmail,
+      businessStreet,
+      businessCity,
+      businessState,
+      businessZip,
+      ein,
+    } = req.body;
+
+    // Validate required fields
+    const missing = [];
+    if (!contactFirstName?.trim()) missing.push('contactFirstName');
+    if (!contactLastName?.trim()) missing.push('contactLastName');
+    if (!contactEmail?.trim()) missing.push('contactEmail');
+    if (!businessStreet?.trim()) missing.push('businessStreet');
+    if (!businessCity?.trim()) missing.push('businessCity');
+    if (!businessState?.trim()) missing.push('businessState');
+    if (!businessZip?.trim()) missing.push('businessZip');
+
+    if (missing.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: `Missing required fields: ${missing.join(', ')}`,
+        code: 'VALIDATION_ERROR',
+      });
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim())) {
+      return res.status(400).json({ success: false, error: 'Invalid email address', code: 'VALIDATION_ERROR' });
+    }
+    if (!/^[A-Z]{2}$/.test(businessState.trim().toUpperCase())) {
+      return res.status(400).json({ success: false, error: 'State must be a 2-letter code', code: 'VALIDATION_ERROR' });
+    }
+    if (!/^\d{5}(-\d{4})?$/.test(businessZip.trim())) {
+      return res.status(400).json({ success: false, error: 'ZIP code must be 5 digits', code: 'VALIDATION_ERROR' });
+    }
+
+    const business = req.business;
+    if (business.entity_type === 'llc_corp' && !ein?.trim()) {
+      return res.status(400).json({ success: false, error: 'EIN is required for LLC/Corp registration', code: 'VALIDATION_ERROR' });
+    }
+
+    // Save KYC fields — EIN is explicitly excluded
+    await knex('businesses').where('id', business.id).update({
+      contact_first_name: contactFirstName.trim(),
+      contact_last_name: contactLastName.trim(),
+      contact_email: contactEmail.trim().toLowerCase(),
+      business_street: businessStreet.trim(),
+      business_city: businessCity.trim(),
+      business_state: businessState.trim().toUpperCase(),
+      business_zip: businessZip.trim(),
+      a2p_registration_status: 'pending',
+      updated_at: knex.raw('CURRENT_TIMESTAMP'),
+    });
+
+    // Fire-and-forget Trust Hub chain. EIN lives in this closure only.
+    registerA2P(business.id, ein?.trim() || null).catch(err =>
+      console.error('registerA2P unhandled error:', err.message)
+    );
+
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('KYC route error:', err);
     return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
   }
 });

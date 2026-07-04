@@ -7,13 +7,19 @@ const knex = require('../db');
 async function truncateAllTables() {
   await knex.raw(`
     TRUNCATE TABLE
+      messages,
+      feedbacks,
       service_completions,
+      service_assignments,
       selections,
       selection_cycles,
       customer_cycle_assignments,
       task_assignments,
       service_cycles,
       tasks,
+      team_memberships,
+      team_members,
+      teams,
       customers,
       businesses
     RESTART IDENTITY CASCADE
@@ -100,10 +106,11 @@ async function addCustomerToBusiness(businessId, token, overrides = {}) {
 }
 
 async function assignCycleToCustomer(businessId, customerId, serviceCycleId, token, totalHours = 3) {
+  const startDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
   const res = await request(app)
     .post(`/api/businesses/${businessId}/customers/${customerId}/assign-cycle`)
     .set('Authorization', `Bearer ${token}`)
-    .send({ serviceCycleId, totalHours });
+    .send({ serviceCycleId, totalHours, startDate });
 
   return res.body.assignment;
 }
