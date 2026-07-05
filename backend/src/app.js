@@ -7,6 +7,7 @@ const businessRoutes = require('./routes/businesses');
 const customerRoutes = require('./routes/customers');
 const teamMemberRoutes = require('./routes/teamMembers');
 const webhookRoutes = require('./routes/webhooks');
+const reviewRoutes = require('./routes/review');
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.use('/api/businesses', businessRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/team-members', teamMemberRoutes);
 app.use('/api/webhooks', webhookRoutes);
+app.use('/api/review', reviewRoutes);
 
 // 404 handler
 app.use((req, res) => {

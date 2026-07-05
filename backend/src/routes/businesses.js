@@ -445,14 +445,14 @@ router.patch('/:businessId/customers/:customerId', requireBusiness, async (req, 
   try {
     const businessId = parseInt(req.params.businessId);
     const customerId = parseInt(req.params.customerId);
-    const { email, address, notes } = req.body;
+    const { email, address, notes, reviewRequestsOptedOut } = req.body;
 
     const customer = await businessService.getCustomerDetails(customerId);
     if (!customer || customer.business_id !== businessId) {
       return res.status(404).json({ success: false, error: 'Customer not found', code: 'CUSTOMER_NOT_FOUND' });
     }
 
-    const updated = await businessService.updateCustomerDetails(customerId, { email, address, notes });
+    const updated = await businessService.updateCustomerDetails(customerId, { email, address, notes, reviewRequestsOptedOut });
 
     return res.status(200).json({
       success: true,
@@ -462,7 +462,8 @@ router.patch('/:businessId/customers/:customerId', requireBusiness, async (req, 
         phoneNumber: updated.phone_number,
         email: updated.email,
         address: updated.address,
-        notes: updated.notes
+        notes: updated.notes,
+        reviewRequestsOptedOut: updated.review_requests_opted_out
       }
     });
   } catch (error) {

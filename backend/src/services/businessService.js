@@ -361,6 +361,7 @@ async function updateCustomerDetails(customerId, data) {
   if (data.email !== undefined) updates.email = data.email || null;
   if (data.address !== undefined) updates.address = data.address || null;
   if (data.notes !== undefined) updates.notes = data.notes || null;
+  if (data.reviewRequestsOptedOut !== undefined) updates.review_requests_opted_out = !!data.reviewRequestsOptedOut;
   const updated = await knex('customers').where('id', customerId).update(updates).returning('*');
   const customer = updated[0];
 
@@ -1430,6 +1431,7 @@ async function recordGeofenceEvent(teamMemberId, selectionCycleId, { eventType, 
     .then(rows => rows[0]);
 
   let laborCostCreated = false;
+  let reviewRequestSent = false;
 
   if (eventType === 'departure') {
     // Recompute total on-site hours from the FULL event history for this
@@ -1502,9 +1504,20 @@ async function recordGeofenceEvent(teamMemberId, selectionCycleId, { eventType, 
         }
       }
     }
+
+    // Review Requests (Rule 1): a departure event triggers a one-per-job review
+    // request. maybeCreateReviewRequest honors opt-out (Rule 2) + token reuse
+    // (Rule 3) and fires the SMS fire-and-forget. Guarded so a failure here never
+    // blocks geofence recording or the labor-cost result.
+    try {
+      const reviewToken = await maybeCreateReviewRequest(selectionCycleId);
+      reviewRequestSent = reviewToken != null;
+    } catch (err) {
+      console.error('Review request creation failed:', err.message);
+    }
   }
 
-  return { event, laborCostCreated };
+  return { event, laborCostCreated, reviewRequestSent };
 }
 
 // ─── JOB COSTING ─────────────────────────────────────────────────────────────
@@ -1812,6 +1825,143 @@ async function getCustomerProfitability(businessId, customerId) {
   };
 }
 
+// ─── REVIEW REQUESTS ─────────────────────────────────────────────────────────
+
+const WEBSITE_URL = process.env.WEBSITE_URL || 'https://taskrightpro.com';
+const REVIEW_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7-day expiry (spec Data Model)
+
+// Departure trigger (Rule 1): create a one-per-job review token (Rule 3) and fire
+// the review SMS inline (Item 7). Honors the opt-out flag (Rule 2). Returns the
+// token row when a new request was created, or null when suppressed/reused so the
+// caller can tell whether an SMS went out. Safe to await from the geofence handler:
+// callers should still guard so a failure here never blocks event recording.
+async function maybeCreateReviewRequest(selectionCycleId) {
+  const cycle = await knex('selection_cycles').where('id', selectionCycleId).first();
+  if (!cycle) return null;
+
+  const customer = await knex('customers').where('id', cycle.customer_id).first();
+  if (!customer) return null;
+
+  // Rule 2: opted-out customers get no token and no SMS.
+  if (customer.review_requests_opted_out) return null;
+
+  // Rule 3: one token per job. A re-exit reuses the existing token — no second SMS.
+  const existing = await knex('review_tokens').where('selection_cycle_id', selectionCycleId).first();
+  if (existing) return null;
+
+  const business = await knex('businesses').where('id', customer.business_id).first();
+  if (!business) return null;
+
+  const token = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + REVIEW_TOKEN_TTL_MS).toISOString();
+
+  let row;
+  try {
+    [row] = await knex('review_tokens')
+      .insert({
+        selection_cycle_id: selectionCycleId,
+        customer_id: customer.id,
+        business_id: business.id,
+        token,
+        expires_at: expiresAt,
+        sent_at: knex.raw('CURRENT_TIMESTAMP'),
+        created_at: knex.raw('CURRENT_TIMESTAMP'),
+      })
+      .returning('*');
+  } catch (err) {
+    // Unique(selection_cycle_id) race — another departure beat us to it. Reuse, no SMS.
+    if (err.code === '23505') return null;
+    throw err;
+  }
+
+  // Fire-and-forget SMS, same pattern as other outbound notifications (dev mode logs).
+  const message =
+    `Hi ${customer.name || 'there'}, how was your ${business.name} service today?\n` +
+    `Leave a quick note — it only takes a moment:\n` +
+    `${WEBSITE_URL}/review/${token}`;
+  Promise.resolve()
+    .then(() => notificationService.sendSMS(business, customer.phone_number, message))
+    .catch((err) => console.error('Review request SMS failed:', err.message));
+
+  return row;
+}
+
+// GET /api/review/:token — non-sensitive review context for the no-auth page.
+// Sets opened_at on first load (open-rate tracking). Returns { valid: false } for
+// missing OR expired tokens (Rule 4) so the page can't distinguish the two.
+async function getReviewByToken(token) {
+  const row = await knex('review_tokens').where('token', token).first();
+  if (!row) return { valid: false };
+  if (new Date(row.expires_at).getTime() <= Date.now()) return { valid: false };
+
+  if (!row.opened_at) {
+    await knex('review_tokens').where('id', row.id).update({ opened_at: knex.raw('CURRENT_TIMESTAMP') });
+  }
+
+  const customer = await knex('customers').where('id', row.customer_id).first();
+  const business = await knex('businesses').where('id', row.business_id).first();
+  const cycle = await knex('selection_cycles').where('id', row.selection_cycle_id).first();
+
+  return {
+    valid: true,
+    customerName: customer ? customer.name : null,
+    businessName: business ? business.name : null,
+    serviceDate: cycle ? new Date(cycle.service_date).toISOString().split('T')[0] : null,
+    alreadySubmitted: row.submitted_at != null,
+  };
+}
+
+// POST /api/review/:token — record the star rating + optional comment.
+// Rule 4: reject expired. Rule 5: idempotent — a resubmit is a no-op that still
+// reports success. Writes a feedbacks row with source='sms_request'.
+async function submitReviewByToken(token, { rating, comment }) {
+  const row = await knex('review_tokens').where('token', token).first();
+  if (!row) {
+    throw Object.assign(new Error('This link isn\'t valid.'), { code: 'INVALID_TOKEN', statusCode: 404 });
+  }
+  if (new Date(row.expires_at).getTime() <= Date.now()) {
+    throw Object.assign(new Error('This review link has expired.'), { code: 'EXPIRED_TOKEN', statusCode: 410 });
+  }
+
+  // Rule 5: already submitted — no second feedback row, still succeed.
+  if (row.submitted_at) return { success: true };
+
+  const parsedRating = parseInt(rating, 10);
+  if (Number.isNaN(parsedRating) || parsedRating < 1 || parsedRating > 5) {
+    throw Object.assign(new Error('rating must be an integer from 1 to 5'), { code: 'VALIDATION_ERROR', statusCode: 400 });
+  }
+
+  // feedbacks has unique(customer_id, selection_cycle_id) — if voluntary in-app
+  // feedback already exists for this job, update it in place rather than colliding.
+  const existingFeedback = await knex('feedbacks')
+    .where('customer_id', row.customer_id)
+    .where('selection_cycle_id', row.selection_cycle_id)
+    .first();
+
+  if (existingFeedback) {
+    await knex('feedbacks').where('id', existingFeedback.id).update({
+      rating: parsedRating,
+      feedback_text: comment != null ? comment : existingFeedback.feedback_text,
+      source: 'sms_request',
+      updated_at: knex.raw('CURRENT_TIMESTAMP'),
+    });
+  } else {
+    await knex('feedbacks').insert({
+      customer_id: row.customer_id,
+      selection_cycle_id: row.selection_cycle_id,
+      rating: parsedRating,
+      feedback_text: comment != null ? comment : null,
+      source: 'sms_request',
+      created_at: knex.raw('CURRENT_TIMESTAMP'),
+      updated_at: knex.raw('CURRENT_TIMESTAMP'),
+    });
+  }
+
+  await knex('review_tokens').where('id', row.id).update({ submitted_at: knex.raw('CURRENT_TIMESTAMP') });
+
+  return { success: true };
+}
+
 module.exports = {
   // Auth
   createBusiness,
@@ -1887,4 +2037,8 @@ module.exports = {
   generateSelectionToken,
   getSelectionByToken,
   submitSelectionByToken,
+  // Review Requests
+  maybeCreateReviewRequest,
+  getReviewByToken,
+  submitReviewByToken,
 };

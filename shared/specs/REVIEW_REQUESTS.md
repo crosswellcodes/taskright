@@ -72,6 +72,13 @@ Unique constraint on `selection_cycle_id` — one token per job, enforced at DB 
 
 > ⚠️ Verify current `feedbacks` schema against `003_feedbacks.js` and `008_feedback_business_notes.js` before writing migration. Confirm `selection_cycle_id` and `customer_id` columns exist and that adding a `source` column with a default does not break existing queries.
 
+> **Resolved at implementation (Session 13, migration 020):** verification found `feedbacks` had **no `rating` column** — only `feedback_text` — yet the POST body and the `/review` page require a 1–5 star rating. Added `feedbacks.rating` (`smallint`, **nullable**) alongside `source`; nullable so existing in-app rows (which carry no star rating) stay valid. POST maps `rating → feedbacks.rating`, `comment → feedbacks.feedback_text`. Because `feedbacks` has `unique(customer_id, selection_cycle_id)`, the submit path updates any pre-existing in-app feedback row in place rather than inserting a colliding second row.
+
+#### `feedbacks` — new column (added at implementation)
+| Column | Type | Notes |
+|--------|------|-------|
+| rating | smallint (nullable) | 1–5 star rating from the SMS review page. Null for in-app feedback. |
+
 #### `customers` — new column
 | Column | Type | Notes |
 |--------|------|-------|

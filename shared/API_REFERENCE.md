@@ -800,6 +800,27 @@ Aggregates **completed** cycles only. Response: `{ success, profitability: { tot
 
 ---
 
+### Review Requests
+
+No-auth review endpoints (no JWT — same public pattern as `GET /auth/selection/:token`). Component 1/3, added 2026-07-05 (see `shared/specs/REVIEW_REQUESTS.md`). Triggered by a geofence **departure** event, which inline-creates a one-per-job `review_tokens` row (Rule 3, `selection_cycle_id` unique) and fires the review SMS fire-and-forget — honoring `customers.review_requests_opted_out` (Rule 2). Feedback lands in the `feedbacks` table with new columns `source` (`'in_app'` default | `'sms_request'`) and `rating` (smallint 1–5, nullable).
+
+#### Get Review Context (no-auth)
+**GET** `/review/:token`
+
+Returns non-sensitive context for the `/review/[token]` page. Sets `opened_at` on first load. Response: `{ success, valid, customerName, businessName, serviceDate, alreadySubmitted }`. Missing **or** expired tokens (Rule 4) return `{ success: true, valid: false }` (indistinguishable, so the page can't probe).
+
+#### Submit Review (no-auth)
+**POST** `/review/:token`
+
+Body: `{ rating: 1–5, comment? }`. Writes a `feedbacks` row (`source='sms_request'`, `rating`, `feedback_text=comment`) and sets `review_tokens.submitted_at`. Idempotent (Rule 5) — a resubmit returns `{ success: true }` without writing a second row. `410` for expired (Rule 4), `404` for missing token, `400` for out-of-range rating. If voluntary in-app feedback already exists for the same job, it is updated in place (avoids the `feedbacks` unique(`customer_id`,`selection_cycle_id`) collision).
+
+#### Opt-Out Toggle (business owner)
+**PATCH** `/businesses/:businessId/customers/:customerId`
+
+The existing customer-update endpoint now also accepts `{ reviewRequestsOptedOut: boolean }` (owner-controlled, Rule 7). Persists to `customers.review_requests_opted_out`; echoed back on the response `customer` object.
+
+---
+
 ## Webhook Endpoints
 
 Twilio posts to these endpoints. They accept `application/x-www-form-urlencoded` (not JSON) and always return `200` with TwiML `<Response/>` to prevent Twilio retries. No JWT authentication — called directly by Twilio.
