@@ -749,7 +749,7 @@ Body: `{ price }` — non-negative number or `null`. Also the ad-hoc-job path (R
 #### Set Assignment Recurring Price
 **PATCH** `/businesses/:businessId/customers/:customerId/assignments/:assignmentId`
 
-Body: `{ pricePerVisit }` — non-negative number or `null`. Sets `customer_cycle_assignments.price_per_visit`, which future cycle generation copies into new jobs' `price`. Response: `{ success, assignment }`.
+Body: `{ pricePerVisit }` — non-negative number or `null`. Sets `customer_cycle_assignments.price_per_visit`, which future cycle generation copies into new jobs' `price`. Response: `{ success, assignment }`. The **GET customer detail** payload (`GET /businesses/:id/customers/:customerId`) surfaces `assignmentId` (`cca.id`) and `pricePerVisit` on each `customer.assignedCycles[]` entry so the CustomerDetailScreen can drive this PATCH and show the current recurring price (added 2026-07-05 for the Profitability card).
 
 #### Get Job Costs (per-job payload)
 **GET** `/businesses/:businessId/jobs/:selectionCycleId/costs`

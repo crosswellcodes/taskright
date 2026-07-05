@@ -129,6 +129,15 @@ export const updateJobCost = (businessId, selectionCycleId, costId, data) =>
 export const deleteJobCost = (businessId, selectionCycleId, costId) =>
   del(`/api/businesses/${businessId}/jobs/${selectionCycleId}/costs/${costId}`);
 
+// Aggregate profitability over COMPLETED cycles only (see JOB_COSTING.md Business Rules).
+export const getCustomerProfitability = (businessId, customerId) =>
+  get(`/api/businesses/${businessId}/customers/${customerId}/profitability`);
+
+// Set the customer's recurring price for an assigned cycle. Feeds D2: future
+// cycle generation copies this into new jobs' price. Pass null to clear.
+export const setAssignmentPrice = (businessId, customerId, assignmentId, pricePerVisit) =>
+  patch(`/api/businesses/${businessId}/customers/${customerId}/assignments/${assignmentId}`, { pricePerVisit });
+
 // Team Groups
 export const getTeamGroups = (businessId) =>
   get(`/api/businesses/${businessId}/groups`);

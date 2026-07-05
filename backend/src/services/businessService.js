@@ -303,14 +303,19 @@ async function getCustomerDetails(customerId) {
   const assignments = await knex('customer_cycle_assignments as cca')
     .join('service_cycles as sc', 'cca.service_cycle_id', 'sc.id')
     .where('cca.customer_id', customerId)
-    .select('sc.id', 'sc.name', 'sc.frequency', 'cca.total_hours');
+    .select('sc.id', 'sc.name', 'sc.frequency', 'cca.total_hours',
+            'cca.id as assignment_id', 'cca.price_per_visit');
 
   customer.assignedCycles = assignments.map(a => ({
     id: a.id,
     serviceCycleId: a.id,
     serviceCycleName: a.name,
     frequency: a.frequency,
-    totalHours: a.total_hours
+    totalHours: a.total_hours,
+    // Job costing: assignment row id + current recurring price so the
+    // CustomerDetailScreen can PATCH .../assignments/:assignmentId (D2 source).
+    assignmentId: a.assignment_id,
+    pricePerVisit: a.price_per_visit
   }));
 
   const upcomingServiceRows = await knex('selection_cycles')

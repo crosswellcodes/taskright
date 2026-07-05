@@ -2,12 +2,28 @@ import React, { useState, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Alert, RefreshControl, Linking
+  ActivityIndicator, Alert, RefreshControl, Linking, Modal, TextInput
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
-import { getCustomerDetails, markServiceComplete, getLatestCustomerFeedback } from '../../api/businessApi';
+import {
+  getCustomerDetails, markServiceComplete, getLatestCustomerFeedback,
+  getCustomerProfitability, setAssignmentPrice,
+} from '../../api/businessApi';
 import { formatPhone } from '../../utils/phoneUtils';
+
+function money(n) {
+  if (n === null || n === undefined || n === '') return '—';
+  return `$${Number(n).toFixed(2)}`;
+}
+
+function formatShortDate(dateStr) {
+  if (!dateStr) return '—';
+  const s = String(dateStr).split('T')[0];
+  return new Date(s + 'T12:00:00').toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  });
+}
 
 export default function CustomerDetailScreen({ route, navigation }) {
   const { user } = useAuth();
@@ -15,9 +31,16 @@ export default function CustomerDetailScreen({ route, navigation }) {
   const { customerId } = route.params;
   const [customer, setCustomer] = useState(null);
   const [latestFeedback, setLatestFeedback] = useState(null);
+  const [profitability, setProfitability] = useState(null);
+  const [profitExpanded, setProfitExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [completing, setCompleting] = useState(false);
+
+  // Recurring price editor: { assignmentId, cycleName, current } | null
+  const [editingPrice, setEditingPrice] = useState(null);
+  const [priceInput, setPriceInput] = useState('');
+  const [savingPrice, setSavingPrice] = useState(false);
 
   const fetchCustomer = useCallback(async () => {
     try {
@@ -29,6 +52,13 @@ export default function CustomerDetailScreen({ route, navigation }) {
         setLatestFeedback(fb.feedback || null);
       } catch {
         setLatestFeedback(null);
+      }
+      // Profitability aggregates COMPLETED cycles only — non-blocking supplement.
+      try {
+        const prof = await getCustomerProfitability(user.businessId, customerId);
+        setProfitability(prof.profitability || null);
+      } catch {
+        setProfitability(null);
       }
     } catch (err) {
       Alert.alert('Error', err.message || 'Failed to load customer');
@@ -66,6 +96,43 @@ export default function CustomerDetailScreen({ route, navigation }) {
     );
   };
 
+  function openPriceEditor(cycle) {
+    setEditingPrice({
+      assignmentId: cycle.assignmentId,
+      cycleName: cycle.serviceCycleName || `Cycle #${cycle.serviceCycleId}`,
+    });
+    setPriceInput(
+      cycle.pricePerVisit !== null && cycle.pricePerVisit !== undefined
+        ? String(cycle.pricePerVisit)
+        : ''
+    );
+  }
+
+  async function handleSavePrice() {
+    if (!editingPrice) return;
+    const trimmed = priceInput.trim();
+    let value;
+    if (trimmed === '') {
+      value = null; // clears the recurring price
+    } else {
+      value = Number(trimmed);
+      if (Number.isNaN(value) || value < 0) {
+        Alert.alert('Invalid price', 'Enter a non-negative dollar amount, or leave it blank to clear the price.');
+        return;
+      }
+    }
+    setSavingPrice(true);
+    try {
+      await setAssignmentPrice(user.businessId, customerId, editingPrice.assignmentId, value);
+      await fetchCustomer(); // refetch so the row reflects the new recurring price
+      setEditingPrice(null);
+    } catch (err) {
+      Alert.alert('Error', err.message || 'Failed to update price');
+    } finally {
+      setSavingPrice(false);
+    }
+  }
+
   if (loading) {
     return <View style={styles.center}><ActivityIndicator size="large" /></View>;
   }
@@ -81,6 +148,7 @@ export default function CustomerDetailScreen({ route, navigation }) {
   };
 
   return (
+    <>
     <ScrollView
       style={styles.container}
       contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
@@ -107,18 +175,111 @@ export default function CustomerDetailScreen({ route, navigation }) {
         ) : null}
       </View>
 
+      {/* Profitability (COMPLETED cycles only) */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Profitability</Text>
+        {profitability && profitability.completedJobCount > 0 ? (
+          <TouchableOpacity activeOpacity={0.7} onPress={() => setProfitExpanded(v => !v)}>
+            <View style={styles.profitGrid}>
+              <View style={styles.profitCell}>
+                <Text style={styles.profitCellLabel}>Revenue</Text>
+                <Text style={styles.profitCellValue}>{money(profitability.totalRevenue)}</Text>
+              </View>
+              <View style={styles.profitCell}>
+                <Text style={styles.profitCellLabel}>Cost</Text>
+                <Text style={styles.profitCellValue}>{money(profitability.totalCost)}</Text>
+              </View>
+              <View style={styles.profitCell}>
+                <Text style={styles.profitCellLabel}>Margin</Text>
+                <Text style={[
+                  styles.profitCellValue,
+                  Number(profitability.totalMarginDollars) < 0 ? styles.marginNegative : styles.marginPositive,
+                ]}>
+                  {money(profitability.totalMarginDollars)}
+                </Text>
+              </View>
+              <View style={styles.profitCell}>
+                <Text style={styles.profitCellLabel}>Margin %</Text>
+                <Text style={[
+                  styles.profitCellValue,
+                  Number(profitability.totalMarginDollars) < 0 ? styles.marginNegative : styles.marginPositive,
+                ]}>
+                  {profitability.totalMarginPercent === null || profitability.totalMarginPercent === undefined
+                    ? '—'
+                    : `${Number(profitability.totalMarginPercent).toFixed(1)}%`}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.profitFooter}>
+              <Text style={styles.profitJobCount}>
+                {profitability.completedJobCount} completed job{profitability.completedJobCount !== 1 ? 's' : ''}
+              </Text>
+              <Text style={styles.profitExpandLink}>
+                {profitExpanded ? 'Hide breakdown ▲' : 'View breakdown ▼'}
+              </Text>
+            </View>
+
+            {profitExpanded && (
+              <View style={styles.profitBreakdown}>
+                {profitability.jobs.map((job) => (
+                  <View key={job.selectionCycleId} style={styles.profitJobRow}>
+                    <View style={styles.profitJobLeft}>
+                      <Text style={styles.profitJobDate}>{formatShortDate(job.serviceDate)}</Text>
+                      <Text style={styles.profitJobRef}>Ref #{job.selectionCycleId}</Text>
+                    </View>
+                    <View style={styles.profitJobRight}>
+                      <Text style={styles.profitJobPriceCost}>
+                        {money(job.price)} − {money(job.totalCost)}
+                      </Text>
+                      <Text style={[
+                        styles.profitJobMargin,
+                        job.marginDollars === null || job.marginDollars === undefined
+                          ? styles.marginUnset
+                          : Number(job.marginDollars) < 0 ? styles.marginNegative : styles.marginPositive,
+                      ]}>
+                        {job.marginDollars === null || job.marginDollars === undefined
+                          ? 'No price'
+                          : money(job.marginDollars)}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </TouchableOpacity>
+        ) : (
+          <Text style={styles.emptyText}>No completed jobs yet. Profitability appears once a service call is marked complete.</Text>
+        )}
+      </View>
+
       {/* Assigned Cycles */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Assigned Cycles</Text>
         {customer.assignedCycles?.length === 0 ? (
           <Text style={styles.emptyText}>No cycles assigned.</Text>
         ) : (
-          customer.assignedCycles?.map(c => (
-            <View key={c.id} style={styles.row}>
-              <Text style={styles.rowLabel}>{c.serviceCycleName || `Cycle #${c.serviceCycleId}`}</Text>
-              <Text style={styles.rowValue}>{c.totalHours}h / visit</Text>
-            </View>
-          ))
+          customer.assignedCycles?.map(c => {
+            const hasPrice = c.pricePerVisit !== null && c.pricePerVisit !== undefined;
+            return (
+              <TouchableOpacity
+                key={c.id}
+                style={styles.row}
+                activeOpacity={0.6}
+                onPress={() => openPriceEditor(c)}
+              >
+                <View style={styles.cycleInfo}>
+                  <Text style={styles.rowLabel}>{c.serviceCycleName || `Cycle #${c.serviceCycleId}`}</Text>
+                  <Text style={[styles.cyclePrice, !hasPrice && styles.cyclePriceUnset]}>
+                    {hasPrice ? `${money(c.pricePerVisit)} / visit` : 'Set recurring price'}
+                  </Text>
+                </View>
+                <View style={styles.rowRight}>
+                  <Text style={styles.rowValue}>{c.totalHours}h / visit</Text>
+                  <Text style={styles.rowChevron}>›</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })
         )}
         <TouchableOpacity
           style={styles.assignBtn}
@@ -230,6 +391,49 @@ export default function CustomerDetailScreen({ route, navigation }) {
         }
       </TouchableOpacity>
     </ScrollView>
+
+    {/* Recurring Price Editor Modal */}
+    <Modal visible={!!editingPrice} transparent animationType="slide">
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalCard}>
+          <Text style={styles.modalTitle}>Recurring Price</Text>
+          <Text style={styles.modalSubtitle}>
+            Standard price per visit for {editingPrice?.cycleName}. New service calls copy
+            this automatically. Leave blank to clear it.
+          </Text>
+          <View style={styles.amountInputRow}>
+            <Text style={styles.amountPrefix}>$</Text>
+            <TextInput
+              style={styles.amountInput}
+              value={priceInput}
+              onChangeText={setPriceInput}
+              keyboardType="decimal-pad"
+              placeholder="0.00"
+              placeholderTextColor="#9ca3af"
+              autoFocus
+              editable={!savingPrice}
+            />
+          </View>
+          <TouchableOpacity
+            style={[styles.modalSave, savingPrice && styles.modalSaveDisabled]}
+            onPress={handleSavePrice}
+            disabled={savingPrice}
+          >
+            {savingPrice
+              ? <ActivityIndicator color="#fff" size="small" />
+              : <Text style={styles.modalSaveText}>Save</Text>}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.modalCancel}
+            onPress={() => setEditingPrice(null)}
+            disabled={savingPrice}
+          >
+            <Text style={styles.modalCancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+    </>
   );
 }
 
@@ -258,6 +462,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
   rowRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   rowChevron: { fontSize: 18, color: '#c7d2fe', fontWeight: '400' },
+  cycleInfo: { flex: 1, marginRight: 12 },
   rowLabel: { fontSize: 15, color: '#333' },
   rowValue: { fontSize: 14, color: '#888' },
   emptyText: { fontSize: 14, color: '#aaa' },
@@ -279,4 +484,62 @@ const styles = StyleSheet.create({
   completeBtnDisabled: { backgroundColor: '#6ee7b7' },
   completeBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   viewThreadLink: { fontSize: 14, color: '#2563eb', fontWeight: '500', marginTop: 2 },
+
+  // Profitability card
+  profitGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  profitCell: { width: '50%', paddingVertical: 8 },
+  profitCellLabel: {
+    fontSize: 12, color: '#9ca3af', marginBottom: 3,
+    textTransform: 'uppercase', letterSpacing: 0.4,
+  },
+  profitCellValue: { fontSize: 19, fontWeight: '700', color: '#1a1a1a' },
+  marginPositive: { color: '#059669' },
+  marginNegative: { color: '#dc2626' },
+  marginUnset: { color: '#9ca3af', fontStyle: 'italic' },
+  profitFooter: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginTop: 6, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f3f4f6',
+  },
+  profitJobCount: { fontSize: 13, color: '#6b7280' },
+  profitExpandLink: { fontSize: 13, color: '#2563eb', fontWeight: '600' },
+  profitBreakdown: { marginTop: 4 },
+  profitJobRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#f3f4f6',
+  },
+  profitJobLeft: { flex: 1 },
+  profitJobDate: { fontSize: 14, color: '#1a1a1a', fontWeight: '500' },
+  profitJobRef: { fontSize: 12, color: '#9ca3af', marginTop: 1 },
+  profitJobRight: { alignItems: 'flex-end' },
+  profitJobPriceCost: { fontSize: 12, color: '#6b7280', marginBottom: 2 },
+  profitJobMargin: { fontSize: 15, fontWeight: '700' },
+
+  // Recurring price editor modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  modalCard: {
+    backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    padding: 20, paddingBottom: 36,
+  },
+  modalTitle: { fontSize: 17, fontWeight: '700', color: '#111', marginBottom: 6 },
+  modalSubtitle: { fontSize: 13, color: '#6b7280', marginBottom: 16, lineHeight: 18 },
+  amountInputRow: {
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1.5, borderColor: '#e5e7eb', borderRadius: 10,
+    paddingHorizontal: 14, marginBottom: 4,
+  },
+  amountPrefix: { fontSize: 20, fontWeight: '600', color: '#6b7280', marginRight: 4 },
+  amountInput: { flex: 1, fontSize: 20, fontWeight: '600', color: '#1a1a1a', paddingVertical: 14 },
+  modalSave: {
+    marginTop: 16, paddingVertical: 14, borderRadius: 10,
+    backgroundColor: '#2563eb', alignItems: 'center',
+  },
+  modalSaveDisabled: { opacity: 0.6 },
+  modalSaveText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  modalCancel: {
+    marginTop: 16, paddingVertical: 13, borderRadius: 10,
+    backgroundColor: '#f3f4f6', alignItems: 'center',
+  },
+  modalCancelText: { fontSize: 15, fontWeight: '600', color: '#374151' },
+  cyclePrice: { fontSize: 13, color: '#2563eb', fontWeight: '600', marginTop: 2 },
+  cyclePriceUnset: { color: '#9ca3af', fontStyle: 'italic', fontWeight: '500' },
 });

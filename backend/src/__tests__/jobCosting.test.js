@@ -132,6 +132,18 @@ describe('PATCH /customers/:customerId/assignments/:assignmentId', () => {
       expect(Number(c.price)).toBe(88);
     }
   });
+
+  it('exposes assignmentId + pricePerVisit on customer detail assignedCycles', async () => {
+    // CustomerDetailScreen needs the assignment row id (to PATCH) and current
+    // recurring price (to display) — both surfaced on assignedCycles.
+    await auth(request(app).patch(`/api/businesses/${businessId}/customers/${customerId}/assignments/${assignmentId}`))
+      .send({ pricePerVisit: 175 });
+    const res = await auth(request(app).get(`/api/businesses/${businessId}/customers/${customerId}`));
+    expect(res.status).toBe(200);
+    const cyc = res.body.customer.assignedCycles.find(c => c.assignmentId === assignmentId);
+    expect(cyc).toBeTruthy();
+    expect(Number(cyc.pricePerVisit)).toBe(175);
+  });
 });
 
 // ─── MANUAL COST LINES (D1) ───────────────────────────────────────────────────

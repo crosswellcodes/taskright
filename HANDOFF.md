@@ -1,5 +1,5 @@
 # TaskRight — Handoff Document
-**Last updated: July 5, 2026 (Session 11 — job-costing UI Component 1/2: ServiceCallDetailScreen per-job section)**
+**Last updated: July 5, 2026 (Session 12 — job-costing UI Component 2/2: CustomerDetailScreen Profitability card — job-costing UI feature COMPLETE)**
 
 > Start every new session by reading this file + `shared/API_REFERENCE.md`. Do NOT read SPEC.md unless you need deep schema details — it is 75KB and slow to load.
 
@@ -322,7 +322,12 @@ React Navigation requires all params to be plain serializable data. Functions ca
     - Materials/Overhead editors use **POST-if-null / PATCH-if-present**, so repeated edits replace rather than accumulate; blank+Save deletes the line.
     - **Backend touched (additive, agreed):** `getJobCosts` now also returns `materialsCostId` / `overheadCostId` (nullable, single-line ids) — GET previously only exposed summed amounts, so the single-field editor had no id to PATCH. `+2` tests; **95/95 backend tests passing**.
     - Two-blocker env fix along the way (documented so it doesn't bite next session): `@react-native-community/geolocation` pod was never installed (`cd TaskRight/ios && LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install` — the UTF-8 locale works around a CocoaPods 1.16.2 / Ruby 4.0 encoding crash), and Xcode 26.6 needs the **iOS 26.5 simulator runtime** installed (Xcode ▸ Settings ▸ Components).
-  - **⚠️ NEXT STEP: UI Component 2 of 2 — CustomerDetailScreen "Profitability" summary card.** Consume `GET /businesses/:id/customers/:customerId/profitability` (already built, completed cycles only): Total Revenue | Total Cost | Margin $ | Margin % | Job Count, tap-to-expand per-job breakdown. Also set the recurring `price_per_visit` here via `PATCH .../assignments/:assignmentId` (this is the recurring-price source that auto-copies into new jobs). See `shared/specs/JOB_COSTING.md` "UI Additions". Client call for profitability still needs adding to `businessApi.js`.
+  - **UI — Component 2 of 2 DONE (Session 12, July 5, 2026): CustomerDetailScreen "Profitability" summary card. ✅ Job-costing UI feature COMPLETE.** Built incrementally + verified in the iOS simulator against two seeded completed cycles (one profitable, one at a loss).
+    - `TaskRight/src/api/businessApi.js` — added client calls: `getCustomerProfitability`, `setAssignmentPrice`.
+    - `CustomerDetailScreen.js` — new **Profitability** card (2×2 grid: Revenue | Cost | Margin $ | Margin %, green/red on sign) + "N completed jobs" and a tap-to-expand per-job breakdown (each row: date, Ref #, `price − cost`, margin colored green/red, "No price" when null). Empty state ("No completed jobs yet…") when `completedJobCount === 0` — not a zeroed loss card. Aggregates **COMPLETED cycles only** (Rule).
+    - Recurring price: **Assigned Cycles rows are now tap-to-edit** — opens the same amount modal to set `price_per_visit` via `PATCH .../assignments/:assignmentId` (blank clears to null). This is the D2 source that auto-copies into new jobs' `price` at cycle creation. Row shows `$X.XX / visit` or a "Set recurring price" prompt.
+    - **Backend touched (additive, agreed):** `getCustomerDetails` now also returns `assignmentId` (`cca.id`) + `pricePerVisit` on each `assignedCycles` entry — the detail payload previously exposed only the service-cycle id, so the UI had no assignment id to PATCH nor a current price to display (same shape gap as Component 1's `materialsCostId`). `+1` test; **96/96 backend tests passing**.
+- **⚠️ NEXT STEP: Review Requests** (see below) — first feature after job costing. Migration **020**.
 - **Review Requests** — `shared/specs/REVIEW_REQUESTS.md`. New table: `review_tokens`. New columns: `feedbacks.source`, `customers.review_requests_opted_out`. Migration **020** (`019` reserved for job-costing integrity — see `JOB_COSTING_DATA_GAPS.md`). Triggered by geo-fence departure; sends SMS immediately with `/review/[token]` link.
 
 ### Open Questions / Future Decisions
