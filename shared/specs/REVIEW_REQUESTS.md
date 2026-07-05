@@ -133,6 +133,8 @@ New Next.js App Router route: `TaskRight-Website/src/app/review/[token]/page.tsx
 
 Follows the same pattern as `/s/[token]` (no-auth task selection page).
 
+> **Built (Session 13, Component 2/3).** One caveat vs. the 4-state table below: **Expired and Invalid collapse into a single load state.** The backend `GET /api/review/:token` returns `{ valid: false }` for both expired and missing tokens by design (anti-probing — Component 1), so the page can't tell them apart on load and shows one combined "link isn't valid or has expired" card. The distinct **Expired** message still appears when a token expires between load and submit (POST returns `410`).
+
 **States:**
 
 | State | Condition | UI |
