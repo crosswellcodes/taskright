@@ -256,7 +256,7 @@ React Navigation requires all params to be plain serializable data. Functions ca
 ## Pending Work
 
 ### Mobile App
-- [ ] **Day-of-week backend migration** — `002_scheduling_format.js` in `backend/migrations/`. Schema columns exist in service layer but the migration file needs to be created and run. See SPEC/plan for exact SQL.
+- [x] **Day-of-week backend migration** — Complete (stale note cleared July 5, 2026). `002_scheduling_format.js` exists (committed in `33df15d`), is recorded in `knex_migrations` (batch 10), and its columns (`businesses.scheduling_format`, `customer_cycle_assignments.day_of_week`) are present on both `task_app_db` and `task_app_test`. Fully wired backend (`validators.js`, `auth.js`, `businesses.js`, `businessService.js`) + mobile (`PhoneEntryScreen.js`, `AssignCycleScreen.js`, `authApi.js`). The "needs to be created and run" note predated the Session 9 repo-hygiene reconciliation.
 - [x] **Activate Twilio** — Complete. See live credential note above.
 - [x] **A2P 10DLC self-service registration** (Session 6 complete) — Full self-service signup flow built. Entity type at step 0 (sole_prop|llc_corp) with requirements preview and transparency copy. KYC form at step 3 post-OTP. Migration `016_a2p_registration.js` adds all new columns. `registerA2P(businessId, ein)` in `twilioProvisioningService.js` chains Trust Hub API: Customer Profile → end-user attachment → Brand Registration → Messaging Campaign → link to Messaging Service. EIN is closure-only, never written to DB or logs. Fire-and-forget from `PATCH /api/businesses/:id/kyc`. JWT from signup held in React state for the KYC call, then discarded. 76/76 tests passing.
 - [x] **A2P Trust Hub prerequisites + code fix** (Session 7 complete) — All three items addressed:
