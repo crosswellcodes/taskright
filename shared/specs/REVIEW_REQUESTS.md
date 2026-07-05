@@ -1,5 +1,5 @@
 # Review Requests — Feature Spec
-**Status:** Design complete. All decisions resolved.
+**Status:** ✅ BUILT (Session 13, July 5, 2026) — all 3 components shipped: backend/data (migration 020, no-auth `/api/review` endpoints, geofence-departure trigger, opt-out), the `/review/[token]` web page, and the CustomerDetailScreen opt-out toggle. Implementation notes inline below (`> Resolved…` / `> Built…`). Design complete; all decisions resolved.
 **Dependencies:** Geo-fencing infrastructure (`JOB_COSTING.md`), Twilio Messaging Service (existing), `/review/[token]` page (new Next.js route)
 
 ---

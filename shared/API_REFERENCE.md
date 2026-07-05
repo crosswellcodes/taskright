@@ -817,7 +817,7 @@ Body: `{ rating: 1–5, comment? }`. Writes a `feedbacks` row (`source='sms_requ
 #### Opt-Out Toggle (business owner)
 **PATCH** `/businesses/:businessId/customers/:customerId`
 
-The existing customer-update endpoint now also accepts `{ reviewRequestsOptedOut: boolean }` (owner-controlled, Rule 7). Persists to `customers.review_requests_opted_out`; echoed back on the response `customer` object.
+The existing customer-update endpoint now also accepts `{ reviewRequestsOptedOut: boolean }` (owner-controlled, Rule 7). Persists to `customers.review_requests_opted_out`; echoed back on the response `customer` object. The **GET customer detail** payload (`GET /businesses/:id/customers/:customerId`) also surfaces `reviewRequestsOptedOut` so the CustomerDetailScreen can render + drive the toggle (added 2026-07-05 for Component 3, same additive-field pattern as the job-costing `assignmentId`/`materialsCostId`).
 
 ---
 

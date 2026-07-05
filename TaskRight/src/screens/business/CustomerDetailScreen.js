@@ -2,13 +2,13 @@ import React, { useState, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Alert, RefreshControl, Linking, Modal, TextInput
+  ActivityIndicator, Alert, RefreshControl, Linking, Modal, TextInput, Switch
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import {
   getCustomerDetails, markServiceComplete, getLatestCustomerFeedback,
-  getCustomerProfitability, setAssignmentPrice,
+  getCustomerProfitability, setAssignmentPrice, updateCustomerDetails,
 } from '../../api/businessApi';
 import { formatPhone } from '../../utils/phoneUtils';
 
@@ -41,6 +41,8 @@ export default function CustomerDetailScreen({ route, navigation }) {
   const [editingPrice, setEditingPrice] = useState(null);
   const [priceInput, setPriceInput] = useState('');
   const [savingPrice, setSavingPrice] = useState(false);
+
+  const [savingOptOut, setSavingOptOut] = useState(false);
 
   const fetchCustomer = useCallback(async () => {
     try {
@@ -130,6 +132,20 @@ export default function CustomerDetailScreen({ route, navigation }) {
       Alert.alert('Error', err.message || 'Failed to update price');
     } finally {
       setSavingPrice(false);
+    }
+  }
+
+  // Optimistic toggle: flip the flag immediately, PATCH, roll back on failure.
+  async function handleToggleOptOut(value) {
+    setSavingOptOut(true);
+    setCustomer(prev => ({ ...prev, reviewRequestsOptedOut: value }));
+    try {
+      await updateCustomerDetails(user.businessId, customerId, { reviewRequestsOptedOut: value });
+    } catch (err) {
+      setCustomer(prev => ({ ...prev, reviewRequestsOptedOut: !value }));
+      Alert.alert('Error', err.message || 'Failed to update review setting');
+    } finally {
+      setSavingOptOut(false);
     }
   }
 
@@ -330,6 +346,25 @@ export default function CustomerDetailScreen({ route, navigation }) {
         <Text style={styles.viewThreadLink}>View SMS thread →</Text>
       </TouchableOpacity>
 
+      {/* Review Requests */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Review Requests</Text>
+        <View style={styles.optOutRow}>
+          <View style={styles.optOutInfo}>
+            <Text style={styles.optOutLabel}>Pause review requests</Text>
+            <Text style={styles.optOutHint}>
+              When on, this customer won&apos;t receive an SMS review link after a completed visit.
+            </Text>
+          </View>
+          <Switch
+            value={!!customer.reviewRequestsOptedOut}
+            onValueChange={handleToggleOptOut}
+            disabled={savingOptOut}
+            trackColor={{ true: '#2563eb' }}
+          />
+        </View>
+      </View>
+
       {/* Last Selection */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Last Selection</Text>
@@ -466,6 +501,10 @@ const styles = StyleSheet.create({
   rowLabel: { fontSize: 15, color: '#333' },
   rowValue: { fontSize: 14, color: '#888' },
   emptyText: { fontSize: 14, color: '#aaa' },
+  optOutRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  optOutInfo: { flex: 1, marginRight: 12 },
+  optOutLabel: { fontSize: 15, color: '#333', fontWeight: '500' },
+  optOutHint: { fontSize: 13, color: '#888', marginTop: 2, lineHeight: 18 },
   assignBtn: { marginTop: 12, paddingVertical: 10, borderRadius: 8, borderWidth: 1.5, borderColor: '#2563eb', alignItems: 'center' },
   assignBtnText: { color: '#2563eb', fontWeight: '600' },
   badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },

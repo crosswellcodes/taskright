@@ -195,4 +195,15 @@ describe('PATCH customer reviewRequestsOptedOut', () => {
     const row = await knex('customers').where('id', customerId).first();
     expect(row.review_requests_opted_out).toBe(true);
   });
+
+  it('surfaces reviewRequestsOptedOut on the customer detail payload', async () => {
+    const before = await auth(request(app).get(`/api/businesses/${businessId}/customers/${customerId}`));
+    expect(before.body.customer.reviewRequestsOptedOut).toBe(false);
+
+    await auth(request(app).patch(`/api/businesses/${businessId}/customers/${customerId}`))
+      .send({ reviewRequestsOptedOut: true });
+
+    const after = await auth(request(app).get(`/api/businesses/${businessId}/customers/${customerId}`));
+    expect(after.body.customer.reviewRequestsOptedOut).toBe(true);
+  });
 });

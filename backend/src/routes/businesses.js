@@ -428,7 +428,10 @@ router.get('/:businessId/customers/:customerId', requireBusiness, async (req, re
         notes: customer.notes,
         assignedCycles: customer.assignedCycles,
         upcomingServices: customer.upcomingServices,
-        lastSelection: customer.lastSelection
+        lastSelection: customer.lastSelection,
+        // Review Requests (Component 3): surface the opt-out flag so the detail
+        // screen can render + toggle it (PATCH .../customers/:id below).
+        reviewRequestsOptedOut: customer.review_requests_opted_out
       }
     });
   } catch (error) {
