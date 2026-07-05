@@ -107,6 +107,28 @@ export const getCustomerMessages = (businessId, customerId, params = {}) => {
 export const sendCustomerMessage = (businessId, customerId, body) =>
   post(`/api/businesses/${businessId}/customers/${customerId}/messages`, { body });
 
+// Job Costing (business view) — see shared/specs/JOB_COSTING.md + API_REFERENCE.md
+// A "job" is a selection_cycle.
+export const getCostCategories = (businessId) =>
+  get(`/api/businesses/${businessId}/cost-categories`);
+
+export const getJobCosts = (businessId, selectionCycleId) =>
+  get(`/api/businesses/${businessId}/jobs/${selectionCycleId}/costs`);
+
+export const setJobPrice = (businessId, selectionCycleId, price) =>
+  patch(`/api/businesses/${businessId}/jobs/${selectionCycleId}/price`, { price });
+
+// data: { costCategoryId, amount, teamMemberId?, hoursActual? } — always stamped source='manual'
+export const addJobCost = (businessId, selectionCycleId, data) =>
+  post(`/api/businesses/${businessId}/jobs/${selectionCycleId}/costs`, data);
+
+// data: { amount?, hoursActual? } (at least one) — marks the row source='manual'
+export const updateJobCost = (businessId, selectionCycleId, costId, data) =>
+  patch(`/api/businesses/${businessId}/jobs/${selectionCycleId}/costs/${costId}`, data);
+
+export const deleteJobCost = (businessId, selectionCycleId, costId) =>
+  del(`/api/businesses/${businessId}/jobs/${selectionCycleId}/costs/${costId}`);
+
 // Team Groups
 export const getTeamGroups = (businessId) =>
   get(`/api/businesses/${businessId}/groups`);

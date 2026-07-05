@@ -235,9 +235,9 @@ describe('GET /jobs/:selectionCycleId/costs', () => {
     await auth(request(app).patch(`/api/businesses/${businessId}/jobs/${selectionCycleId}/price`)).send({ price: 200 });
     const materials = await knex('cost_categories').where('code', 5100).first();
     const overhead = await knex('cost_categories').where('code', 5200).first();
-    await auth(request(app).post(`/api/businesses/${businessId}/jobs/${selectionCycleId}/costs`))
+    const matCreated = await auth(request(app).post(`/api/businesses/${businessId}/jobs/${selectionCycleId}/costs`))
       .send({ costCategoryId: materials.id, amount: 50 });
-    await auth(request(app).post(`/api/businesses/${businessId}/jobs/${selectionCycleId}/costs`))
+    const ovhCreated = await auth(request(app).post(`/api/businesses/${businessId}/jobs/${selectionCycleId}/costs`))
       .send({ costCategoryId: overhead.id, amount: 30 });
 
     const res = await auth(request(app).get(`/api/businesses/${businessId}/jobs/${selectionCycleId}/costs`));
@@ -250,6 +250,9 @@ describe('GET /jobs/:selectionCycleId/costs', () => {
     expect(c.marginDollars).toBe(120);
     expect(c.marginPercent).toBe(60);
     expect(c.estimatedHours).toBe(0); // no selection submitted
+    // Single-line ids let the UI PATCH the existing materials/overhead value.
+    expect(c.materialsCostId).toBe(matCreated.body.data.id);
+    expect(c.overheadCostId).toBe(ovhCreated.body.data.id);
   });
 
   it('returns null margin when price is not set (Rule 3)', async () => {
@@ -258,6 +261,13 @@ describe('GET /jobs/:selectionCycleId/costs', () => {
     expect(res.body.costs.price).toBeNull();
     expect(res.body.costs.marginDollars).toBeNull();
     expect(res.body.costs.marginPercent).toBeNull();
+  });
+
+  it('returns null materials/overhead cost ids when no such lines exist', async () => {
+    const res = await auth(request(app).get(`/api/businesses/${businessId}/jobs/${selectionCycleId}/costs`));
+    expect(res.status).toBe(200);
+    expect(res.body.costs.materialsCostId).toBeNull();
+    expect(res.body.costs.overheadCostId).toBeNull();
   });
 });
 

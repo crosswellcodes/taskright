@@ -1,5 +1,5 @@
 # TaskRight — Handoff Document
-**Last updated: July 4, 2026 (Session 10 — job-costing data-model gaps cleared; API layer built)**
+**Last updated: July 5, 2026 (Session 11 — job-costing UI Component 1/2: ServiceCallDetailScreen per-job section)**
 
 > Start every new session by reading this file + `shared/API_REFERENCE.md`. Do NOT read SPEC.md unless you need deep schema details — it is 75KB and slow to load.
 
@@ -316,8 +316,13 @@ React Navigation requires all params to be plain serializable data. Functions ca
       - `PUT /businesses/:id/team-members/:memberId` extended to accept `hourlyRate` (existing endpoint, not a new PATCH).
       - `recordGeofenceEvent()` recompute now **skips `source='manual'`** rows (D1 guard); `generateUpcomingSelectionCycles()` copies `price_per_visit → price` at creation (D2).
       - Test helper `truncateAllTables()` now re-seeds the GAAP `cost_categories` system rows (TRUNCATE…CASCADE was wiping them).
-    - **Not yet built:** job-costing **UI** on ServiceCallDetailScreen (per-job section) + CustomerDetailScreen (profitability card). See `shared/specs/JOB_COSTING.md` "UI Additions".
-  - **⚠️ NEXT STEP: build the job-costing UI** against the now-settled API contract (see `shared/specs/JOB_COSTING.md` UI Additions + API endpoints above). Data model and endpoints are final.
+  - **UI — Component 1 of 2 DONE (Session 11, July 5, 2026): ServiceCallDetailScreen per-job "Job Costing" section.** Built incrementally + verified in the iOS simulator on a seeded job.
+    - `TaskRight/src/api/businessApi.js` — added client calls: `getCostCategories`, `getJobCosts`, `setJobPrice`, `addJobCost`, `updateJobCost`, `deleteJobCost`.
+    - `ServiceCallDetailScreen.js` — new section renders Price (tap-to-edit, blank clears → null), Labor table (Member | Est | Actual | Rate | Cost) with per-line **Auto-tracked / Edited** `source` badges + subtotal, null-rate warning banner (Rule 2), team-assigned empty-state (D3), Materials + Overhead single fields (tap-to-edit), Total Cost, and Margin ($/%; "Price not set" per Rule 3, red when negative).
+    - Materials/Overhead editors use **POST-if-null / PATCH-if-present**, so repeated edits replace rather than accumulate; blank+Save deletes the line.
+    - **Backend touched (additive, agreed):** `getJobCosts` now also returns `materialsCostId` / `overheadCostId` (nullable, single-line ids) — GET previously only exposed summed amounts, so the single-field editor had no id to PATCH. `+2` tests; **95/95 backend tests passing**.
+    - Two-blocker env fix along the way (documented so it doesn't bite next session): `@react-native-community/geolocation` pod was never installed (`cd TaskRight/ios && LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install` — the UTF-8 locale works around a CocoaPods 1.16.2 / Ruby 4.0 encoding crash), and Xcode 26.6 needs the **iOS 26.5 simulator runtime** installed (Xcode ▸ Settings ▸ Components).
+  - **⚠️ NEXT STEP: UI Component 2 of 2 — CustomerDetailScreen "Profitability" summary card.** Consume `GET /businesses/:id/customers/:customerId/profitability` (already built, completed cycles only): Total Revenue | Total Cost | Margin $ | Margin % | Job Count, tap-to-expand per-job breakdown. Also set the recurring `price_per_visit` here via `PATCH .../assignments/:assignmentId` (this is the recurring-price source that auto-copies into new jobs). See `shared/specs/JOB_COSTING.md` "UI Additions". Client call for profitability still needs adding to `businessApi.js`.
 - **Review Requests** — `shared/specs/REVIEW_REQUESTS.md`. New table: `review_tokens`. New columns: `feedbacks.source`, `customers.review_requests_opted_out`. Migration **020** (`019` reserved for job-costing integrity — see `JOB_COSTING_DATA_GAPS.md`). Triggered by geo-fence departure; sends SMS immediately with `/review/[token]` link.
 
 ### Open Questions / Future Decisions

@@ -769,14 +769,16 @@ Body: `{ pricePerVisit }` — non-negative number or `null`. Sets `customer_cycl
         "hoursActual": 2, "hourlyRate": 20, "amount": 40, "source": "auto" }
     ],
     "materialsAmount": 50,
+    "materialsCostId": 5,
     "overheadAmount": 30,
+    "overheadCostId": 6,
     "totalCost": 120,
     "marginDollars": 80,
     "marginPercent": 40
   }
 }
 ```
-`estimatedHours` (Rule 7) = Σ `tasks.time_allotment_minutes` for the selected tasks ÷ 60, computed at query time. When `price` is null, `marginDollars`/`marginPercent` are `null` (Rule 3 — UI shows "Price not set"). `source` is `"auto"` (geofence-tracked) or `"manual"` (owner-corrected).
+`estimatedHours` (Rule 7) = Σ `tasks.time_allotment_minutes` for the selected tasks ÷ 60, computed at query time. When `price` is null, `marginDollars`/`marginPercent` are `null` (Rule 3 — UI shows "Price not set"). `source` is `"auto"` (geofence-tracked) or `"manual"` (owner-corrected). `materialsCostId`/`overheadCostId` are the single v1 line's id (or `null` when none) so the per-job UI can drive a single editable field — POST when null, PATCH the existing line otherwise (added 2026-07-05 for the ServiceCallDetailScreen costing UI).
 
 #### Add Cost Line (manual)
 **POST** `/businesses/:businessId/jobs/:selectionCycleId/costs`

@@ -1714,12 +1714,14 @@ async function getJobCosts(businessId, selectionCycleId) {
       source: l.source,
     }));
 
-  const materialsAmount = round2(
-    lines.filter((l) => l.type === 'materials').reduce((s, l) => s + Number(l.amount), 0)
-  );
-  const overheadAmount = round2(
-    lines.filter((l) => l.type === 'overhead').reduce((s, l) => s + Number(l.amount), 0)
-  );
+  const materialsLines = lines.filter((l) => l.type === 'materials');
+  const overheadLines = lines.filter((l) => l.type === 'overhead');
+  const materialsAmount = round2(materialsLines.reduce((s, l) => s + Number(l.amount), 0));
+  const overheadAmount = round2(overheadLines.reduce((s, l) => s + Number(l.amount), 0));
+  // v1 keeps materials/overhead to a single line per job, so the UI can drive a
+  // single editable field: POST when the id is null, PATCH the existing line otherwise.
+  const materialsCostId = materialsLines.length ? materialsLines[0].id : null;
+  const overheadCostId = overheadLines.length ? overheadLines[0].id : null;
   const laborTotal = round2(laborLines.reduce((s, l) => s + l.amount, 0));
   const totalCost = round2(laborTotal + materialsAmount + overheadAmount);
 
@@ -1738,7 +1740,9 @@ async function getJobCosts(businessId, selectionCycleId) {
     estimatedHours,
     laborLines,
     materialsAmount,
+    materialsCostId,
     overheadAmount,
+    overheadCostId,
     totalCost,
     marginDollars,
     marginPercent,
