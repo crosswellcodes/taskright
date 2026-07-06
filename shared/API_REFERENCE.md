@@ -517,7 +517,13 @@ Empty array is valid: `{ "selectedTaskIds": [] }` — interpreted as "no specifi
 
 ---
 
-### Service Cycles
+### Service Templates (formerly "Service Cycles")
+
+> **Service Model (SERVICE_MODEL.md, C1):** these endpoints now manage the business-global
+> **template library** (`service_templates`). A template only *seeds* a customer's Service; it is
+> decoupled after instantiation. Per-customer Services are created via the Customers endpoints below.
+> The `/service-cycles` paths are retained for backward compatibility until the mobile Cycles tab
+> is repurposed (C3).
 
 #### Create Service Cycle
 **POST** `/businesses/:businessId/service-cycles`
@@ -579,15 +585,62 @@ Empty array is valid: `{ "selectedTaskIds": [] }` — interpreted as "no specifi
 #### Delete Customer
 **DELETE** `/businesses/:businessId/customers/:customerId`
 
-#### Assign Cycle to Customer
+#### Assign Cycle to Customer *(legacy — seeds a Service from a template)*
 **POST** `/businesses/:businessId/customers/:customerId/assign-cycle`
 
 **Request Body**:
 ```json
 {
-  "cycleId": 10
+  "serviceCycleId": 10,
+  "totalHours": 3,
+  "startDate": "2026-07-20",
+  "dayOfWeek": null
 }
 ```
+Snapshots template `serviceCycleId` into a new decoupled Service. Enforces one-per-template (409 `ALREADY_ASSIGNED`). Prefer the per-customer Service endpoints below for new work.
+
+---
+
+### Customer Services (Service Model C1 — per-customer service definitions)
+
+A **Service** is a customer's own service definition (name, frequency, deadlines, task menu, hours,
+price, schedule) living on `customer_services`. Built directly on the customer profile; a template
+only seeds initial values. Downstream job costing / reviews are unaffected (they key off the
+Service Call / `selection_cycles`).
+
+#### Create Service
+**POST** `/businesses/:businessId/customers/:customerId/services`
+
+**Request Body** (from scratch, or pass `templateId` to seed defaults; explicit fields override):
+```json
+{
+  "templateId": null,
+  "name": "Alice Weekly",
+  "frequency": "weekly",
+  "daysBeforeServiceDeadline": 2,
+  "daysBeforeAutoRepeat": 1,
+  "taskIds": [1, 2],
+  "totalHours": 3,
+  "startDate": "2026-07-20",
+  "dayOfWeek": null,
+  "pricePerVisit": 150
+}
+```
+`201` → `{ success, service }`. Generates the upcoming Service Calls and the Service's own task menu.
+Scheduling validated per business format (`startDate` for date-based, `dayOfWeek` 0–6 for day-of-week).
+Multiple Services per customer are allowed.
+
+#### Get Service (full definition)
+**GET** `/businesses/:businessId/customers/:customerId/services/:serviceId`
+→ `{ success, service: { id, customerId, templateId, name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, totalHours, pricePerVisit, startDate, dayOfWeek, taskIds } }`
+
+#### Update Service (definition-only)
+**PATCH** `/businesses/:businessId/customers/:customerId/services/:serviceId`
+Accepts any subset of `{ name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, totalHours, pricePerVisit, taskIds, startDate, dayOfWeek }`. Does **not** regenerate or delete Service Calls; a deadline change recomputes `submission_deadline` on open calls only.
+
+#### Delete Service
+**DELETE** `/businesses/:businessId/customers/:customerId/services/:serviceId`
+Cascades open Service Calls + menu. Refuses with `409 HAS_HISTORY` if any Service Call is completed (preserves job-costing / review history).
 
 ---
 

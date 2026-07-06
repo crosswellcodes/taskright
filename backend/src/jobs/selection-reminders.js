@@ -15,7 +15,6 @@ function startSelectionReminderJob() {
     try {
       // Get all service cycles that are 3 days away, joining businesses for per-business SMS routing
       const upcomingServices = await knex('selection_cycles')
-        .join('service_cycles', 'selection_cycles.service_cycle_id', '=', 'service_cycles.id')
         .join('customers', 'selection_cycles.customer_id', '=', 'customers.id')
         .join('businesses', 'customers.business_id', '=', 'businesses.id')
         .whereRaw(`selection_cycles.service_date = CURRENT_DATE + INTERVAL '3 days'`)

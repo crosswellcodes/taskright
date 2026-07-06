@@ -74,27 +74,24 @@ async function getCurrentSelectionCycle(customerId) {
   // ── 3. Build the open-cycle detail object ──
   let selectionCycle = null;
   if (openCycle) {
-    const serviceCycle = await knex('service_cycles')
-      .where('id', openCycle.service_cycle_id)
-      .first();
-
-    const business = serviceCycle
-      ? await knex('businesses').where('id', serviceCycle.business_id).first()
+    const serviceCycle = openCycle.customer_service_id
+      ? await knex('customer_services').where('id', openCycle.customer_service_id).first()
       : null;
 
-    const taskAssignments = await knex('task_assignments')
-      .where('service_cycle_id', openCycle.service_cycle_id);
+    const customer = await knex('customers').where('id', customerId).first();
+    const business = customer
+      ? await knex('businesses').where('id', customer.business_id).first()
+      : null;
+
+    const taskAssignments = await knex('service_task_assignments')
+      .where('customer_service_id', openCycle.customer_service_id);
     const taskIds = taskAssignments.map(ta => ta.task_id);
     const availableTasks = taskIds.length > 0
       ? await knex('tasks').whereIn('id', taskIds)
       : [];
 
-    const assignment = await knex('customer_cycle_assignments')
-      .where('customer_id', customerId)
-      .where('service_cycle_id', openCycle.service_cycle_id)
-      .first();
-
-    const totalHours = assignment ? assignment.total_hours : 0;
+    // The Service row carries total_hours directly.
+    const totalHours = serviceCycle ? serviceCycle.total_hours : 0;
 
     // ── Resolve who is assigned to this customer's service day ──────────────
     const serviceAssignment = await knex('service_assignments')
@@ -181,16 +178,15 @@ async function submitSelections(selectionCycleId, customerId, selectedTasks, sel
     throw error;
   }
 
-  const assignment = await knex('customer_cycle_assignments')
-    .where('customer_id', customerId)
-    .where('service_cycle_id', selectionCycle.service_cycle_id)
-    .first();
+  const assignment = selectionCycle.customer_service_id
+    ? await knex('customer_services').where('id', selectionCycle.customer_service_id).first()
+    : null;
 
   const maxMinutes = assignment ? assignment.total_hours * 60 : 0;
 
-  // Validate all selected tasks are available for this cycle
-  const taskAssignments = await knex('task_assignments')
-    .where('service_cycle_id', selectionCycle.service_cycle_id);
+  // Validate all selected tasks are available for this Service
+  const taskAssignments = await knex('service_task_assignments')
+    .where('customer_service_id', selectionCycle.customer_service_id);
   const availableTaskIds = taskAssignments.map(ta => ta.task_id);
 
   for (const taskId of selectedTasks) {
@@ -268,37 +264,34 @@ async function getUpcomingServiceDates(customerId) {
 
   if (cycles.length === 0) return [];
 
-  // Resolve business names in bulk
-  const serviceCycleIds = [...new Set(cycles.map(c => c.service_cycle_id))];
-  const serviceCycles = await knex('service_cycles').whereIn('id', serviceCycleIds);
-  const businessIds = [...new Set(serviceCycles.map(sc => sc.business_id))];
-  const businesses = await knex('businesses').whereIn('id', businessIds);
+  // Resolve the per-customer Services (which now carry name + total_hours) in bulk
+  const serviceIds = [...new Set(cycles.map(c => c.customer_service_id).filter(Boolean))];
+  const services = await knex('customer_services').whereIn('id', serviceIds);
+  const serviceCycleMap = Object.fromEntries(services.map(s => [s.id, s]));
 
-  const serviceCycleMap = Object.fromEntries(serviceCycles.map(sc => [sc.id, sc]));
-  const businessMap = Object.fromEntries(businesses.map(b => [b.id, b]));
+  // Business name comes from the customer (Services have no business_id)
+  const customer = await knex('customers').where('id', customerId).first();
+  const business = customer
+    ? await knex('businesses').where('id', customer.business_id).first()
+    : null;
 
-  // Resolve total hours per service cycle
-  const hoursRows = await knex('customer_cycle_assignments')
-    .where('customer_id', customerId)
-    .whereIn('service_cycle_id', serviceCycleIds)
-    .select('service_cycle_id', 'total_hours');
-  const hoursMap = Object.fromEntries(hoursRows.map(r => [r.service_cycle_id, r.total_hours]));
+  const hoursMap = Object.fromEntries(services.map(s => [s.id, s.total_hours]));
 
-  // Resolve available tasks for all service cycles in bulk
-  const taskAssignments = await knex('task_assignments')
-    .whereIn('service_cycle_id', serviceCycleIds)
-    .select('service_cycle_id', 'task_id');
+  // Resolve available tasks per Service from each Service's own menu
+  const taskAssignments = await knex('service_task_assignments')
+    .whereIn('customer_service_id', serviceIds)
+    .select('customer_service_id', 'task_id');
   const taskIds = [...new Set(taskAssignments.map(ta => ta.task_id))];
   const tasks = taskIds.length > 0 ? await knex('tasks').whereIn('id', taskIds) : [];
   const taskById = Object.fromEntries(tasks.map(t => [t.id, t]));
 
-  // Group tasks by service_cycle_id
+  // Group tasks by customer_service_id
   const tasksByServiceCycle = {};
   taskAssignments.forEach(ta => {
-    if (!tasksByServiceCycle[ta.service_cycle_id]) tasksByServiceCycle[ta.service_cycle_id] = [];
+    if (!tasksByServiceCycle[ta.customer_service_id]) tasksByServiceCycle[ta.customer_service_id] = [];
     const task = taskById[ta.task_id];
     if (task) {
-      tasksByServiceCycle[ta.service_cycle_id].push({
+      tasksByServiceCycle[ta.customer_service_id].push({
         id: task.id,
         name: task.name,
         timeAllotmentMinutes: task.time_allotment_minutes,
@@ -316,9 +309,7 @@ async function getUpcomingServiceDates(customerId) {
   const submittedSet = new Set(submissions.map(s => s.selection_cycle_id));
 
   return cycles.map(c => {
-    const sc = serviceCycleMap[c.service_cycle_id];
-    const business = sc ? businessMap[sc.business_id] : null;
-    const totalHours = hoursMap[c.service_cycle_id] || 0;
+    const totalHours = hoursMap[c.customer_service_id] || 0;
     return {
       id: c.id,
       serviceDate: c.service_date,
@@ -326,7 +317,7 @@ async function getUpcomingServiceDates(customerId) {
       businessName: business ? business.name : null,
       totalHours,
       totalMinutesAvailable: totalHours * 60,
-      availableTasks: tasksByServiceCycle[c.service_cycle_id] || [],
+      availableTasks: tasksByServiceCycle[c.customer_service_id] || [],
       selectionSubmitted: submittedSet.has(c.id),
     };
   });

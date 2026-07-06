@@ -1,6 +1,14 @@
 # Service Model — Feature Spec (Per-Customer Services)
 
-**Status:** 🟡 DESIGN COMPLETE — approved, unbuilt. Component 0 (design) done in the July 5, 2026 design session. All six open questions resolved with the user (see **Resolved Decisions**). Reserved migrations: **021** (additive + backfill) and **022** (enforce + cleanup). Implementation begins at **Component 1**.
+**Status:** 🟢 COMPONENT 1 BUILT (July 5, 2026) — data + backend done. Migrations **021** (rename+backfill) and **022** (enforce+cleanup) run on both DBs; service layer repointed; per-customer Service CRUD + template library live; **119/119 backend tests** (10 new in `serviceModel.test.js`). Component 0 (design) approved earlier same session; all six open questions resolved (see **Resolved Decisions**). **Next: Component 2** (customer-profile Add/Edit Service UI).
+
+> **C1 build notes (what actually shipped):**
+> - Tables renamed: `service_cycles`→`service_templates`, `customer_cycle_assignments`→`customer_services` (absorbed `name`/`frequency`/`days_before_service_deadline`/`days_before_auto_repeat` + nullable `template_id` provenance FK, `ON DELETE SET NULL`), `task_assignments`→`template_task_assignments` (col `service_cycle_id`→`template_id`). New `service_task_assignments` (per-service menu). `selection_cycles.service_cycle_id`→`customer_service_id` (021 nullable+backfilled; 022 `NOT NULL` + drops legacy col). Old `UNIQUE(customer_id, service_cycle_id)` dropped → a customer may hold multiple Services (incl. several from one template). Live fan-out verified: template 6's 3 customers → 3 independent Services each with their own 4-task menu.
+> - New service fns (`businessService.js`): `createCustomerService` (core: insert + own menu + generate + welcome SMS), `createCustomerServiceForBusiness` (from-scratch or `templateId`-seeded, overrides win, validates tasks/frequency/hours), `updateCustomerService` (definition-only per C1 decision; deadline change recomputes open calls' `submission_deadline`, never regenerates/deletes), `deleteCustomerService` (cascades open calls; `409 HAS_HISTORY` if any completed), `getCustomerServiceDetail`.
+> - New endpoints (`routes/businesses.js`): `POST|GET|PATCH|DELETE /businesses/:id/customers/:cid/services[/:serviceId]`. See API_REFERENCE.
+> - Backward-compat preserved: `/service-cycles` CRUD (now the template library) + `/assign-cycle` (now seeds a Service from a template, keeps the one-per-template 409 guard) still work → the mobile app keeps running until C2/C3 repurpose those screens.
+> - Ownership checks that used to go `selection_cycles → service_cycles.business_id` now go via `customers.business_id` (Services carry no `business_id`).
+> - Function *symbols* for template CRUD kept their `ServiceCycle` names (createServiceCycle/etc.) to avoid churning the still-live `/service-cycles` callers; symbol rename deferred to C3/C4 when those callers move.
 
 **Dependencies (must not break):** `JOB_COSTING.md` (job_costs, price copy, geo-fencing), `REVIEW_REQUESTS.md` (review_tokens), and the selection/completion/feedback chain. All of these anchor on `selection_cycles.id`, which is why the overhaul is safe (see **Downstream Preservation**).
 
@@ -190,7 +198,7 @@ Run both on `task_app_db` and `task_app_test`. No dual-write, no lingering two-m
 
 Sized like the job-costing / review-request cadence — data+backend first, then UI slices, each independently shippable and test-covered.
 
-### Component 1 — Data + backend (migrations 021, then 022 after verify)
+### Component 1 — Data + backend (migrations 021, then 022 after verify) — ✅ DONE (July 5, 2026)
 - Migration 021 (additive + backfill) on both DBs.
 - Service layer: rename identifiers; repoint reads/writes; per-customer **Service CRUD** (`POST/PATCH/DELETE` on the customer), **Template CRUD** (business-global), "start from template" (copy) and "save as template" (snapshot).
 - `assignCycle` → `createServiceForCustomer` (builds a service + generates its 4 upcoming service calls). `generateUpcomingSelectionCycles` reads price/schedule from the service.

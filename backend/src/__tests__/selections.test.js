@@ -106,11 +106,11 @@ describe('POST /api/customers/:customerId/selection-cycle/:selectionCycleId/subm
     const bigTask = await createTestTask(businessId, bizToken, { name: 'Big Task', timeAllotmentMinutes: 200 });
 
     // Re-assign the cycle to include bigTask
-    // Directly insert the task into the existing service cycle's task_assignments
-    const cycleRow = await knex('customer_cycle_assignments').where('customer_id', customerId).first();
-    await knex('task_assignments').insert({
+    // Directly insert the task into the customer's Service task menu
+    const cycleRow = await knex('customer_services').where('customer_id', customerId).first();
+    await knex('service_task_assignments').insert({
       task_id: bigTask.id,
-      service_cycle_id: cycleRow.service_cycle_id,
+      customer_service_id: cycleRow.id,
       created_at: knex.raw('CURRENT_TIMESTAMP'),
       updated_at: knex.raw('CURRENT_TIMESTAMP')
     });

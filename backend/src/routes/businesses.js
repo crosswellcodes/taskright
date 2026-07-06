@@ -142,8 +142,10 @@ router.delete('/:businessId/tasks/:taskId', requireBusiness, async (req, res) =>
       return res.status(404).json({ success: false, error: 'Task not found', code: 'TASK_NOT_FOUND' });
     }
 
-    const inUse = await knex('task_assignments').where('task_id', taskId).first();
-    if (inUse) {
+    // A task is "in use" if any template OR any customer Service references it.
+    const inTemplate = await knex('template_task_assignments').where('task_id', taskId).first();
+    const inService = await knex('service_task_assignments').where('task_id', taskId).first();
+    if (inTemplate || inService) {
       return res.status(409).json({ success: false, error: 'Task is assigned to a service cycle and cannot be deleted', code: 'TASK_IN_USE' });
     }
 
@@ -565,7 +567,7 @@ router.post('/:businessId/customers/:customerId/assign-cycle', requireBusiness, 
       assignment: {
         id: assignment.id,
         customerId: assignment.customer_id,
-        serviceCycleId: assignment.service_cycle_id,
+        serviceCycleId: assignment.template_id,   // template it was seeded from
         totalHours: assignment.total_hours,
         createdAt: assignment.created_at
       },
@@ -581,6 +583,98 @@ router.post('/:businessId/customers/:customerId/assign-cycle', requireBusiness, 
     }
     console.error('Assign cycle error:', error);
     return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
+  }
+});
+
+// ─── PER-CUSTOMER SERVICES (Service Model C1) ────────────────────────────────
+// Build/edit/delete a customer's own Service directly on their profile. The
+// definition lives on the Service; a template (if any) only seeds initial values.
+
+function serviceModelError(res, err, label) {
+  if (err && err.statusCode) {
+    return res.status(err.statusCode).json({ success: false, error: err.message, code: err.code });
+  }
+  console.error(`${label} error:`, err);
+  return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
+}
+
+async function assertCustomerOwned(businessId, customerId) {
+  const customer = await knex('customers').where('id', customerId).where('business_id', businessId).first();
+  if (!customer) {
+    throw Object.assign(new Error('Customer not found'), { code: 'CUSTOMER_NOT_FOUND', statusCode: 404 });
+  }
+  return customer;
+}
+
+/**
+ * POST /api/businesses/:businessId/customers/:customerId/services
+ * Create a Service on the customer. Body: { name, frequency, daysBeforeServiceDeadline?,
+ * daysBeforeAutoRepeat?, taskIds?, totalHours, startDate?, dayOfWeek?, pricePerVisit?, templateId? }
+ */
+router.post('/:businessId/customers/:customerId/services', requireBusiness, async (req, res) => {
+  try {
+    const businessId = parseInt(req.params.businessId);
+    const customerId = parseInt(req.params.customerId);
+    await assertCustomerOwned(businessId, customerId);
+
+    // Scheduling validation mirrors assign-cycle (day-of-week vs date-based).
+    const business = await knex('businesses').where('id', businessId).first();
+    const { startDate, dayOfWeek } = req.body;
+    if (business && business.scheduling_format === 'day_of_week') {
+      if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
+        return res.status(400).json({ success: false, error: 'dayOfWeek (0–6) is required for day-of-week scheduling', code: 'VALIDATION_ERROR' });
+      }
+    } else if (!startDate || !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+      return res.status(400).json({ success: false, error: 'startDate is required and must be in YYYY-MM-DD format', code: 'VALIDATION_ERROR' });
+    }
+
+    const service = await businessService.createCustomerServiceForBusiness(businessId, customerId, req.body);
+    return res.status(201).json({ success: true, service });
+  } catch (err) {
+    return serviceModelError(res, err, 'Create customer service');
+  }
+});
+
+/**
+ * GET /api/businesses/:businessId/customers/:customerId/services/:serviceId
+ * Full Service definition (for the builder / edit view).
+ */
+router.get('/:businessId/customers/:customerId/services/:serviceId', requireBusiness, async (req, res) => {
+  try {
+    const businessId = parseInt(req.params.businessId);
+    const service = await businessService.getCustomerServiceDetail(businessId, parseInt(req.params.serviceId));
+    return res.status(200).json({ success: true, service });
+  } catch (err) {
+    return serviceModelError(res, err, 'Get customer service');
+  }
+});
+
+/**
+ * PATCH /api/businesses/:businessId/customers/:customerId/services/:serviceId
+ * Definition-only edit. Does not regenerate Service Calls (deadline change
+ * recomputes open calls' submission_deadline).
+ */
+router.patch('/:businessId/customers/:customerId/services/:serviceId', requireBusiness, async (req, res) => {
+  try {
+    const businessId = parseInt(req.params.businessId);
+    const service = await businessService.updateCustomerService(businessId, parseInt(req.params.serviceId), req.body);
+    return res.status(200).json({ success: true, service });
+  } catch (err) {
+    return serviceModelError(res, err, 'Update customer service');
+  }
+});
+
+/**
+ * DELETE /api/businesses/:businessId/customers/:customerId/services/:serviceId
+ * Refuses (409 HAS_HISTORY) if any Service Call is completed.
+ */
+router.delete('/:businessId/customers/:customerId/services/:serviceId', requireBusiness, async (req, res) => {
+  try {
+    const businessId = parseInt(req.params.businessId);
+    await businessService.deleteCustomerService(businessId, parseInt(req.params.serviceId));
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    return serviceModelError(res, err, 'Delete customer service');
   }
 });
 

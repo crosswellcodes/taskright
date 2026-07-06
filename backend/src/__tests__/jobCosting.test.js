@@ -22,7 +22,7 @@ beforeEach(async () => {
   customerId = customer.id;
 
   await assignCycleToCustomer(businessId, customerId, cycle.id, bizToken, 3);
-  const cca = await knex('customer_cycle_assignments').where('customer_id', customerId).first();
+  const cca = await knex('customer_services').where('customer_id', customerId).first();
   assignmentId = cca.id;
   const sc = await knex('selection_cycles').where('customer_id', customerId).orderBy('service_date', 'asc').first();
   selectionCycleId = sc.id;
@@ -102,7 +102,7 @@ describe('PATCH /customers/:customerId/assignments/:assignmentId', () => {
     const res = await auth(request(app).patch(`/api/businesses/${businessId}/customers/${customerId}/assignments/${assignmentId}`))
       .send({ pricePerVisit: 175 });
     expect(res.status).toBe(200);
-    const row = await knex('customer_cycle_assignments').where('id', assignmentId).first();
+    const row = await knex('customer_services').where('id', assignmentId).first();
     expect(Number(row.price_per_visit)).toBe(175);
   });
 
@@ -114,19 +114,19 @@ describe('PATCH /customers/:customerId/assignments/:assignmentId', () => {
       .set('Authorization', `Bearer ${bizToken}`)
       .send({ serviceCycleId: cycle2.id, totalHours: 2, startDate });
 
-    const cca2 = await knex('customer_cycle_assignments')
-      .where('customer_id', customerId).where('service_cycle_id', cycle2.id).first();
+    const cca2 = await knex('customer_services')
+      .where('customer_id', customerId).where('template_id', cycle2.id).first();
     await auth(request(app).patch(`/api/businesses/${businessId}/customers/${customerId}/assignments/${cca2.id}`))
       .send({ pricePerVisit: 88 });
 
     // Clear the cycles that were generated before the price existed, then
     // re-run generation — now the recurring price should copy onto each cycle.
-    await knex('selection_cycles').where('customer_id', customerId).where('service_cycle_id', cycle2.id).delete();
-    const svc = await knex('service_cycles').where('id', cycle2.id).first();
+    await knex('selection_cycles').where('customer_id', customerId).where('customer_service_id', cca2.id).delete();
+    const svc = await knex('customer_services').where('id', cca2.id).first();
     await businessService.generateUpcomingSelectionCycles(customerId, svc, startDate, null);
 
     const cycles = await knex('selection_cycles')
-      .where('customer_id', customerId).where('service_cycle_id', cycle2.id);
+      .where('customer_id', customerId).where('customer_service_id', cca2.id);
     expect(cycles.length).toBeGreaterThan(0);
     for (const c of cycles) {
       expect(Number(c.price)).toBe(88);

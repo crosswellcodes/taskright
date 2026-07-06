@@ -1,5 +1,5 @@
 # TaskRight — Handoff Document
-**Last updated: July 5, 2026 (Session 13 — Review Requests ALL 3 COMPONENTS DONE → feature COMPLETE: backend/data (109/109 tests), `/review/[token]` web page (build passes), CustomerDetailScreen opt-out toggle. Next priority: see Pending Work.)**
+**Last updated: July 5, 2026 (Session 14 — Service Model Component 1 DONE: per-customer Services. Migrations 021+022 (rename+backfill+enforce) on both DBs; service layer repointed; per-customer Service CRUD + template library; 119/119 backend tests. Next: Component 2 UI — see Pending Work.)**
 
 > Start every new session by reading this file + `shared/API_REFERENCE.md`. Do NOT read SPEC.md unless you need deep schema details — it is 75KB and slow to load.
 
@@ -59,20 +59,24 @@ cd TaskRight-Website && npm run dev  # localhost:3001
 - **Test suite**: 94/94 passing (`npm test`, uses `task_app_test` DB)
 
 ### Database Schema (PostgreSQL 18, Knex)
-Migration files: `backend/migrations/001_initial_schema.js` through `016_a2p_registration.js` (all run on both `task_app_db` and `task_app_test`).
+Migration files: `backend/migrations/001_initial_schema.js` through `022_service_model_cleanup.js` (all run on both `task_app_db` and `task_app_test`).
 - `013_message_media.js` — `media_urls` JSONB on messages
 - `014_business_join_code.js` — `join_code` on businesses (Session 5)
 - `015_sms_keywords.js` — `pending_sms_action` on customers; `customer_note`, `selection_token`, `selection_token_expires_at` on selection_cycles (Session 5)
+- `017–019` — job costing (cost_categories, job_costs, geofence_events, price columns, integrity)
+- `020_review_tokens.js` — review_tokens + feedbacks.source/rating + customers.review_requests_opted_out
+- `021_per_customer_services.js` + `022_service_model_cleanup.js` — **Service Model C1**: rename service_cycles→service_templates, customer_cycle_assignments→customer_services (absorbs definition), task_assignments→template_task_assignments, new service_task_assignments, selection_cycles.service_cycle_id→customer_service_id
 
 Key tables:
 - `businesses` — id, name, phone_number, scheduling_format ('date_based' | 'day_of_week'), twilio_subaccount_sid, twilio_phone_number, twilio_messaging_service_sid, twilio_provisioning_status ('pending'|'active'|'failed'|'dev_mode'), join_code (varchar 12, unique — for customer invite links `/join/[code]`), entity_type ('sole_prop'|'llc_corp'), contact_first_name, contact_last_name, contact_email, business_street, business_city, business_state, business_zip, a2p_brand_sid, a2p_campaign_sid, a2p_registration_status ('pending'|'approved'|'failed')
 - `customers` — id, business_id, name, phone_number, address, notes, pending_sms_action (nullable varchar — 'note_pending' when waiting for N follow-up)
-- `service_cycles` — id, business_id, name, frequency, total_hours
-- `customer_cycle_assignments` — id, customer_id, service_cycle_id, total_hours, start_date, day_of_week (nullable)
-- `selection_cycles` — id, service_cycle_id, customer_id, service_date, submission_deadline, status ('open'|'completed'), customer_note (text nullable — set via SMS 'N' keyword, visible to team member in job detail), selection_token (varchar 36 unique nullable — 7-day expiry, for SMS 'T' keyword link), selection_token_expires_at (timestamptz nullable)
+- `service_templates` *(was `service_cycles`, renamed in 021)* — id, business_id, name, frequency, days_before_service_deadline, days_before_auto_repeat. Business-global reusable **template library** (Service Model C1); a template only seeds a customer Service, decoupled after.
+- `customer_services` *(was `customer_cycle_assignments`, renamed in 021)* — id, customer_id, **template_id (nullable, provenance only, FK SET NULL)**, **name, frequency, days_before_service_deadline, days_before_auto_repeat** (absorbed definition), total_hours, price_per_visit, start_date, day_of_week (nullable). The **per-customer Service** — one row per service a customer receives; a customer may have several (old unique(customer,cycle) dropped).
+- `selection_cycles` — id, **customer_service_id** *(was `service_cycle_id`; 021 backfilled, 022 made NOT NULL + dropped the legacy col)*, customer_id, service_date, submission_deadline, status ('open'|'completed'), price, customer_note, selection_token, selection_token_expires_at
 - `selections` — id, selection_cycle_id, customer_id, selected_tasks (JSONB), status ('draft'|'submitted')
 - `tasks` — id, business_id, name, description, time_allotment_minutes
-- `task_assignments` — links tasks to service cycles
+- `template_task_assignments` *(was `task_assignments`, renamed in 021; col `service_cycle_id`→`template_id`)* — template task menu
+- `service_task_assignments` *(new in 021)* — per-customer-Service task menu (customer_service_id, task_id)
 - `service_completions` — id, selection_cycle_id, customer_id, completed_at, notes
 - `messages` — id, business_id, customer_id (nullable), direction ('inbound'|'outbound'), body, twilio_message_sid, to_phone, from_phone, media_urls (JSONB nullable), created_at. Indexed on (business_id, customer_id, created_at). `media_urls` is an array of local paths like `["/uploads/messages/SMxxx_0.jpeg"]` — served statically by Express.
 - `team_members` — id, business_id, name, phone_number, invite_code (server-generated)
@@ -340,11 +344,11 @@ React Navigation requires all params to be plain serializable data. Functions ca
     - **Backend touched (additive, same pattern as Components 1/2 of job costing):** `GET /businesses/:id/customers/:customerId` now returns `reviewRequestsOptedOut` (the whitelisted detail payload previously omitted it). `+1` test; **109/109 backend tests passing**.
     - Verified via backend tests; the RN sim loop is the user's (memory rule — no `preview_start` for React Native). Suggested manual sim check: toggle on → fire a geofence departure for that customer → confirm no review token/SMS; toggle off → departure creates the token.
 
-### Service Model Overhaul (Per-Customer Services) — DESIGN APPROVED, unbuilt
-- **Spec:** `shared/specs/SERVICE_MODEL.md` (design session July 5, 2026). Reworks build-then-assign into per-customer services created on the customer profile, seeded from an optional template library and decoupled after creation.
-- **Resolved:** `service_cycles`→`service_templates` (global library); `customer_cycle_assignments`→`customer_services` (absorbs name/frequency/deadlines + own task menu); repoint `selection_cycles.service_cycle_id`→`customer_service_id` and `task_assignments`. Job costing + review requests preserved — they anchor on `selection_cycle_id`, not `service_cycle_id`.
-- **Reserved migrations: 021** (additive + backfill; shared cycles fan out per customer) **+ 022** (enforce NOT NULL + drop legacy columns, after C1 verified).
-- **NEXT STEP → Component 1 (data + backend):** migration 021, service-layer rename/repoint, per-customer Service CRUD + Template CRUD, keep test suites green. Then C2 (customer-profile Add Service builder — repurpose AssignCycleScreen), C3 (Cycles tab → Templates browser). See spec §6.
+### Service Model Overhaul (Per-Customer Services) — COMPONENT 1 DONE (July 5, 2026)
+- **Spec:** `shared/specs/SERVICE_MODEL.md`. Reworks build-then-assign into per-customer Services created on the customer profile, seeded from an optional template library and decoupled after creation.
+- **C1 (data + backend) SHIPPED:** migrations **021** (rename+backfill; shared cycles fanned out — verified) + **022** (enforce NOT NULL + drop legacy col) run on both DBs. `service_cycles`→`service_templates`, `customer_cycle_assignments`→`customer_services` (absorbed definition), `task_assignments`→`template_task_assignments`, new `service_task_assignments`, `selection_cycles.service_cycle_id`→`customer_service_id`. Per-customer Service CRUD (`POST|GET|PATCH|DELETE .../customers/:cid/services`) + template library preserved on `/service-cycles`. **119/119 backend tests** (`serviceModel.test.js` +10). Job costing + review requests intact (anchor on `selection_cycle_id`). See spec build notes + API_REFERENCE "Customer Services".
+- **NEXT STEP → Component 2 (customer-profile UI):** repurpose `AssignCycleScreen` into an "Add / Edit Service" builder on `CustomerDetailScreen` against the new `/services` endpoints (name/frequency/deadlines/tasks/hours/price/start-or-day, optional "start from template"). Then **C3** (Cycles tab → Templates browser + "save as template"). RN sim verification is the user's (no `preview_start` for React Native). Endpoints are final.
+- **Deferred to C3/C4:** rename the `createServiceCycle`/etc. *function symbols* (kept for the still-live `/service-cycles` callers); drop the legacy `/assign-cycle` path once the mobile builder replaces it.
 
 ### Open Questions / Future Decisions
 - Twilio webhook signature validation — subaccount webhooks are signed with the subaccount's auth token, which we don't store. Current approach: no validation (dev acceptable). Production options: store auth token at provisioning time, or use Twilio IP allowlisting.
