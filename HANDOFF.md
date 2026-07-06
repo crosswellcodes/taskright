@@ -340,6 +340,12 @@ React Navigation requires all params to be plain serializable data. Functions ca
     - **Backend touched (additive, same pattern as Components 1/2 of job costing):** `GET /businesses/:id/customers/:customerId` now returns `reviewRequestsOptedOut` (the whitelisted detail payload previously omitted it). `+1` test; **109/109 backend tests passing**.
     - Verified via backend tests; the RN sim loop is the user's (memory rule — no `preview_start` for React Native). Suggested manual sim check: toggle on → fire a geofence departure for that customer → confirm no review token/SMS; toggle off → departure creates the token.
 
+### Service Model Overhaul (Per-Customer Services) — DESIGN APPROVED, unbuilt
+- **Spec:** `shared/specs/SERVICE_MODEL.md` (design session July 5, 2026). Reworks build-then-assign into per-customer services created on the customer profile, seeded from an optional template library and decoupled after creation.
+- **Resolved:** `service_cycles`→`service_templates` (global library); `customer_cycle_assignments`→`customer_services` (absorbs name/frequency/deadlines + own task menu); repoint `selection_cycles.service_cycle_id`→`customer_service_id` and `task_assignments`. Job costing + review requests preserved — they anchor on `selection_cycle_id`, not `service_cycle_id`.
+- **Reserved migrations: 021** (additive + backfill; shared cycles fan out per customer) **+ 022** (enforce NOT NULL + drop legacy columns, after C1 verified).
+- **NEXT STEP → Component 1 (data + backend):** migration 021, service-layer rename/repoint, per-customer Service CRUD + Template CRUD, keep test suites green. Then C2 (customer-profile Add Service builder — repurpose AssignCycleScreen), C3 (Cycles tab → Templates browser). See spec §6.
+
 ### Open Questions / Future Decisions
 - Twilio webhook signature validation — subaccount webhooks are signed with the subaccount's auth token, which we don't store. Current approach: no validation (dev acceptable). Production options: store auth token at provisioning time, or use Twilio IP allowlisting.
 - Pagination on list endpoints (customers, history) — deferred to Phase 2. Messages endpoint uses cursor pagination already.
