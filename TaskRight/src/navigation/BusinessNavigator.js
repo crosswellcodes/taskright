@@ -38,7 +38,7 @@ function CustomersStack() {
       <Stack.Screen name="CustomerList" component={CustomerListScreen} options={{ title: 'Customers' }} />
       <Stack.Screen name="CustomerDetail" component={CustomerDetailScreen} options={{ title: 'Customer' }} />
       <Stack.Screen name="AddCustomer" component={AddCustomerScreen} options={{ title: 'Add Customer' }} />
-      <Stack.Screen name="AssignCycle" component={AssignCycleScreen} options={{ title: 'Assign Service Cycle' }} />
+      <Stack.Screen name="AssignCycle" component={AssignCycleScreen} options={{ title: 'Service' }} />
       <Stack.Screen name="ServiceDaySnapshot" component={ServiceDaySnapshotScreen} options={{ title: 'Day Overview' }} />
       <Stack.Screen name="CustomerPreferences" component={CustomerPreferencesScreen} options={{ title: 'Customer Details' }} />
       <Stack.Screen name="CustomerFeedbackDetail" component={CustomerFeedbackDetailScreen} options={{ title: 'Customer Feedback' }} />

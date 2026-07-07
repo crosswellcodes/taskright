@@ -45,6 +45,21 @@ export const updateCustomerDetails = (businessId, customerId, data) =>
 export const assignCycle = (businessId, customerId, data) =>
   post(`/api/businesses/${businessId}/customers/${customerId}/assign-cycle`, data);
 
+// Per-customer Services (Service Model C2). A Service is the customer's own
+// service definition (name/frequency/deadlines/tasks/hours/price/schedule),
+// built on the profile — optionally seeded from a template.
+export const createCustomerService = (businessId, customerId, data) =>
+  post(`/api/businesses/${businessId}/customers/${customerId}/services`, data);
+
+export const getCustomerService = (businessId, customerId, serviceId) =>
+  get(`/api/businesses/${businessId}/customers/${customerId}/services/${serviceId}`);
+
+export const updateCustomerService = (businessId, customerId, serviceId, data) =>
+  patch(`/api/businesses/${businessId}/customers/${customerId}/services/${serviceId}`, data);
+
+export const deleteCustomerService = (businessId, customerId, serviceId) =>
+  del(`/api/businesses/${businessId}/customers/${customerId}/services/${serviceId}`);
+
 // Forecast
 export const getForecast = (businessId) =>
   get(`/api/businesses/${businessId}/selections`);

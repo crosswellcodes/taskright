@@ -2,13 +2,13 @@ import React, { useState, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Alert, RefreshControl, Linking, Modal, TextInput, Switch
+  ActivityIndicator, Alert, RefreshControl, Linking, Switch
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import {
   getCustomerDetails, markServiceComplete, getLatestCustomerFeedback,
-  getCustomerProfitability, setAssignmentPrice, updateCustomerDetails,
+  getCustomerProfitability, updateCustomerDetails,
 } from '../../api/businessApi';
 import { formatPhone } from '../../utils/phoneUtils';
 
@@ -36,11 +36,6 @@ export default function CustomerDetailScreen({ route, navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [completing, setCompleting] = useState(false);
-
-  // Recurring price editor: { assignmentId, cycleName, current } | null
-  const [editingPrice, setEditingPrice] = useState(null);
-  const [priceInput, setPriceInput] = useState('');
-  const [savingPrice, setSavingPrice] = useState(false);
 
   const [savingOptOut, setSavingOptOut] = useState(false);
 
@@ -98,41 +93,15 @@ export default function CustomerDetailScreen({ route, navigation }) {
     );
   };
 
-  function openPriceEditor(cycle) {
-    setEditingPrice({
-      assignmentId: cycle.assignmentId,
-      cycleName: cycle.serviceCycleName || `Cycle #${cycle.serviceCycleId}`,
+  // Open the Service builder to edit an existing Service (name/frequency/tasks/
+  // hours/deadline/price all editable there — the price field feeds D2).
+  function openServiceEditor(service) {
+    navigation.navigate('AssignCycle', {
+      customerId,
+      customerName: customer.name,
+      serviceId: service.id,
+      serviceName: service.serviceCycleName,
     });
-    setPriceInput(
-      cycle.pricePerVisit !== null && cycle.pricePerVisit !== undefined
-        ? String(cycle.pricePerVisit)
-        : ''
-    );
-  }
-
-  async function handleSavePrice() {
-    if (!editingPrice) return;
-    const trimmed = priceInput.trim();
-    let value;
-    if (trimmed === '') {
-      value = null; // clears the recurring price
-    } else {
-      value = Number(trimmed);
-      if (Number.isNaN(value) || value < 0) {
-        Alert.alert('Invalid price', 'Enter a non-negative dollar amount, or leave it blank to clear the price.');
-        return;
-      }
-    }
-    setSavingPrice(true);
-    try {
-      await setAssignmentPrice(user.businessId, customerId, editingPrice.assignmentId, value);
-      await fetchCustomer(); // refetch so the row reflects the new recurring price
-      setEditingPrice(null);
-    } catch (err) {
-      Alert.alert('Error', err.message || 'Failed to update price');
-    } finally {
-      setSavingPrice(false);
-    }
   }
 
   // Optimistic toggle: flip the flag immediately, PATCH, roll back on failure.
@@ -268,11 +237,11 @@ export default function CustomerDetailScreen({ route, navigation }) {
         )}
       </View>
 
-      {/* Assigned Cycles */}
+      {/* Services */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Assigned Cycles</Text>
+        <Text style={styles.sectionTitle}>Services</Text>
         {customer.assignedCycles?.length === 0 ? (
-          <Text style={styles.emptyText}>No cycles assigned.</Text>
+          <Text style={styles.emptyText}>No services yet.</Text>
         ) : (
           customer.assignedCycles?.map(c => {
             const hasPrice = c.pricePerVisit !== null && c.pricePerVisit !== undefined;
@@ -281,12 +250,13 @@ export default function CustomerDetailScreen({ route, navigation }) {
                 key={c.id}
                 style={styles.row}
                 activeOpacity={0.6}
-                onPress={() => openPriceEditor(c)}
+                onPress={() => openServiceEditor(c)}
               >
                 <View style={styles.cycleInfo}>
-                  <Text style={styles.rowLabel}>{c.serviceCycleName || `Cycle #${c.serviceCycleId}`}</Text>
+                  <Text style={styles.rowLabel}>{c.serviceCycleName || `Service #${c.id}`}</Text>
                   <Text style={[styles.cyclePrice, !hasPrice && styles.cyclePriceUnset]}>
-                    {hasPrice ? `${money(c.pricePerVisit)} / visit` : 'Set recurring price'}
+                    {hasPrice ? `${money(c.pricePerVisit)} / visit` : 'No recurring price'}
+                    {c.frequency ? `  ·  ${c.frequency}` : ''}
                   </Text>
                 </View>
                 <View style={styles.rowRight}>
@@ -301,7 +271,7 @@ export default function CustomerDetailScreen({ route, navigation }) {
           style={styles.assignBtn}
           onPress={() => navigation.navigate('AssignCycle', { customerId, customerName: customer.name })}
         >
-          <Text style={styles.assignBtnText}>+ Assign Cycle</Text>
+          <Text style={styles.assignBtnText}>+ Add Service</Text>
         </TouchableOpacity>
       </View>
 
@@ -426,48 +396,6 @@ export default function CustomerDetailScreen({ route, navigation }) {
         }
       </TouchableOpacity>
     </ScrollView>
-
-    {/* Recurring Price Editor Modal */}
-    <Modal visible={!!editingPrice} transparent animationType="slide">
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalCard}>
-          <Text style={styles.modalTitle}>Recurring Price</Text>
-          <Text style={styles.modalSubtitle}>
-            Standard price per visit for {editingPrice?.cycleName}. New service calls copy
-            this automatically. Leave blank to clear it.
-          </Text>
-          <View style={styles.amountInputRow}>
-            <Text style={styles.amountPrefix}>$</Text>
-            <TextInput
-              style={styles.amountInput}
-              value={priceInput}
-              onChangeText={setPriceInput}
-              keyboardType="decimal-pad"
-              placeholder="0.00"
-              placeholderTextColor="#9ca3af"
-              autoFocus
-              editable={!savingPrice}
-            />
-          </View>
-          <TouchableOpacity
-            style={[styles.modalSave, savingPrice && styles.modalSaveDisabled]}
-            onPress={handleSavePrice}
-            disabled={savingPrice}
-          >
-            {savingPrice
-              ? <ActivityIndicator color="#fff" size="small" />
-              : <Text style={styles.modalSaveText}>Save</Text>}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.modalCancel}
-            onPress={() => setEditingPrice(null)}
-            disabled={savingPrice}
-          >
-            <Text style={styles.modalCancelText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
     </>
   );
 }

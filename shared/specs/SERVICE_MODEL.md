@@ -1,6 +1,6 @@
 # Service Model — Feature Spec (Per-Customer Services)
 
-**Status:** 🟢 COMPONENT 1 BUILT (July 5, 2026) — data + backend done. Migrations **021** (rename+backfill) and **022** (enforce+cleanup) run on both DBs; service layer repointed; per-customer Service CRUD + template library live; **119/119 backend tests** (10 new in `serviceModel.test.js`). Component 0 (design) approved earlier same session; all six open questions resolved (see **Resolved Decisions**). **Next: Component 2** (customer-profile Add/Edit Service UI).
+**Status:** 🟢 COMPONENTS 1 + 2 BUILT — data/backend (C1, July 5) + customer-profile Add/Edit Service UI (C2, July 6). Migrations 021/022 on both DBs; per-customer Service CRUD + template library; builder on `CustomerDetailScreen`. **119/119 backend tests.** All six design questions resolved (see **Resolved Decisions**). **Next: Component 3** (Cycles tab → Templates browser + "save as template").
 
 > **C1 build notes (what actually shipped):**
 > - Tables renamed: `service_cycles`→`service_templates`, `customer_cycle_assignments`→`customer_services` (absorbed `name`/`frequency`/`days_before_service_deadline`/`days_before_auto_repeat` + nullable `template_id` provenance FK, `ON DELETE SET NULL`), `task_assignments`→`template_task_assignments` (col `service_cycle_id`→`template_id`). New `service_task_assignments` (per-service menu). `selection_cycles.service_cycle_id`→`customer_service_id` (021 nullable+backfilled; 022 `NOT NULL` + drops legacy col). Old `UNIQUE(customer_id, service_cycle_id)` dropped → a customer may hold multiple Services (incl. several from one template). Live fan-out verified: template 6's 3 customers → 3 independent Services each with their own 4-task menu.
@@ -206,9 +206,14 @@ Sized like the job-costing / review-request cadence — data+backend first, then
 - Full test coverage; keep the 96/109 suites green. Migration 022 lands once C1 is proven.
 - **No UI.**
 
-### Component 2 — Customer-profile creation UI
+### Component 2 — Customer-profile creation UI — ✅ DONE (July 6, 2026)
 - Repurposed builder on `CustomerDetailScreen` ("Add Service" / edit). Task picker, frequency, deadlines, hours, price, start-or-day, optional "start from template".
 - Client API calls; RN sim verification (user-run, per memory rule).
+- **Build notes:**
+  - `AssignCycleScreen.js` fully repurposed into the **Service builder** (create + edit via `serviceId` route param; title set dynamically to "Add Service" / "Edit Service"). Fields: name, frequency chips, per-task multi-select (from `getTasks`), hours, selection-deadline days, optional recurring price, and schedule (date-based calendar or day-of-week picker — **create mode only**, since C1 edits are definition-only). "Start from a template" modal seeds name/frequency/tasks/deadline from `getServiceCycles`. Edit mode adds a **Delete Service** action (handles `409 HAS_HISTORY`). Reuses the existing `ServiceDaySnapshot` confirmed-date round-trip.
+  - `CustomerDetailScreen.js`: "Assigned Cycles" → **"Services"**; rows now tap into the builder (edit) and show `price/visit · frequency`; "+ Assign Cycle" → **"+ Add Service"**. The standalone recurring-price modal was **folded into the builder's price field** (same D2 path via `updateCustomerService` → `price_per_visit`); removed `setAssignmentPrice` usage + the price-only modal/state from this screen (endpoint still exists).
+  - `businessApi.js`: added `createCustomerService`, `getCustomerService`, `updateCustomerService`, `deleteCustomerService`. Navigator `AssignCycle` static title → "Service" (component overrides dynamically).
+  - Verified via Babel parse of all changed files; interactive sim check is the user's (no `preview_start` for RN).
 
 ### Component 3 — Templates library UI
 - Repurpose Cycles tab → **Templates** browser (create/edit reusable templates). "Save as template" from a service; "Start from template" in the builder.
