@@ -80,7 +80,7 @@ export default function ServiceCyclesScreen({ navigation }) {
   };
 
   const handleSave = async () => {
-    if (!cycleName.trim()) return Alert.alert('Error', 'Cycle name is required');
+    if (!cycleName.trim()) return Alert.alert('Error', 'Template name is required');
     setSaving(true);
     try {
       const payload = {
@@ -98,14 +98,14 @@ export default function ServiceCyclesScreen({ navigation }) {
       setModalVisible(false);
       fetchData();
     } catch (err) {
-      Alert.alert('Error', err.message || 'Failed to save cycle');
+      Alert.alert('Error', err.message || 'Failed to save template');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = (cycle) => {
-    Alert.alert('Delete Cycle', `Delete "${cycle.name}"?`, [
+    Alert.alert('Delete Template', `Delete "${cycle.name}"? Existing customer services are unaffected.`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete', style: 'destructive',
@@ -114,7 +114,7 @@ export default function ServiceCyclesScreen({ navigation }) {
             await deleteServiceCycle(user.businessId, cycle.id);
             fetchData();
           } catch (err) {
-            Alert.alert('Error', err.message || 'Failed to delete cycle');
+            Alert.alert('Error', err.message || 'Failed to delete template');
           }
         }
       }
@@ -137,7 +137,14 @@ export default function ServiceCyclesScreen({ navigation }) {
         keyExtractor={item => String(item.id)}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData(); }} />}
         contentContainerStyle={{ padding: 16, paddingBottom: 90 + insets.bottom }}
-        ListEmptyComponent={<View style={styles.empty}><Text style={styles.emptyText}>No service cycles yet.</Text></View>}
+        ListHeaderComponent={
+          <Text style={styles.introText}>
+            Templates are reusable service blueprints. Start a customer's service from one to
+            save time — the customer's service is a separate copy afterward, so editing a
+            template never changes existing services.
+          </Text>
+        }
+        ListEmptyComponent={<View style={styles.empty}><Text style={styles.emptyText}>No templates yet.</Text></View>}
         renderItem={({ item }) => (
           <View style={styles.card}>
             <View style={styles.cardLeft}>
@@ -161,7 +168,7 @@ export default function ServiceCyclesScreen({ navigation }) {
 
       <View style={[styles.fab, { paddingBottom: insets.bottom + 12 }]}>
         <TouchableOpacity style={styles.fabBtn} onPress={openCreate}>
-          <Text style={styles.fabText}>+ New Cycle</Text>
+          <Text style={styles.fabText}>+ New Template</Text>
         </TouchableOpacity>
       </View>
 
@@ -171,7 +178,7 @@ export default function ServiceCyclesScreen({ navigation }) {
           contentContainerStyle={{ paddingBottom: 40 }}
           ListHeaderComponent={
             <>
-              <Text style={styles.modalTitle}>{editCycle ? 'Edit Cycle' : 'New Service Cycle'}</Text>
+              <Text style={styles.modalTitle}>{editCycle ? 'Edit Template' : 'New Template'}</Text>
 
               <Text style={styles.label}>Name</Text>
               <TextInput style={styles.input} value={cycleName} onChangeText={setCycleName} placeholder="e.g. Weekly Cleaning" />
@@ -217,7 +224,7 @@ export default function ServiceCyclesScreen({ navigation }) {
           ListFooterComponent={
             <>
               <TouchableOpacity style={[styles.saveBtn, saving && styles.saveBtnDisabled]} onPress={handleSave} disabled={saving}>
-                {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>{editCycle ? 'Save Changes' : 'Create Cycle'}</Text>}
+                {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>{editCycle ? 'Save Changes' : 'Create Template'}</Text>}
               </TouchableOpacity>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
                 <Text style={styles.cancelBtnText}>Cancel</Text>
@@ -237,6 +244,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   empty: { paddingTop: 60, alignItems: 'center' },
   emptyText: { fontSize: 15, color: '#888' },
+  introText: { fontSize: 13, color: '#6b7280', lineHeight: 19, marginBottom: 14 },
   card: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 10, flexDirection: 'row', alignItems: 'center' },
   cardLeft: { flex: 1 },
   cycleName: { fontSize: 16, fontWeight: '600', color: '#1a1a1a', marginBottom: 2 },

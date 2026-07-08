@@ -1,6 +1,6 @@
 # Service Model — Feature Spec (Per-Customer Services)
 
-**Status:** 🟢 COMPONENTS 1 + 2 BUILT — data/backend (C1, July 5) + customer-profile Add/Edit Service UI (C2, July 6). Migrations 021/022 on both DBs; per-customer Service CRUD + template library; builder on `CustomerDetailScreen`. **119/119 backend tests.** All six design questions resolved (see **Resolved Decisions**). **Next: Component 3** (Cycles tab → Templates browser + "save as template").
+**Status:** ✅ COMPONENTS 1–3 BUILT → FEATURE COMPLETE (July 5–6, 2026). C1 data/backend + C2 customer-profile builder + C3 Templates browser & "save as template". Migrations 021/022 on both DBs; per-customer Service CRUD + template library; **119/119 backend tests.** All six design questions resolved (see **Resolved Decisions**). Optional **C4** cleanup remains (rename template-CRUD function symbols; drop legacy `/assign-cycle`).
 
 > **C1 build notes (what actually shipped):**
 > - Tables renamed: `service_cycles`→`service_templates`, `customer_cycle_assignments`→`customer_services` (absorbed `name`/`frequency`/`days_before_service_deadline`/`days_before_auto_repeat` + nullable `template_id` provenance FK, `ON DELETE SET NULL`), `task_assignments`→`template_task_assignments` (col `service_cycle_id`→`template_id`). New `service_task_assignments` (per-service menu). `selection_cycles.service_cycle_id`→`customer_service_id` (021 nullable+backfilled; 022 `NOT NULL` + drops legacy col). Old `UNIQUE(customer_id, service_cycle_id)` dropped → a customer may hold multiple Services (incl. several from one template). Live fan-out verified: template 6's 3 customers → 3 independent Services each with their own 4-task menu.
@@ -215,8 +215,13 @@ Sized like the job-costing / review-request cadence — data+backend first, then
   - `businessApi.js`: added `createCustomerService`, `getCustomerService`, `updateCustomerService`, `deleteCustomerService`. Navigator `AssignCycle` static title → "Service" (component overrides dynamically).
   - Verified via Babel parse of all changed files; interactive sim check is the user's (no `preview_start` for RN).
 
-### Component 3 — Templates library UI
+### Component 3 — Templates library UI — ✅ DONE (July 6, 2026)
 - Repurpose Cycles tab → **Templates** browser (create/edit reusable templates). "Save as template" from a service; "Start from template" in the builder.
+- **Build notes:**
+  - `ServiceCyclesScreen.js` relabeled into the **Templates** browser (intro copy explaining templates are decoupled blueprints; empty state, FAB "+ New Template", modal "New/Edit Template", "Create Template", delete alert notes "Existing customer services are unaffected"). Still the same `/service-cycles` CRUD underneath. Bottom-tab label `Cycles`→**Templates** (route name kept `Cycles`).
+  - `AssignCycleScreen.js`: edit mode gains **"Save as Template"** — snapshots the Service's definition (name/frequency/deadlines/tasks; **definition-only**, no hours/price per §8) into the library via the existing `createServiceCycle` endpoint. Carries `daysBeforeAutoRepeat` through from load. No new backend.
+  - "Start from template" (builder template picker) already shipped in C2.
+  - Babel-parse clean; interactive sim check is the user's.
 
 ### Component 4 (optional) — cleanup
 - Migration 022 destructive cleanup (if deferred), remove dead code/paths, drop legacy vocabulary from internals.
@@ -239,7 +244,7 @@ Sized like the job-costing / review-request cadence — data+backend first, then
 ## 8. Open Questions / Deferred
 
 - **Editing a Service that already has generated Service Calls** — when frequency/schedule changes on an existing service, do we regenerate future (open) service calls, or only affect the next generation? Completed calls must never move (they carry job_costs/reviews). Decide at C1.
-- **"Save as template" scope** — snapshot the task menu + deadlines only, or also default hours/price? Leaning definition-only (no customer-specific hours/price in a shared template). Confirm at C3.
+- **"Save as template" scope** — ✅ RESOLVED (C3): **definition-only** (name/frequency/deadlines/tasks). Per-customer hours/price are never copied into a shared template.
 - **Multiple services per customer** — the model supports N services per customer (N cca rows already allowed). Confirm the builder/UI treats the customer's service list as a first-class list (it should).
 - **Template deletion with live services** — templates are decoupled, so deleting a template must not cascade to `customer_services`. Enforce `template_id ON DELETE SET NULL` at 021.
 - **`002_scheduling_format` interplay** — `day_of_week` moves onto `customer_services` (already there via cca). Business-level `scheduling_format` still governs which picker the builder shows. No change needed; noted for C2.

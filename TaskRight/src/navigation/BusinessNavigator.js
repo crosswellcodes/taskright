@@ -69,7 +69,7 @@ export default function BusinessNavigator() {
       <Tab.Screen name="Dashboard" component={DashboardStack} options={{ title: 'Dashboard' }} />
       <Tab.Screen name="Customers" component={CustomersStack} options={{ title: 'Customers' }} />
       <Tab.Screen name="Tasks" component={TasksScreen} options={{ title: 'Tasks' }} />
-      <Tab.Screen name="Cycles" component={ServiceCyclesScreen} options={{ title: 'Service Cycles' }} />
+      <Tab.Screen name="Cycles" component={ServiceCyclesScreen} options={{ title: 'Templates' }} />
       <Tab.Screen name="Team" component={TeamStack} options={{ title: 'Team' }} />
     </Tab.Navigator>
   );

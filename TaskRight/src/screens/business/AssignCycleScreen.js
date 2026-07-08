@@ -7,7 +7,7 @@ import { Calendar } from 'react-native-calendars';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import {
-  getServiceCycles, getTasks, getForecast,
+  getServiceCycles, getTasks, getForecast, createServiceCycle,
   createCustomerService, getCustomerService, updateCustomerService, deleteCustomerService,
 } from '../../api/businessApi';
 
@@ -59,6 +59,7 @@ export default function AssignCycleScreen({ route, navigation }) {
   const [selectedTaskIds, setSelectedTaskIds] = useState([]);
   const [totalHours, setTotalHours] = useState('');
   const [deadlineDays, setDeadlineDays] = useState('3');
+  const [autoRepeatDays, setAutoRepeatDays] = useState('1'); // carried through; feeds save-as-template
   const [pricePerVisit, setPricePerVisit] = useState('');
 
   // Schedule (create mode only)
@@ -103,6 +104,7 @@ export default function AssignCycleScreen({ route, navigation }) {
           setSelectedTaskIds(service.taskIds || []);
           setTotalHours(service.totalHours != null ? String(service.totalHours) : '');
           setDeadlineDays(service.daysBeforeServiceDeadline != null ? String(service.daysBeforeServiceDeadline) : '3');
+          setAutoRepeatDays(service.daysBeforeAutoRepeat != null ? String(service.daysBeforeAutoRepeat) : '1');
           setPricePerVisit(service.pricePerVisit != null ? String(service.pricePerVisit) : '');
         }
       } catch (err) {
@@ -194,6 +196,29 @@ export default function AssignCycleScreen({ route, navigation }) {
         },
       },
     ]);
+  };
+
+  // Snapshot this Service's definition into the reusable template library
+  // (definition-only: name/frequency/deadlines/tasks — no per-customer hours/price).
+  const handleSaveAsTemplate = async () => {
+    if (!name.trim()) return Alert.alert('Error', 'Enter a service name first');
+    const deadline = deadlineDays.trim() === '' ? 3 : (parseInt(deadlineDays, 10) || 3);
+    const repeat = autoRepeatDays.trim() === '' ? 1 : (parseInt(autoRepeatDays, 10) || 1);
+    setSubmitting(true);
+    try {
+      await createServiceCycle(user.businessId, {
+        name: name.trim(),
+        frequency,
+        daysBeforeServiceDeadline: deadline,
+        daysBeforeAutoRepeat: repeat,
+        taskIds: selectedTaskIds,
+      });
+      Alert.alert('Saved as Template', `"${name.trim()}" is now reusable from the Templates tab.`);
+    } catch (err) {
+      Alert.alert('Error', err.message || 'Failed to save template');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (loading) {
@@ -332,9 +357,14 @@ export default function AssignCycleScreen({ route, navigation }) {
         </TouchableOpacity>
 
         {isEdit && (
-          <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete} disabled={submitting}>
-            <Text style={styles.deleteBtnText}>Delete Service</Text>
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity style={styles.secondaryBtn} onPress={handleSaveAsTemplate} disabled={submitting}>
+              <Text style={styles.secondaryBtnText}>Save as Template</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete} disabled={submitting}>
+              <Text style={styles.deleteBtnText}>Delete Service</Text>
+            </TouchableOpacity>
+          </>
         )}
       </ScrollView>
 
@@ -420,6 +450,8 @@ const styles = StyleSheet.create({
   btn: { backgroundColor: '#2563eb', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 32 },
   btnDisabled: { backgroundColor: '#93c5fd' },
   btnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  secondaryBtn: { paddingVertical: 14, alignItems: 'center', marginTop: 10, borderWidth: 1.5, borderColor: '#2563eb', borderRadius: 10 },
+  secondaryBtnText: { color: '#2563eb', fontSize: 15, fontWeight: '600' },
   deleteBtn: { paddingVertical: 14, alignItems: 'center', marginTop: 8 },
   deleteBtnText: { color: '#dc2626', fontSize: 15, fontWeight: '600' },
 
