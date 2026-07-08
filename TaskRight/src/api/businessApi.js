@@ -13,18 +13,18 @@ export const updateTask = (businessId, taskId, data) =>
 export const deleteTask = (businessId, taskId) =>
   del(`/api/businesses/${businessId}/tasks/${taskId}`);
 
-// Service Cycles
-export const getServiceCycles = (businessId) =>
-  get(`/api/businesses/${businessId}/service-cycles`);
+// Service Templates (reusable library — formerly "service cycles")
+export const getServiceTemplates = (businessId) =>
+  get(`/api/businesses/${businessId}/service-templates`);
 
-export const createServiceCycle = (businessId, data) =>
-  post(`/api/businesses/${businessId}/service-cycles`, data);
+export const createServiceTemplate = (businessId, data) =>
+  post(`/api/businesses/${businessId}/service-templates`, data);
 
-export const updateServiceCycle = (businessId, cycleId, data) =>
-  put(`/api/businesses/${businessId}/service-cycles/${cycleId}`, data);
+export const updateServiceTemplate = (businessId, templateId, data) =>
+  put(`/api/businesses/${businessId}/service-templates/${templateId}`, data);
 
-export const deleteServiceCycle = (businessId, cycleId) =>
-  del(`/api/businesses/${businessId}/service-cycles/${cycleId}`);
+export const deleteServiceTemplate = (businessId, templateId) =>
+  del(`/api/businesses/${businessId}/service-templates/${templateId}`);
 
 // Customers
 export const getCustomers = (businessId) =>
@@ -41,9 +41,6 @@ export const deleteCustomer = (businessId, customerId) =>
 
 export const updateCustomerDetails = (businessId, customerId, data) =>
   patch(`/api/businesses/${businessId}/customers/${customerId}`, data);
-
-export const assignCycle = (businessId, customerId, data) =>
-  post(`/api/businesses/${businessId}/customers/${customerId}/assign-cycle`, data);
 
 // Per-customer Services (Service Model C2). A Service is the customer's own
 // service definition (name/frequency/deadlines/tasks/hours/price/schedule),

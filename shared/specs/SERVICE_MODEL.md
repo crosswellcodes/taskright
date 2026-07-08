@@ -1,6 +1,6 @@
 # Service Model — Feature Spec (Per-Customer Services)
 
-**Status:** ✅ COMPONENTS 1–3 BUILT → FEATURE COMPLETE (July 5–6, 2026). C1 data/backend + C2 customer-profile builder + C3 Templates browser & "save as template". Migrations 021/022 on both DBs; per-customer Service CRUD + template library; **119/119 backend tests.** All six design questions resolved (see **Resolved Decisions**). Optional **C4** cleanup remains (rename template-CRUD function symbols; drop legacy `/assign-cycle`).
+**Status:** ✅ COMPONENTS 1–4 BUILT → FEATURE COMPLETE (July 5–6, 2026). C1 data/backend + C2 customer-profile builder + C3 Templates browser & "save as template" + C4 vocabulary cleanup. Migrations 021/022 on both DBs; per-customer Service CRUD + template library; **118/118 backend tests.** All six design questions resolved (see **Resolved Decisions**).
 
 > **C1 build notes (what actually shipped):**
 > - Tables renamed: `service_cycles`→`service_templates`, `customer_cycle_assignments`→`customer_services` (absorbed `name`/`frequency`/`days_before_service_deadline`/`days_before_auto_repeat` + nullable `template_id` provenance FK, `ON DELETE SET NULL`), `task_assignments`→`template_task_assignments` (col `service_cycle_id`→`template_id`). New `service_task_assignments` (per-service menu). `selection_cycles.service_cycle_id`→`customer_service_id` (021 nullable+backfilled; 022 `NOT NULL` + drops legacy col). Old `UNIQUE(customer_id, service_cycle_id)` dropped → a customer may hold multiple Services (incl. several from one template). Live fan-out verified: template 6's 3 customers → 3 independent Services each with their own 4-task menu.
@@ -223,10 +223,14 @@ Sized like the job-costing / review-request cadence — data+backend first, then
   - "Start from template" (builder template picker) already shipped in C2.
   - Babel-parse clean; interactive sim check is the user's.
 
-### Component 4 (optional) — cleanup
-- Migration 022 destructive cleanup (if deferred), remove dead code/paths, drop legacy vocabulary from internals.
+### Component 4 — cleanup — ✅ DONE (July 6, 2026)
+- **Function symbols** (`businessService.js`): `createServiceCycle`→`createServiceTemplate`, `getServiceCyclesByBusiness`→`getServiceTemplatesByBusiness`, `getServiceCycleById`→`getServiceTemplateById`, `updateServiceCycle`→`updateServiceTemplate`, `deleteServiceCycle`→`deleteServiceTemplate`. `assignCycle` **removed**.
+- **Routes** (`businesses.js`): `/service-cycles`→`/service-templates` (POST/GET/PUT/DELETE); response keys `serviceCycle(s)`→`serviceTemplate(s)`; error code `CYCLE_NOT_FOUND`→`TEMPLATE_NOT_FOUND`. **Legacy `POST .../assign-cycle` deleted** (superseded by `POST .../services` with `templateId`).
+- **Mobile client** (`businessApi.js`): `getServiceCycles`/`create`/`update`/`deleteServiceCycle`→`*ServiceTemplate*` (+ paths + `serviceTemplates` key). `assignCycle` client removed. Callers updated (`ServiceCyclesScreen`, `AssignCycleScreen`).
+- **Tests:** helper `createTestServiceCycle` + `assignCycleToCustomer` repointed to the new endpoints; obsolete `ALREADY_ASSIGNED` assign-cycle case dropped (multiple Services now allowed). **118/118.**
+- Left intentionally: the **forecast** response field `serviceCycles` (Dashboard/ForecastDay/ServiceDaySnapshot) and the job-detail `serviceCycleName` label — separate domains, out of scope.
 
-**Reserved migrations: 021, 022.**
+**Reserved migrations: 021, 022 (both applied).**
 
 ---
 

@@ -7,7 +7,7 @@ import { Calendar } from 'react-native-calendars';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import {
-  getServiceCycles, getTasks, getForecast, createServiceCycle,
+  getServiceTemplates, getTasks, getForecast, createServiceTemplate,
   createCustomerService, getCustomerService, updateCustomerService, deleteCustomerService,
 } from '../../api/businessApi';
 
@@ -90,11 +90,11 @@ export default function AssignCycleScreen({ route, navigation }) {
       try {
         const [taskData, templateData, forecastData] = await Promise.all([
           getTasks(user.businessId),
-          getServiceCycles(user.businessId),
+          getServiceTemplates(user.businessId),
           isEdit ? Promise.resolve(null) : getForecast(user.businessId),
         ]);
         setTasks(taskData.tasks || []);
-        setTemplates(templateData.serviceCycles || []);
+        setTemplates(templateData.serviceTemplates || []);
         if (forecastData) setForecast(forecastData.summary?.upcomingServices || []);
 
         if (isEdit) {
@@ -206,7 +206,7 @@ export default function AssignCycleScreen({ route, navigation }) {
     const repeat = autoRepeatDays.trim() === '' ? 1 : (parseInt(autoRepeatDays, 10) || 1);
     setSubmitting(true);
     try {
-      await createServiceCycle(user.businessId, {
+      await createServiceTemplate(user.businessId, {
         name: name.trim(),
         frequency,
         daysBeforeServiceDeadline: deadline,

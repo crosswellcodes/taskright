@@ -6,8 +6,8 @@ import {
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import {
-  getServiceCycles, createServiceCycle, updateServiceCycle,
-  deleteServiceCycle, getTasks
+  getServiceTemplates, createServiceTemplate, updateServiceTemplate,
+  deleteServiceTemplate, getTasks
 } from '../../api/businessApi';
 
 const FREQUENCIES = ['weekly', 'biweekly', 'monthly', 'yearly'];
@@ -33,10 +33,10 @@ export default function ServiceCyclesScreen({ navigation }) {
   const fetchData = useCallback(async () => {
     try {
       const [cycleData, taskData] = await Promise.all([
-        getServiceCycles(user.businessId),
+        getServiceTemplates(user.businessId),
         getTasks(user.businessId),
       ]);
-      setCycles(cycleData.serviceCycles || []);
+      setCycles(cycleData.serviceTemplates || []);
       setAllTasks(taskData.tasks || []);
     } catch (err) {
       Alert.alert('Error', err.message || 'Failed to load data');
@@ -91,9 +91,9 @@ export default function ServiceCyclesScreen({ navigation }) {
         taskIds: selectedTaskIds,
       };
       if (editCycle) {
-        await updateServiceCycle(user.businessId, editCycle.id, payload);
+        await updateServiceTemplate(user.businessId, editCycle.id, payload);
       } else {
-        await createServiceCycle(user.businessId, payload);
+        await createServiceTemplate(user.businessId, payload);
       }
       setModalVisible(false);
       fetchData();
@@ -111,7 +111,7 @@ export default function ServiceCyclesScreen({ navigation }) {
         text: 'Delete', style: 'destructive',
         onPress: async () => {
           try {
-            await deleteServiceCycle(user.businessId, cycle.id);
+            await deleteServiceTemplate(user.businessId, cycle.id);
             fetchData();
           } catch (err) {
             Alert.alert('Error', err.message || 'Failed to delete template');

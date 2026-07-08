@@ -110,9 +110,9 @@ describe('PATCH /customers/:customerId/assignments/:assignmentId', () => {
     const cycle2 = await createTestServiceCycle(businessId, bizToken, [task1.id], { name: 'Biweekly' });
     const startDate = new Date(Date.now() + 14 * 864e5).toISOString().split('T')[0];
     await request(app)
-      .post(`/api/businesses/${businessId}/customers/${customerId}/assign-cycle`)
+      .post(`/api/businesses/${businessId}/customers/${customerId}/services`)
       .set('Authorization', `Bearer ${bizToken}`)
-      .send({ serviceCycleId: cycle2.id, totalHours: 2, startDate });
+      .send({ templateId: cycle2.id, totalHours: 2, startDate });
 
     const cca2 = await knex('customer_services')
       .where('customer_id', customerId).where('template_id', cycle2.id).first();

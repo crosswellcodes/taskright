@@ -146,7 +146,7 @@ router.delete('/:businessId/tasks/:taskId', requireBusiness, async (req, res) =>
     const inTemplate = await knex('template_task_assignments').where('task_id', taskId).first();
     const inService = await knex('service_task_assignments').where('task_id', taskId).first();
     if (inTemplate || inService) {
-      return res.status(409).json({ success: false, error: 'Task is assigned to a service cycle and cannot be deleted', code: 'TASK_IN_USE' });
+      return res.status(409).json({ success: false, error: 'Task is assigned to a service or template and cannot be deleted', code: 'TASK_IN_USE' });
     }
 
     await businessService.deleteTask(taskId);
@@ -158,13 +158,13 @@ router.delete('/:businessId/tasks/:taskId', requireBusiness, async (req, res) =>
   }
 });
 
-// ─── SERVICE CYCLES ──────────────────────────────────────────────────────────
+// ─── SERVICE TEMPLATES (reusable library) ────────────────────────────────────
 
 /**
- * POST /api/businesses/:businessId/service-cycles
- * Create a service cycle
+ * POST /api/businesses/:businessId/service-templates
+ * Create a service template
  */
-router.post('/:businessId/service-cycles', requireBusiness, async (req, res) => {
+router.post('/:businessId/service-templates', requireBusiness, async (req, res) => {
   try {
     const businessId = parseInt(req.params.businessId);
     const { name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, taskIds } = req.body;
@@ -172,7 +172,7 @@ router.post('/:businessId/service-cycles', requireBusiness, async (req, res) => 
     const validFrequencies = ['weekly', 'biweekly', 'monthly', 'yearly'];
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
-      return res.status(400).json({ success: false, error: 'Service cycle name is required', code: 'VALIDATION_ERROR' });
+      return res.status(400).json({ success: false, error: 'Service template name is required', code: 'VALIDATION_ERROR' });
     }
     if (!frequency || !validFrequencies.includes(frequency)) {
       return res.status(400).json({
@@ -196,13 +196,13 @@ router.post('/:businessId/service-cycles', requireBusiness, async (req, res) => 
       });
     }
 
-    const { cycle, assignedTasks } = await businessService.createServiceCycle(
+    const { cycle, assignedTasks } = await businessService.createServiceTemplate(
       businessId, name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, taskIds || []
     );
 
     return res.status(201).json({
       success: true,
-      serviceCycle: {
+      serviceTemplate: {
         id: cycle.id,
         businessId: cycle.business_id,
         name: cycle.name,
@@ -221,16 +221,16 @@ router.post('/:businessId/service-cycles', requireBusiness, async (req, res) => 
     if (error.code === 'TASK_NOT_FOUND') {
       return res.status(404).json({ success: false, error: error.message, code: 'TASK_NOT_FOUND' });
     }
-    console.error('Create service cycle error:', error);
+    console.error('Create service template error:', error);
     return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
   }
 });
 
 /**
- * GET /api/businesses/:businessId/service-cycles
- * Get all service cycles for a business
+ * GET /api/businesses/:businessId/service-templates
+ * Get all service templates for a business
  */
-router.get('/:businessId/service-cycles', requireBusiness, async (req, res) => {
+router.get('/:businessId/service-templates', requireBusiness, async (req, res) => {
   try {
     const businessId = parseInt(req.params.businessId);
 
@@ -239,11 +239,11 @@ router.get('/:businessId/service-cycles', requireBusiness, async (req, res) => {
       return res.status(404).json({ success: false, error: 'Business not found', code: 'BUSINESS_NOT_FOUND' });
     }
 
-    const cycles = await businessService.getServiceCyclesByBusiness(businessId);
+    const cycles = await businessService.getServiceTemplatesByBusiness(businessId);
 
     return res.status(200).json({
       success: true,
-      serviceCycles: cycles.map(c => ({
+      serviceTemplates: cycles.map(c => ({
         id: c.id,
         name: c.name,
         frequency: c.frequency,
@@ -255,24 +255,24 @@ router.get('/:businessId/service-cycles', requireBusiness, async (req, res) => {
       total: cycles.length
     });
   } catch (error) {
-    console.error('Get service cycles error:', error);
+    console.error('Get service templates error:', error);
     return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
   }
 });
 
 /**
- * PUT /api/businesses/:businessId/service-cycles/:cycleId
- * Update a service cycle
+ * PUT /api/businesses/:businessId/service-templates/:cycleId
+ * Update a service template
  */
-router.put('/:businessId/service-cycles/:cycleId', requireBusiness, async (req, res) => {
+router.put('/:businessId/service-templates/:cycleId', requireBusiness, async (req, res) => {
   try {
     const businessId = parseInt(req.params.businessId);
     const cycleId = parseInt(req.params.cycleId);
     const { name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, taskIds } = req.body;
 
-    const cycle = await businessService.getServiceCycleById(cycleId);
+    const cycle = await businessService.getServiceTemplateById(cycleId);
     if (!cycle || cycle.business_id !== businessId) {
-      return res.status(404).json({ success: false, error: 'Service cycle not found', code: 'CYCLE_NOT_FOUND' });
+      return res.status(404).json({ success: false, error: 'Service template not found', code: 'TEMPLATE_NOT_FOUND' });
     }
 
     const validFrequencies = ['weekly', 'biweekly', 'monthly', 'yearly'];
@@ -284,13 +284,13 @@ router.put('/:businessId/service-cycles/:cycleId', requireBusiness, async (req, 
       });
     }
 
-    const updated = await businessService.updateServiceCycle(cycleId, {
+    const updated = await businessService.updateServiceTemplate(cycleId, {
       name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, taskIds
     });
 
     return res.status(200).json({
       success: true,
-      serviceCycle: {
+      serviceTemplate: {
         id: updated.id,
         name: updated.name,
         assignedTasks: updated.assignedTasks,
@@ -298,29 +298,29 @@ router.put('/:businessId/service-cycles/:cycleId', requireBusiness, async (req, 
       }
     });
   } catch (error) {
-    console.error('Update service cycle error:', error);
+    console.error('Update service template error:', error);
     return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
   }
 });
 
 /**
- * DELETE /api/businesses/:businessId/service-cycles/:cycleId
- * Delete a service cycle
+ * DELETE /api/businesses/:businessId/service-templates/:cycleId
+ * Delete a service template
  */
-router.delete('/:businessId/service-cycles/:cycleId', requireBusiness, async (req, res) => {
+router.delete('/:businessId/service-templates/:cycleId', requireBusiness, async (req, res) => {
   try {
     const businessId = parseInt(req.params.businessId);
     const cycleId = parseInt(req.params.cycleId);
 
-    const cycle = await businessService.getServiceCycleById(cycleId);
+    const cycle = await businessService.getServiceTemplateById(cycleId);
     if (!cycle || cycle.business_id !== businessId) {
-      return res.status(404).json({ success: false, error: 'Service cycle not found', code: 'CYCLE_NOT_FOUND' });
+      return res.status(404).json({ success: false, error: 'Service template not found', code: 'TEMPLATE_NOT_FOUND' });
     }
 
-    await businessService.deleteServiceCycle(cycleId);
-    return res.status(200).json({ success: true, message: 'Service cycle deleted' });
+    await businessService.deleteServiceTemplate(cycleId);
+    return res.status(200).json({ success: true, message: 'Service template deleted' });
   } catch (error) {
-    console.error('Delete service cycle error:', error);
+    console.error('Delete service template error:', error);
     return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
   }
 });
@@ -499,93 +499,6 @@ router.delete('/:businessId/customers/:customerId', requireBusiness, async (req,
   }
 });
 
-/**
- * POST /api/businesses/:businessId/customers/:customerId/assign-cycle
- * Assign a customer to a service cycle with fixed hours
- */
-router.post('/:businessId/customers/:customerId/assign-cycle', requireBusiness, async (req, res) => {
-  try {
-    const businessId = parseInt(req.params.businessId);
-    const customerId = parseInt(req.params.customerId);
-    const { serviceCycleId, totalHours, startDate, dayOfWeek } = req.body;
-
-    if (!serviceCycleId || typeof serviceCycleId !== 'number') {
-      return res.status(400).json({
-        success: false,
-        error: 'serviceCycleId is required and must be a number',
-        code: 'VALIDATION_ERROR'
-      });
-    }
-    if (!totalHours || typeof totalHours !== 'number' || totalHours <= 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'totalHours is required and must be a positive number',
-        code: 'VALIDATION_ERROR'
-      });
-    }
-
-    // Validate scheduling fields based on business format
-    const business = await knex('businesses').where('id', businessId).first();
-    if (business && business.scheduling_format === 'day_of_week') {
-      if (dayOfWeek === undefined || dayOfWeek === null || !Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
-        return res.status(400).json({
-          success: false,
-          error: 'dayOfWeek (0–6) is required for day-of-week scheduling',
-          code: 'VALIDATION_ERROR'
-        });
-      }
-    } else {
-      if (!startDate || !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
-        return res.status(400).json({
-          success: false,
-          error: 'startDate is required and must be in YYYY-MM-DD format',
-          code: 'VALIDATION_ERROR'
-        });
-      }
-    }
-
-    // Verify customer belongs to this business
-    const customer = await knex('customers').where('id', customerId).where('business_id', businessId).first();
-    if (!customer) {
-      return res.status(404).json({ success: false, error: 'Customer not found', code: 'CUSTOMER_NOT_FOUND' });
-    }
-
-    // Verify service cycle belongs to this business
-    const cycle = await businessService.getServiceCycleById(serviceCycleId);
-    if (!cycle || cycle.business_id !== businessId) {
-      return res.status(404).json({ success: false, error: 'Service cycle not found', code: 'CYCLE_NOT_FOUND' });
-    }
-
-    const assignment = await businessService.assignCycle(
-      customerId, serviceCycleId, totalHours,
-      startDate || null,
-      dayOfWeek !== undefined ? dayOfWeek : null
-    );
-
-    return res.status(201).json({
-      success: true,
-      assignment: {
-        id: assignment.id,
-        customerId: assignment.customer_id,
-        serviceCycleId: assignment.template_id,   // template it was seeded from
-        totalHours: assignment.total_hours,
-        createdAt: assignment.created_at
-      },
-      message: 'Customer assigned to service cycle.'
-    });
-  } catch (error) {
-    if (error.code === 'ALREADY_ASSIGNED') {
-      return res.status(409).json({
-        success: false,
-        error: 'Customer already assigned to this cycle',
-        code: 'ALREADY_ASSIGNED'
-      });
-    }
-    console.error('Assign cycle error:', error);
-    return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
-  }
-});
-
 // ─── PER-CUSTOMER SERVICES (Service Model C1) ────────────────────────────────
 // Build/edit/delete a customer's own Service directly on their profile. The
 // definition lives on the Service; a template (if any) only seeds initial values.
@@ -617,7 +530,7 @@ router.post('/:businessId/customers/:customerId/services', requireBusiness, asyn
     const customerId = parseInt(req.params.customerId);
     await assertCustomerOwned(businessId, customerId);
 
-    // Scheduling validation mirrors assign-cycle (day-of-week vs date-based).
+    // Scheduling validation depends on the business format (day-of-week vs date-based).
     const business = await knex('businesses').where('id', businessId).first();
     const { startDate, dayOfWeek } = req.body;
     if (business && business.scheduling_format === 'day_of_week') {

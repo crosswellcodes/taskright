@@ -133,57 +133,47 @@ describe('GET /api/businesses/:businessId/customers/:customerId', () => {
   });
 });
 
-// ─── ASSIGN CYCLE ─────────────────────────────────────────────────────────────
+// ─── CREATE SERVICE FROM TEMPLATE ─────────────────────────────────────────────
+// (Formerly POST /assign-cycle — removed in Service Model C4. Seeding a Service
+//  from a template is now POST /customers/:id/services with { templateId }.)
 
-describe('POST /api/businesses/:businessId/customers/:customerId/assign-cycle', () => {
-  it('assigns a customer to a service cycle and generates upcoming selection cycles', async () => {
+const soon = () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+describe('POST /api/businesses/:businessId/customers/:customerId/services (template-seeded)', () => {
+  it('creates a Service seeded from a template and generates upcoming service calls', async () => {
     const customer = await addCustomerToBusiness(businessId, token, { name: 'Alice', phoneNumber: '+13330001111' });
 
     const res = await request(app)
-      .post(`/api/businesses/${businessId}/customers/${customer.id}/assign-cycle`)
+      .post(`/api/businesses/${businessId}/customers/${customer.id}/services`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ serviceCycleId: cycle.id, totalHours: 3, startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] });
+      .send({ templateId: cycle.id, totalHours: 3, startDate: soon() });
 
     expect(res.status).toBe(201);
-    expect(res.body.assignment.totalHours).toBe(3);
-    expect(res.body.assignment.serviceCycleId).toBe(cycle.id);
+    expect(Number(res.body.service.total_hours)).toBe(3);
+    expect(res.body.service.template_id).toBe(cycle.id); // provenance
 
-    // Verify selection cycles were generated
     const selectionCycles = await knex('selection_cycles').where('customer_id', customer.id);
     expect(selectionCycles.length).toBeGreaterThan(0);
-  });
-
-  it('returns 409 when already assigned', async () => {
-    const customer = await addCustomerToBusiness(businessId, token, { name: 'Alice', phoneNumber: '+13330001111' });
-    await assignCycleToCustomer(businessId, customer.id, cycle.id, token, 3);
-
-    const res = await request(app)
-      .post(`/api/businesses/${businessId}/customers/${customer.id}/assign-cycle`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({ serviceCycleId: cycle.id, totalHours: 3, startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] });
-
-    expect(res.status).toBe(409);
-    expect(res.body.code).toBe('ALREADY_ASSIGNED');
   });
 
   it('returns 400 when totalHours is missing', async () => {
     const customer = await addCustomerToBusiness(businessId, token, { name: 'Alice', phoneNumber: '+13330001111' });
 
     const res = await request(app)
-      .post(`/api/businesses/${businessId}/customers/${customer.id}/assign-cycle`)
+      .post(`/api/businesses/${businessId}/customers/${customer.id}/services`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ serviceCycleId: cycle.id });
+      .send({ templateId: cycle.id, startDate: soon() });
 
     expect(res.status).toBe(400);
   });
 
-  it('returns 404 for non-existent service cycle', async () => {
+  it('returns 404 for a non-existent template', async () => {
     const customer = await addCustomerToBusiness(businessId, token, { name: 'Alice', phoneNumber: '+13330001111' });
 
     const res = await request(app)
-      .post(`/api/businesses/${businessId}/customers/${customer.id}/assign-cycle`)
+      .post(`/api/businesses/${businessId}/customers/${customer.id}/services`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ serviceCycleId: 99999, totalHours: 3, startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] });
+      .send({ templateId: 99999, totalHours: 3, startDate: soon() });
 
     expect(res.status).toBe(404);
   });

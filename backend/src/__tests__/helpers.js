@@ -100,11 +100,11 @@ async function createTestServiceCycle(businessId, token, taskIds = [], overrides
   };
 
   const res = await request(app)
-    .post(`/api/businesses/${businessId}/service-cycles`)
+    .post(`/api/businesses/${businessId}/service-templates`)
     .set('Authorization', `Bearer ${token}`)
     .send(data);
 
-  return res.body.serviceCycle;
+  return res.body.serviceTemplate;
 }
 
 async function addCustomerToBusiness(businessId, token, overrides = {}) {
@@ -122,14 +122,16 @@ async function addCustomerToBusiness(businessId, token, overrides = {}) {
   return res.body.customer;
 }
 
+// Creates a per-customer Service seeded from a template (serviceCycleId = templateId).
+// Returns the created customer_services row (res.body.service).
 async function assignCycleToCustomer(businessId, customerId, serviceCycleId, token, totalHours = 3) {
   const startDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
   const res = await request(app)
-    .post(`/api/businesses/${businessId}/customers/${customerId}/assign-cycle`)
+    .post(`/api/businesses/${businessId}/customers/${customerId}/services`)
     .set('Authorization', `Bearer ${token}`)
-    .send({ serviceCycleId, totalHours, startDate });
+    .send({ templateId: serviceCycleId, totalHours, startDate });
 
-  return res.body.assignment;
+  return res.body.service;
 }
 
 module.exports = {

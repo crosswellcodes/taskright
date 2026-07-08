@@ -141,10 +141,8 @@ async function deleteTask(taskId) {
 // ─── SERVICE TEMPLATES (business-global reusable library) ────────────────────
 // Formerly "service cycles". These are decoupled templates you optionally seed a
 // customer's Service from. Editing a template never touches existing services.
-// Function names retain the "ServiceCycle" symbols so the existing /service-cycles
-// endpoints + mobile Cycles tab keep working until C3 repurposes them.
 
-async function createServiceCycle(businessId, name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, taskIds) {
+async function createServiceTemplate(businessId, name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, taskIds) {
   if (taskIds && taskIds.length > 0) {
     const tasks = await knex('tasks')
       .whereIn('id', taskIds)
@@ -188,7 +186,7 @@ async function createServiceCycle(businessId, name, frequency, daysBeforeService
   return { cycle, assignedTasks };
 }
 
-async function getServiceCyclesByBusiness(businessId) {
+async function getServiceTemplatesByBusiness(businessId) {
   const cycles = await knex('service_templates')
     .where('business_id', businessId)
     .orderBy('created_at', 'asc');
@@ -201,11 +199,11 @@ async function getServiceCyclesByBusiness(businessId) {
   return cycles;
 }
 
-async function getServiceCycleById(cycleId) {
+async function getServiceTemplateById(cycleId) {
   return await knex('service_templates').where('id', cycleId).first();
 }
 
-async function updateServiceCycle(cycleId, data) {
+async function updateServiceTemplate(cycleId, data) {
   const updates = { updated_at: knex.raw('CURRENT_TIMESTAMP') };
   if (data.name !== undefined) updates.name = data.name.trim();
   if (data.frequency !== undefined) updates.frequency = data.frequency;
@@ -236,7 +234,7 @@ async function updateServiceCycle(cycleId, data) {
   return cycle;
 }
 
-async function deleteServiceCycle(cycleId) {
+async function deleteServiceTemplate(cycleId) {
   await knex('service_templates').where('id', cycleId).delete();
 }
 
@@ -384,8 +382,8 @@ async function updateCustomerDetails(customerId, data) {
 // Create a per-customer Service. The definition (name/frequency/deadlines/tasks)
 // lives on the row itself; `templateId` is provenance only (nullable, decoupled).
 // Copies the given task list into the Service's own menu, generates the upcoming
-// Service Calls, and fires the welcome SMS. Used by both the template-seed path
-// (assignCycle) and the from-scratch builder (createCustomerServiceFromInput).
+// Service Calls, and fires the welcome SMS. Wrapped by createCustomerServiceForBusiness
+// (from-scratch or template-seeded).
 async function createCustomerService(customerId, {
   templateId = null, name, frequency,
   daysBeforeServiceDeadline, daysBeforeAutoRepeat,
@@ -438,38 +436,6 @@ async function createCustomerService(customerId, {
   })();
 
   return service;
-}
-
-// Backward-compatible template-seed path (POST .../assign-cycle). `serviceCycleId`
-// is a TEMPLATE id; snapshot its definition + task menu into a new decoupled Service.
-async function assignCycle(customerId, serviceCycleId, totalHours, startDate, dayOfWeek = null) {
-  // Preserve the one-per-template guard this endpoint has always enforced.
-  const existing = await knex('customer_services')
-    .where('customer_id', customerId)
-    .where('template_id', serviceCycleId)
-    .first();
-  if (existing) {
-    const error = new Error('Customer already assigned to this cycle');
-    error.code = 'ALREADY_ASSIGNED';
-    error.statusCode = 409;
-    throw error;
-  }
-
-  const template = await knex('service_templates').where('id', serviceCycleId).first();
-  const templateTasks = await knex('template_task_assignments').where('template_id', serviceCycleId);
-
-  return createCustomerService(customerId, {
-    templateId: serviceCycleId,
-    name: template.name,
-    frequency: template.frequency,
-    daysBeforeServiceDeadline: template.days_before_service_deadline,
-    daysBeforeAutoRepeat: template.days_before_auto_repeat,
-    taskIds: templateTasks.map(r => r.task_id),
-    totalHours,
-    startDate,
-    dayOfWeek,
-    pricePerVisit: null,
-  });
 }
 
 // ─── PER-CUSTOMER SERVICE CRUD (customer-profile creation flow) ──────────────
@@ -2195,11 +2161,11 @@ module.exports = {
   updateTask,
   deleteTask,
   // Service Cycles
-  createServiceCycle,
-  getServiceCyclesByBusiness,
-  getServiceCycleById,
-  updateServiceCycle,
-  deleteServiceCycle,
+  createServiceTemplate,
+  getServiceTemplatesByBusiness,
+  getServiceTemplateById,
+  updateServiceTemplate,
+  deleteServiceTemplate,
   // Customer Management
   deleteCustomer,
   addCustomer,
@@ -2207,7 +2173,6 @@ module.exports = {
   getCustomerDetails,
   updateCustomerDetails,
   // Cycle Assignment
-  assignCycle,
   generateUpcomingSelectionCycles,
   getUpcomingCustomerSelections,
   // Per-customer Service CRUD (Service Model C1)

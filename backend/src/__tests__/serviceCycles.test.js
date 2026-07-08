@@ -18,10 +18,10 @@ afterAll(async () => { await knex.destroy(); });
 
 // ─── CREATE SERVICE CYCLE ─────────────────────────────────────────────────────
 
-describe('POST /api/businesses/:businessId/service-cycles', () => {
+describe('POST /api/businesses/:businessId/service-templates', () => {
   it('creates a service cycle with assigned tasks', async () => {
     const res = await request(app)
-      .post(`/api/businesses/${businessId}/service-cycles`)
+      .post(`/api/businesses/${businessId}/service-templates`)
       .set('Authorization', `Bearer ${token}`)
       .send({
         name: 'Weekly Cleaning',
@@ -33,15 +33,15 @@ describe('POST /api/businesses/:businessId/service-cycles', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.success).toBe(true);
-    expect(res.body.serviceCycle.name).toBe('Weekly Cleaning');
-    expect(res.body.serviceCycle.frequency).toBe('weekly');
-    expect(res.body.serviceCycle.assignedTasks).toHaveLength(2);
-    expect(res.body.serviceCycle.daysBeforeServiceDeadline).toBe(3);
+    expect(res.body.serviceTemplate.name).toBe('Weekly Cleaning');
+    expect(res.body.serviceTemplate.frequency).toBe('weekly');
+    expect(res.body.serviceTemplate.assignedTasks).toHaveLength(2);
+    expect(res.body.serviceTemplate.daysBeforeServiceDeadline).toBe(3);
   });
 
   it('creates a service cycle with no tasks', async () => {
     const res = await request(app)
-      .post(`/api/businesses/${businessId}/service-cycles`)
+      .post(`/api/businesses/${businessId}/service-templates`)
       .set('Authorization', `Bearer ${token}`)
       .send({
         name: 'Empty Cycle',
@@ -52,12 +52,12 @@ describe('POST /api/businesses/:businessId/service-cycles', () => {
       });
 
     expect(res.status).toBe(201);
-    expect(res.body.serviceCycle.assignedTasks).toHaveLength(0);
+    expect(res.body.serviceTemplate.assignedTasks).toHaveLength(0);
   });
 
   it('returns 400 for invalid frequency', async () => {
     const res = await request(app)
-      .post(`/api/businesses/${businessId}/service-cycles`)
+      .post(`/api/businesses/${businessId}/service-templates`)
       .set('Authorization', `Bearer ${token}`)
       .send({
         name: 'Bad Cycle',
@@ -73,7 +73,7 @@ describe('POST /api/businesses/:businessId/service-cycles', () => {
 
   it('returns 400 when name is missing', async () => {
     const res = await request(app)
-      .post(`/api/businesses/${businessId}/service-cycles`)
+      .post(`/api/businesses/${businessId}/service-templates`)
       .set('Authorization', `Bearer ${token}`)
       .send({
         frequency: 'weekly',
@@ -86,7 +86,7 @@ describe('POST /api/businesses/:businessId/service-cycles', () => {
 
   it('returns 404 when a taskId does not exist', async () => {
     const res = await request(app)
-      .post(`/api/businesses/${businessId}/service-cycles`)
+      .post(`/api/businesses/${businessId}/service-templates`)
       .set('Authorization', `Bearer ${token}`)
       .send({
         name: 'Cycle',
@@ -102,7 +102,7 @@ describe('POST /api/businesses/:businessId/service-cycles', () => {
 
   it('returns 401 without token', async () => {
     const res = await request(app)
-      .post(`/api/businesses/${businessId}/service-cycles`)
+      .post(`/api/businesses/${businessId}/service-templates`)
       .send({ name: 'Cycle', frequency: 'weekly', daysBeforeServiceDeadline: 3, daysBeforeAutoRepeat: 1 });
 
     expect(res.status).toBe(401);
@@ -111,17 +111,17 @@ describe('POST /api/businesses/:businessId/service-cycles', () => {
 
 // ─── GET SERVICE CYCLES ───────────────────────────────────────────────────────
 
-describe('GET /api/businesses/:businessId/service-cycles', () => {
+describe('GET /api/businesses/:businessId/service-templates', () => {
   it('returns all service cycles', async () => {
     await createTestServiceCycle(businessId, token, [task1.id], { name: 'Weekly' });
     await createTestServiceCycle(businessId, token, [], { name: 'Monthly', frequency: 'monthly' });
 
     const res = await request(app)
-      .get(`/api/businesses/${businessId}/service-cycles`)
+      .get(`/api/businesses/${businessId}/service-templates`)
       .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.serviceCycles).toHaveLength(2);
+    expect(res.body.serviceTemplates).toHaveLength(2);
     expect(res.body.total).toBe(2);
   });
 
@@ -129,10 +129,10 @@ describe('GET /api/businesses/:businessId/service-cycles', () => {
     await createTestServiceCycle(businessId, token, [task1.id, task2.id]);
 
     const res = await request(app)
-      .get(`/api/businesses/${businessId}/service-cycles`)
+      .get(`/api/businesses/${businessId}/service-templates`)
       .set('Authorization', `Bearer ${token}`);
 
-    expect(res.body.serviceCycles[0].assignedTasks).toEqual(
+    expect(res.body.serviceTemplates[0].assignedTasks).toEqual(
       expect.arrayContaining([task1.id, task2.id])
     );
   });
@@ -140,34 +140,34 @@ describe('GET /api/businesses/:businessId/service-cycles', () => {
 
 // ─── UPDATE SERVICE CYCLE ─────────────────────────────────────────────────────
 
-describe('PUT /api/businesses/:businessId/service-cycles/:cycleId', () => {
+describe('PUT /api/businesses/:businessId/service-templates/:cycleId', () => {
   it('updates cycle name', async () => {
     const cycle = await createTestServiceCycle(businessId, token, [task1.id]);
 
     const res = await request(app)
-      .put(`/api/businesses/${businessId}/service-cycles/${cycle.id}`)
+      .put(`/api/businesses/${businessId}/service-templates/${cycle.id}`)
       .set('Authorization', `Bearer ${token}`)
       .send({ name: 'Renamed Cycle' });
 
     expect(res.status).toBe(200);
-    expect(res.body.serviceCycle.name).toBe('Renamed Cycle');
+    expect(res.body.serviceTemplate.name).toBe('Renamed Cycle');
   });
 
   it('updates assigned tasks', async () => {
     const cycle = await createTestServiceCycle(businessId, token, [task1.id]);
 
     const res = await request(app)
-      .put(`/api/businesses/${businessId}/service-cycles/${cycle.id}`)
+      .put(`/api/businesses/${businessId}/service-templates/${cycle.id}`)
       .set('Authorization', `Bearer ${token}`)
       .send({ taskIds: [task2.id] });
 
     expect(res.status).toBe(200);
-    expect(res.body.serviceCycle.assignedTasks).toEqual([task2.id]);
+    expect(res.body.serviceTemplate.assignedTasks).toEqual([task2.id]);
   });
 
   it('returns 404 for non-existent cycle', async () => {
     const res = await request(app)
-      .put(`/api/businesses/${businessId}/service-cycles/99999`)
+      .put(`/api/businesses/${businessId}/service-templates/99999`)
       .set('Authorization', `Bearer ${token}`)
       .send({ name: 'Ghost' });
 

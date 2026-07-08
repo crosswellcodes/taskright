@@ -519,48 +519,35 @@ Empty array is valid: `{ "selectedTaskIds": [] }` — interpreted as "no specifi
 
 ### Service Templates (formerly "Service Cycles")
 
-> **Service Model (SERVICE_MODEL.md, C1):** these endpoints now manage the business-global
-> **template library** (`service_templates`). A template only *seeds* a customer's Service; it is
-> decoupled after instantiation. Per-customer Services are created via the Customers endpoints below.
-> The `/service-cycles` paths are retained for backward compatibility until the mobile Cycles tab
-> is repurposed (C3).
+> **Service Model (SERVICE_MODEL.md):** these endpoints manage the business-global **template
+> library** (`service_templates`). A template only *seeds* a customer's Service; it is decoupled
+> after instantiation. Per-customer Services are created via the Customer Services endpoints below.
+> Renamed from `/service-cycles` in C4 (function symbols + paths + response keys → template vocabulary).
 
-#### Create Service Cycle
-**POST** `/businesses/:businessId/service-cycles`
+#### Create Service Template
+**POST** `/businesses/:businessId/service-templates`
 
 **Request Body**:
 ```json
 {
-  "serviceDate": "2026-03-24T09:00:00Z",
-  "submissionDeadline": "2026-03-23T18:00:00Z",
-  "taskIds": [1, 2, 3],
-  "customerIds": [5, 6, 7]
+  "name": "Weekly Cleaning",
+  "frequency": "weekly",
+  "daysBeforeServiceDeadline": 3,
+  "daysBeforeAutoRepeat": 1,
+  "taskIds": [1, 2, 3]
 }
 ```
+**Response (201)**: `{ success, serviceTemplate: { id, businessId, name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, assignedTasks, createdAt } }`
 
-**Response (201)**:
-```json
-{
-  "success": true,
-  "cycle": {
-    "id": 10,
-    "businessId": 1,
-    "serviceDate": "2026-03-24T09:00:00Z",
-    "submissionDeadline": "2026-03-23T18:00:00Z",
-    "status": "open",
-    "createdAt": "2026-03-16T12:00:00Z"
-  }
-}
-```
+#### Get All Service Templates
+**GET** `/businesses/:businessId/service-templates` → `{ success, serviceTemplates: [...], total }`
 
-#### Get All Service Cycles
-**GET** `/businesses/:businessId/service-cycles`
+#### Update Service Template
+**PUT** `/businesses/:businessId/service-templates/:templateId` → `{ success, serviceTemplate }`
 
-#### Update Service Cycle
-**PUT** `/businesses/:businessId/service-cycles/:cycleId`
-
-#### Delete Service Cycle
-**DELETE** `/businesses/:businessId/service-cycles/:cycleId`
+#### Delete Service Template
+**DELETE** `/businesses/:businessId/service-templates/:templateId`
+Existing customer Services are unaffected (`template_id` is `ON DELETE SET NULL`).
 
 ---
 
@@ -585,23 +572,12 @@ Empty array is valid: `{ "selectedTaskIds": [] }` — interpreted as "no specifi
 #### Delete Customer
 **DELETE** `/businesses/:businessId/customers/:customerId`
 
-#### Assign Cycle to Customer *(legacy — seeds a Service from a template)*
-**POST** `/businesses/:businessId/customers/:customerId/assign-cycle`
-
-**Request Body**:
-```json
-{
-  "serviceCycleId": 10,
-  "totalHours": 3,
-  "startDate": "2026-07-20",
-  "dayOfWeek": null
-}
-```
-Snapshots template `serviceCycleId` into a new decoupled Service. Enforces one-per-template (409 `ALREADY_ASSIGNED`). Prefer the per-customer Service endpoints below for new work.
+> **Note:** `POST .../assign-cycle` was **removed in C4**. To seed a Service from a template,
+> `POST .../services` with `{ templateId }` (see Customer Services below).
 
 ---
 
-### Customer Services (Service Model C1 — per-customer service definitions)
+### Customer Services (Service Model — per-customer service definitions)
 
 A **Service** is a customer's own service definition (name, frequency, deadlines, task menu, hours,
 price, schedule) living on `customer_services`. Built directly on the customer profile; a template

@@ -80,7 +80,7 @@ describe('POST /customers/:id/services — seed from template', () => {
     expect(menu.length).toBe(2);
 
     // Decoupled: editing the template does not touch the Service's menu.
-    await auth(request(app).put(`/api/businesses/${businessId}/service-cycles/${template.id}`))
+    await auth(request(app).put(`/api/businesses/${businessId}/service-templates/${template.id}`))
       .send({ taskIds: [] });
     const menuAfter = await knex('service_task_assignments').where('customer_service_id', svc.id);
     expect(menuAfter.length).toBe(2);
