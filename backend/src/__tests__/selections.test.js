@@ -1,8 +1,9 @@
 const request = require('supertest');
 const {
   app, knex, truncateAllTables,
-  createTestBusiness, createTestCustomer, createTestTask,
-  createTestServiceCycle, addCustomerToBusiness, assignCycleToCustomer
+  createTestBusiness, createTestCustomer,
+  createTestServiceCycle, getServiceTasksForCustomer,
+  addCustomerToBusiness, assignCycleToCustomer
 } = require('./helpers');
 
 let businessId, bizToken, customerId, custToken, selectionCycleId, task1, task2;
@@ -15,19 +16,23 @@ beforeEach(async () => {
   businessId = biz.business.id;
   bizToken = biz.token;
 
-  // Tasks (60 min each — 2 tasks = 2 hours, fits in 3-hour budget)
-  task1 = await createTestTask(businessId, bizToken, { name: 'Task A', timeAllotmentMinutes: 60 });
-  task2 = await createTestTask(businessId, bizToken, { name: 'Task B', timeAllotmentMinutes: 60 });
-
-  // Service cycle
-  const cycle = await createTestServiceCycle(businessId, bizToken, [task1.id, task2.id]);
+  // Template with an inline 2-task menu (60 min each — 2h, fits a 3h budget).
+  const cycle = await createTestServiceCycle(businessId, bizToken, [
+    { name: 'Task A', timeAllotmentMinutes: 60 },
+    { name: 'Task B', timeAllotmentMinutes: 60 },
+  ]);
 
   // Add customer via business owner
   const added = await addCustomerToBusiness(businessId, bizToken, { name: 'Alice', phoneNumber: '+13330001111' });
   customerId = added.id;
 
-  // Assign cycle (3 hours = 180 min max)
+  // Assign cycle (3 hours = 180 min max) — copies the menu into the Service's service_tasks
   await assignCycleToCustomer(businessId, customerId, cycle.id, bizToken, 3);
+
+  // Resolve the Service's OWN task ids (what selections must reference now).
+  const svcTasks = await getServiceTasksForCustomer(customerId);
+  task1 = svcTasks[0];
+  task2 = svcTasks[1];
 
   // Customer logs in
   const custRes = await createTestCustomer(businessId, { phoneNumber: '+13330001111' });
@@ -103,17 +108,16 @@ describe('POST /api/customers/:customerId/selection-cycle/:selectionCycleId/subm
     // task1 (60) + task2 (60) + hypothetical overage: add a 3rd task worth 70min
     // To trigger TIME_EXCEEDED, create a task > 180min total
     // 60 + 60 = 120min, within limit. We need a task that alone = 200min
-    const bigTask = await createTestTask(businessId, bizToken, { name: 'Big Task', timeAllotmentMinutes: 200 });
-
-    // Re-assign the cycle to include bigTask
-    // Directly insert the task into the customer's Service task menu
+    // Add a 200-min task directly to the customer's Service menu (owned row).
     const cycleRow = await knex('customer_services').where('customer_id', customerId).first();
-    await knex('service_task_assignments').insert({
-      task_id: bigTask.id,
+    const [bigTask] = await knex('service_tasks').insert({
       customer_service_id: cycleRow.id,
+      name: 'Big Task',
+      time_allotment_minutes: 200,
+      is_optional: true,
       created_at: knex.raw('CURRENT_TIMESTAMP'),
       updated_at: knex.raw('CURRENT_TIMESTAMP')
-    });
+    }).returning('*');
 
     const res = await request(app)
       .post(`/api/customers/${customerId}/selection-cycle/${selectionCycleId}/submit`)
@@ -151,13 +155,13 @@ describe('POST /api/customers/:customerId/selection-cycle/:selectionCycleId/subm
   });
 
   it('returns 400 for a task not in this cycle', async () => {
-    // Create a task not assigned to this cycle
-    const outsideTask = await createTestTask(businessId, bizToken, { name: 'Outside Task', timeAllotmentMinutes: 10 });
+    // An id that is not part of this Service's own menu.
+    const outsideTaskId = task2.id + 100000;
 
     const res = await request(app)
       .post(`/api/customers/${customerId}/selection-cycle/${selectionCycleId}/submit`)
       .set('Authorization', `Bearer ${custToken}`)
-      .send({ selectedTasks: [outsideTask.id], selectedTotalHours: 1 });
+      .send({ selectedTasks: [outsideTaskId], selectedTotalHours: 1 });
 
     expect(res.status).toBe(400);
     expect(res.body.code).toBe('INVALID_TASK');

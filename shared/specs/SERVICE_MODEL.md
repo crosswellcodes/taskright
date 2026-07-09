@@ -12,6 +12,8 @@
 
 **Dependencies (must not break):** `JOB_COSTING.md` (job_costs, price copy, geo-fencing), `REVIEW_REQUESTS.md` (review_tokens), and the selection/completion/feedback chain. All of these anchor on `selection_cycles.id`, which is why the overhaul is safe (see **Downstream Preservation**).
 
+> **Phase 2 — Per-Service Task Ownership** (`SERVICE_TASK_OWNERSHIP.md`, migration 023) — ✅ **BUILT (July 8, 2026).** C1–C4 moved the *definition* to per-customer ownership but left the **task menu** on the global `tasks` table. Phase 2 retired that table (and the Tasks tab), making tasks owned by the service (`service_tasks`) and template (`template_tasks`). Task shape at every boundary: `{ id?, name, timeAllotmentMinutes }`; service edits diff-upsert by id (selections anchor on `service_tasks.id`). **104/104 backend tests.** See §8 open question "task tweak per customer" — resolved there.
+
 ---
 
 ## Overview

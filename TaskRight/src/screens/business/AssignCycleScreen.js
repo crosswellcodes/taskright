@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert,
   ScrollView, ActivityIndicator, TextInput, Modal
@@ -7,7 +7,7 @@ import { Calendar } from 'react-native-calendars';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import {
-  getServiceTemplates, getTasks, getForecast, createServiceTemplate,
+  getServiceTemplates, getForecast, createServiceTemplate,
   createCustomerService, getCustomerService, updateCustomerService, deleteCustomerService,
 } from '../../api/businessApi';
 
@@ -56,7 +56,10 @@ export default function AssignCycleScreen({ route, navigation }) {
   // Definition
   const [name, setName] = useState('');
   const [frequency, setFrequency] = useState('weekly');
-  const [selectedTaskIds, setSelectedTaskIds] = useState([]);
+  // Tasks are OWNED by this service (SERVICE_TASK_OWNERSHIP.md). Each row:
+  // { id?, name, timeAllotmentMinutes, _key }. `id` present ⇒ existing service_task
+  // (diff-upserted server-side); absent ⇒ new. `_key` is a stable local list key.
+  const [serviceTasks, setServiceTasks] = useState([]);
   const [totalHours, setTotalHours] = useState('');
   const [deadlineDays, setDeadlineDays] = useState('3');
   const [autoRepeatDays, setAutoRepeatDays] = useState('1'); // carried through; feeds save-as-template
@@ -68,12 +71,19 @@ export default function AssignCycleScreen({ route, navigation }) {
   const [showCalendar, setShowCalendar] = useState(false);
 
   // Data
-  const [tasks, setTasks] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [forecast, setForecast] = useState([]);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
+  // Inline task add/edit (local only — no server round-trip until Save)
+  const keyRef = useRef(1);
+  const makeKey = () => `t${keyRef.current++}`;
+  const [taskModalVisible, setTaskModalVisible] = useState(false);
+  const [newTaskName, setNewTaskName] = useState('');
+  const [newTaskMinutes, setNewTaskMinutes] = useState('');
+  const [editingKey, setEditingKey] = useState(null); // null ⇒ adding; else the _key being edited
 
   useEffect(() => {
     navigation.setOptions({ title: isEdit ? 'Edit Service' : 'Add Service' });
@@ -88,12 +98,10 @@ export default function AssignCycleScreen({ route, navigation }) {
   useEffect(() => {
     (async () => {
       try {
-        const [taskData, templateData, forecastData] = await Promise.all([
-          getTasks(user.businessId),
+        const [templateData, forecastData] = await Promise.all([
           getServiceTemplates(user.businessId),
           isEdit ? Promise.resolve(null) : getForecast(user.businessId),
         ]);
-        setTasks(taskData.tasks || []);
         setTemplates(templateData.serviceTemplates || []);
         if (forecastData) setForecast(forecastData.summary?.upcomingServices || []);
 
@@ -101,7 +109,9 @@ export default function AssignCycleScreen({ route, navigation }) {
           const { service } = await getCustomerService(user.businessId, customerId, serviceId);
           setName(service.name || '');
           setFrequency(service.frequency || 'weekly');
-          setSelectedTaskIds(service.taskIds || []);
+          setServiceTasks((service.tasks || []).map(t => ({
+            id: t.id, name: t.name, timeAllotmentMinutes: t.timeAllotmentMinutes, _key: makeKey(),
+          })));
           setTotalHours(service.totalHours != null ? String(service.totalHours) : '');
           setDeadlineDays(service.daysBeforeServiceDeadline != null ? String(service.daysBeforeServiceDeadline) : '3');
           setAutoRepeatDays(service.daysBeforeAutoRepeat != null ? String(service.daysBeforeAutoRepeat) : '1');
@@ -115,13 +125,44 @@ export default function AssignCycleScreen({ route, navigation }) {
     })();
   }, [user.businessId, customerId, serviceId, isEdit]);
 
-  const toggleTask = (taskId) =>
-    setSelectedTaskIds(prev => prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]);
+  const openAddTask = () => {
+    setEditingKey(null);
+    setNewTaskName('');
+    setNewTaskMinutes('');
+    setTaskModalVisible(true);
+  };
+
+  const openEditTask = (item) => {
+    setEditingKey(item._key);
+    setNewTaskName(item.name);
+    setNewTaskMinutes(String(item.timeAllotmentMinutes));
+    setTaskModalVisible(true);
+  };
+
+  // Add or update a task row — purely local; persisted on Save via the `tasks` payload.
+  const handleSaveTask = () => {
+    if (!newTaskName.trim()) return Alert.alert('Error', 'Enter a task name');
+    const mins = parseInt(newTaskMinutes, 10);
+    if (!mins || mins <= 0) return Alert.alert('Error', 'Enter a valid number of minutes');
+    const value = { name: newTaskName.trim(), timeAllotmentMinutes: mins };
+    if (editingKey != null) {
+      // Preserve id + _key so an existing service_task is updated in place (stable id).
+      setServiceTasks(prev => prev.map(t => t._key === editingKey ? { ...t, ...value } : t));
+    } else {
+      setServiceTasks(prev => [...prev, { ...value, _key: makeKey() }]);
+    }
+    setTaskModalVisible(false);
+  };
+
+  const removeTask = (key) => setServiceTasks(prev => prev.filter(t => t._key !== key));
 
   function applyTemplate(t) {
     setName(t.name || '');
     setFrequency(t.frequency || 'weekly');
-    setSelectedTaskIds(t.assignedTasks || []);
+    // Copy the template's tasks into fresh service_task rows (drop template ids).
+    setServiceTasks((t.tasks || []).map(tk => ({
+      name: tk.name, timeAllotmentMinutes: tk.timeAllotmentMinutes, _key: makeKey(),
+    })));
     if (t.daysBeforeServiceDeadline != null) setDeadlineDays(String(t.daysBeforeServiceDeadline));
     setShowTemplatePicker(false);
   }
@@ -147,7 +188,11 @@ export default function AssignCycleScreen({ route, navigation }) {
     const base = {
       name: name.trim(),
       frequency,
-      taskIds: selectedTaskIds,
+      tasks: serviceTasks.map(t => ({
+        ...(t.id != null ? { id: t.id } : {}),
+        name: t.name,
+        timeAllotmentMinutes: t.timeAllotmentMinutes,
+      })),
       totalHours: hours,
       pricePerVisit: price,
       ...(deadline !== undefined ? { daysBeforeServiceDeadline: deadline } : {}),
@@ -211,7 +256,8 @@ export default function AssignCycleScreen({ route, navigation }) {
         frequency,
         daysBeforeServiceDeadline: deadline,
         daysBeforeAutoRepeat: repeat,
-        taskIds: selectedTaskIds,
+        // Template tasks are fresh copies (definition-only) — drop per-service ids.
+        tasks: serviceTasks.map(t => ({ name: t.name, timeAllotmentMinutes: t.timeAllotmentMinutes })),
       });
       Alert.alert('Saved as Template', `"${name.trim()}" is now reusable from the Templates tab.`);
     } catch (err) {
@@ -277,19 +323,25 @@ export default function AssignCycleScreen({ route, navigation }) {
         </View>
 
         <Text style={styles.label}>Tasks</Text>
-        {tasks.length === 0 ? (
-          <Text style={styles.noneText}>No tasks yet. Create tasks in the Tasks tab.</Text>
+        <Text style={styles.hint}>Tasks belong to this service. Editing them affects only {customerName}.</Text>
+        {serviceTasks.length === 0 ? (
+          <Text style={styles.noneText}>No tasks yet — add one below.</Text>
         ) : (
-          tasks.map(t => {
-            const on = selectedTaskIds.includes(t.id);
-            return (
-              <TouchableOpacity key={t.id} style={[styles.taskRow, on && styles.taskRowActive]} onPress={() => toggleTask(t.id)}>
-                <Text style={[styles.taskName, on && styles.taskNameActive]}>{t.name}</Text>
-                <Text style={styles.taskTime}>{on ? '✓ ' : ''}{t.timeAllotmentMinutes} min</Text>
+          serviceTasks.map(t => (
+            <View key={t._key} style={styles.taskRow}>
+              <TouchableOpacity style={styles.taskRowMain} onPress={() => openEditTask(t)}>
+                <Text style={styles.taskName}>{t.name}</Text>
+                <Text style={styles.taskTime}>{t.timeAllotmentMinutes} min · tap to edit</Text>
               </TouchableOpacity>
-            );
-          })
+              <TouchableOpacity style={styles.removeTaskBtn} onPress={() => removeTask(t._key)}>
+                <Text style={styles.removeTaskText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          ))
         )}
+        <TouchableOpacity style={styles.addTaskRow} onPress={openAddTask}>
+          <Text style={styles.addTaskRowText}>+ New task</Text>
+        </TouchableOpacity>
 
         <Text style={styles.label}>Hours per Visit</Text>
         <TextInput style={styles.input} placeholder="e.g. 2.5" value={totalHours} onChangeText={setTotalHours} keyboardType="decimal-pad" />
@@ -410,6 +462,25 @@ export default function AssignCycleScreen({ route, navigation }) {
           </View>
         </View>
       </Modal>
+
+      {/* Inline task add/edit */}
+      <Modal visible={taskModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.calendarModal}>
+            <Text style={styles.calendarTitle}>{editingKey != null ? 'Edit Task' : 'New Task'}</Text>
+            <Text style={styles.label}>Task Name</Text>
+            <TextInput style={styles.input} value={newTaskName} onChangeText={setNewTaskName} placeholder="e.g. Vacuum living room" />
+            <Text style={styles.label}>Time (minutes)</Text>
+            <TextInput style={styles.input} value={newTaskMinutes} onChangeText={setNewTaskMinutes} placeholder="e.g. 30" keyboardType="number-pad" />
+            <TouchableOpacity style={[styles.btn, { marginTop: 20 }]} onPress={handleSaveTask}>
+              <Text style={styles.btnText}>{editingKey != null ? 'Save Task' : 'Add Task'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => setTaskModalVisible(false)}>
+              <Text style={styles.cancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -434,11 +505,15 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 13, color: '#555', textTransform: 'capitalize' },
   chipTextActive: { color: '#2563eb', fontWeight: '700' },
 
-  taskRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1.5, borderColor: '#eee', borderRadius: 10, padding: 12, marginBottom: 6 },
-  taskRowActive: { borderColor: '#2563eb', backgroundColor: '#eff6ff' },
-  taskName: { fontSize: 15, color: '#333' },
-  taskNameActive: { color: '#2563eb', fontWeight: '600' },
-  taskTime: { fontSize: 12, color: '#888' },
+  taskRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#eee', borderRadius: 10, padding: 12, marginBottom: 6 },
+  taskRowMain: { flex: 1 },
+  taskName: { fontSize: 15, color: '#333', fontWeight: '500' },
+  taskTime: { fontSize: 12, color: '#888', marginTop: 2 },
+  removeTaskBtn: { paddingHorizontal: 10, paddingVertical: 4, marginLeft: 8 },
+  removeTaskText: { fontSize: 16, color: '#dc2626', fontWeight: '600' },
+
+  addTaskRow: { borderWidth: 1.5, borderColor: '#bfdbfe', borderStyle: 'dashed', borderRadius: 10, padding: 12, marginBottom: 6, alignItems: 'center' },
+  addTaskRowText: { fontSize: 14, color: '#2563eb', fontWeight: '600' },
 
   amountRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#ddd', borderRadius: 10, paddingHorizontal: 14, backgroundColor: '#fafafa' },
   amountPrefix: { fontSize: 16, color: '#6b7280', marginRight: 4 },

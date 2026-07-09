@@ -459,61 +459,12 @@ Empty array is valid: `{ "selectedTaskIds": [] }` — interpreted as "no specifi
 
 ### Tasks
 
-#### Create Task
-**POST** `/businesses/:businessId/tasks`
-
-**Authentication**: Required (Business)
-
-**Request Body**:
-```json
-{
-  "name": "Bathroom cleaning",
-  "description": "Clean bathroom including toilet, sink, shower",
-  "timeAllotmentMinutes": 45
-}
-```
-
-**Response (201)**:
-```json
-{
-  "success": true,
-  "task": {
-    "id": 1,
-    "businessId": 1,
-    "name": "Bathroom cleaning",
-    "description": "...",
-    "timeAllotmentMinutes": 45,
-    "createdAt": "2026-03-16T12:00:00Z"
-  }
-}
-```
-
-#### Get All Tasks
-**GET** `/businesses/:businessId/tasks`
-
-**Response (200)**:
-```json
-{
-  "success": true,
-  "tasks": [ /* array of task objects */ ]
-}
-```
-
-#### Update Task
-**PUT** `/businesses/:businessId/tasks/:taskId`
-
-**Request Body**: (same as create)
-
-#### Delete Task
-**DELETE** `/businesses/:businessId/tasks/:taskId`
-
-**Response (200)**:
-```json
-{
-  "success": true,
-  "message": "Task deleted"
-}
-```
+> **Phase 2 (SERVICE_TASK_OWNERSHIP.md, migration 023):** the global `tasks` table and its
+> `POST/GET/PUT/DELETE /businesses/:businessId/tasks` routes were **removed**. Tasks are now
+> **owned** per-service (`service_tasks`) and per-template (`template_tasks`). There are no
+> standalone task endpoints — a task is authored inline inside a Service or a Template as part
+> of that resource's `tasks` array. **Task shape everywhere:** `{ id?, name, timeAllotmentMinutes }`
+> (`id` present ⇒ existing `service_task`, diff-upserted in place; absent ⇒ new).
 
 ---
 
@@ -534,10 +485,12 @@ Empty array is valid: `{ "selectedTaskIds": [] }` — interpreted as "no specifi
   "frequency": "weekly",
   "daysBeforeServiceDeadline": 3,
   "daysBeforeAutoRepeat": 1,
-  "taskIds": [1, 2, 3]
+  "tasks": [{ "name": "Vacuum", "timeAllotmentMinutes": 20 }, { "name": "Mop", "timeAllotmentMinutes": 30 }]
 }
 ```
-**Response (201)**: `{ success, serviceTemplate: { id, businessId, name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, assignedTasks, createdAt } }`
+**Response (201)**: `{ success, serviceTemplate: { id, businessId, name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, tasks: [{ id, name, timeAllotmentMinutes }], createdAt } }`
+
+`GET` returns `serviceTemplates: [{ …, tasks: [{ id, name, timeAllotmentMinutes }] }]`. `PUT` accepts `tasks` (replaces the menu wholesale) and returns the updated `tasks`.
 
 #### Get All Service Templates
 **GET** `/businesses/:businessId/service-templates` → `{ success, serviceTemplates: [...], total }`
@@ -595,24 +548,25 @@ Service Call / `selection_cycles`).
   "frequency": "weekly",
   "daysBeforeServiceDeadline": 2,
   "daysBeforeAutoRepeat": 1,
-  "taskIds": [1, 2],
+  "tasks": [{ "name": "Vacuum", "timeAllotmentMinutes": 20 }, { "name": "Mop", "timeAllotmentMinutes": 30 }],
   "totalHours": 3,
   "startDate": "2026-07-20",
   "dayOfWeek": null,
   "pricePerVisit": 150
 }
 ```
-`201` → `{ success, service }`. Generates the upcoming Service Calls and the Service's own task menu.
+`201` → `{ success, service }`. Generates the upcoming Service Calls and the Service's own task menu
+(`service_tasks`). When seeded from a template, its `template_tasks` are copied into `service_tasks`.
 Scheduling validated per business format (`startDate` for date-based, `dayOfWeek` 0–6 for day-of-week).
 Multiple Services per customer are allowed.
 
 #### Get Service (full definition)
 **GET** `/businesses/:businessId/customers/:customerId/services/:serviceId`
-→ `{ success, service: { id, customerId, templateId, name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, totalHours, pricePerVisit, startDate, dayOfWeek, taskIds } }`
+→ `{ success, service: { id, customerId, templateId, name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, totalHours, pricePerVisit, startDate, dayOfWeek, tasks: [{ id, name, timeAllotmentMinutes }] } }`
 
 #### Update Service (definition-only)
 **PATCH** `/businesses/:businessId/customers/:customerId/services/:serviceId`
-Accepts any subset of `{ name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, totalHours, pricePerVisit, taskIds, startDate, dayOfWeek }`. Does **not** regenerate or delete Service Calls; a deadline change recomputes `submission_deadline` on open calls only.
+Accepts any subset of `{ name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, totalHours, pricePerVisit, tasks, startDate, dayOfWeek }`. `tasks` is **diff-upserted by id** (item with `id` → update in place; without `id` → insert; existing row absent from the payload → delete) so live selections never orphan (`selections.selected_tasks` references `service_tasks.id`). Does **not** regenerate or delete Service Calls; a deadline change recomputes `submission_deadline` on open calls only.
 
 #### Delete Service
 **DELETE** `/businesses/:businessId/customers/:customerId/services/:serviceId`

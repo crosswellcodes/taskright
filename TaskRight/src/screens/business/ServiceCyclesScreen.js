@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, ActivityIndicator, Alert, RefreshControl, Modal
@@ -7,7 +7,7 @@ import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context'
 import { useAuth } from '../../context/AuthContext';
 import {
   getServiceTemplates, createServiceTemplate, updateServiceTemplate,
-  deleteServiceTemplate, getTasks
+  deleteServiceTemplate
 } from '../../api/businessApi';
 
 const FREQUENCIES = ['weekly', 'biweekly', 'monthly', 'yearly'];
@@ -16,7 +16,6 @@ export default function ServiceCyclesScreen({ navigation }) {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const [cycles, setCycles] = useState([]);
-  const [allTasks, setAllTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -28,16 +27,22 @@ export default function ServiceCyclesScreen({ navigation }) {
   const [frequency, setFrequency] = useState('weekly');
   const [daysBeforeDeadline, setDaysBeforeDeadline] = useState('3');
   const [daysBeforeRepeat, setDaysBeforeRepeat] = useState('1');
-  const [selectedTaskIds, setSelectedTaskIds] = useState([]);
+  // A template owns its task menu (SERVICE_TASK_OWNERSHIP.md). Each row:
+  // { id?, name, timeAllotmentMinutes, _key }. `_key` is a stable local list key.
+  const [templateTasks, setTemplateTasks] = useState([]);
+
+  // Inline task add/edit (local only until the template is saved)
+  const keyRef = useRef(1);
+  const makeKey = () => `t${keyRef.current++}`;
+  const [taskModalVisible, setTaskModalVisible] = useState(false);
+  const [newTaskName, setNewTaskName] = useState('');
+  const [newTaskMinutes, setNewTaskMinutes] = useState('');
+  const [editingKey, setEditingKey] = useState(null); // null ⇒ adding; else the _key being edited
 
   const fetchData = useCallback(async () => {
     try {
-      const [cycleData, taskData] = await Promise.all([
-        getServiceTemplates(user.businessId),
-        getTasks(user.businessId),
-      ]);
+      const cycleData = await getServiceTemplates(user.businessId);
       setCycles(cycleData.serviceTemplates || []);
-      setAllTasks(taskData.tasks || []);
     } catch (err) {
       Alert.alert('Error', err.message || 'Failed to load data');
     } finally {
@@ -53,11 +58,34 @@ export default function ServiceCyclesScreen({ navigation }) {
     return unsubscribe;
   }, [navigation, fetchData]);
 
-  const toggleTaskSelection = (taskId) => {
-    setSelectedTaskIds(prev =>
-      prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]
-    );
+  const openAddTask = () => {
+    setEditingKey(null);
+    setNewTaskName('');
+    setNewTaskMinutes('');
+    setTaskModalVisible(true);
   };
+
+  const openEditTask = (item) => {
+    setEditingKey(item._key);
+    setNewTaskName(item.name);
+    setNewTaskMinutes(String(item.timeAllotmentMinutes));
+    setTaskModalVisible(true);
+  };
+
+  const handleSaveTask = () => {
+    if (!newTaskName.trim()) return Alert.alert('Error', 'Enter a task name');
+    const mins = parseInt(newTaskMinutes, 10);
+    if (!mins || mins <= 0) return Alert.alert('Error', 'Enter a valid number of minutes');
+    const value = { name: newTaskName.trim(), timeAllotmentMinutes: mins };
+    if (editingKey != null) {
+      setTemplateTasks(prev => prev.map(t => t._key === editingKey ? { ...t, ...value } : t));
+    } else {
+      setTemplateTasks(prev => [...prev, { ...value, _key: makeKey() }]);
+    }
+    setTaskModalVisible(false);
+  };
+
+  const removeTask = (key) => setTemplateTasks(prev => prev.filter(t => t._key !== key));
 
   const openCreate = () => {
     setEditCycle(null);
@@ -65,7 +93,7 @@ export default function ServiceCyclesScreen({ navigation }) {
     setFrequency('weekly');
     setDaysBeforeDeadline('3');
     setDaysBeforeRepeat('1');
-    setSelectedTaskIds([]);
+    setTemplateTasks([]);
     setModalVisible(true);
   };
 
@@ -75,7 +103,9 @@ export default function ServiceCyclesScreen({ navigation }) {
     setFrequency(cycle.frequency);
     setDaysBeforeDeadline(String(cycle.daysBeforeServiceDeadline));
     setDaysBeforeRepeat(String(cycle.daysBeforeAutoRepeat));
-    setSelectedTaskIds(cycle.assignedTasks || []);
+    setTemplateTasks((cycle.tasks || []).map(t => ({
+      id: t.id, name: t.name, timeAllotmentMinutes: t.timeAllotmentMinutes, _key: makeKey(),
+    })));
     setModalVisible(true);
   };
 
@@ -88,7 +118,8 @@ export default function ServiceCyclesScreen({ navigation }) {
         frequency,
         daysBeforeServiceDeadline: parseInt(daysBeforeDeadline) || 3,
         daysBeforeAutoRepeat: parseInt(daysBeforeRepeat) || 1,
-        taskIds: selectedTaskIds,
+        // Template menus are replaced wholesale server-side — send name/time only.
+        tasks: templateTasks.map(t => ({ name: t.name, timeAllotmentMinutes: t.timeAllotmentMinutes })),
       };
       if (editCycle) {
         await updateServiceTemplate(user.businessId, editCycle.id, payload);
@@ -149,7 +180,7 @@ export default function ServiceCyclesScreen({ navigation }) {
           <View style={styles.card}>
             <View style={styles.cardLeft}>
               <Text style={styles.cycleName}>{item.name}</Text>
-              <Text style={styles.cycleFreq}>{item.frequency} · {item.assignedTasks?.length || 0} tasks</Text>
+              <Text style={styles.cycleFreq}>{item.frequency} · {item.tasks?.length || 0} tasks</Text>
               <Text style={styles.cycleDays}>
                 Selection deadline: {item.daysBeforeServiceDeadline}d before service
               </Text>
@@ -205,24 +236,29 @@ export default function ServiceCyclesScreen({ navigation }) {
               <TextInput style={styles.input} value={daysBeforeRepeat} onChangeText={setDaysBeforeRepeat} keyboardType="number-pad" placeholder="1" />
 
               <Text style={styles.label}>Tasks (optional)</Text>
+              <Text style={styles.taskHint}>Tasks are copied into a customer's service when they start from this template.</Text>
             </>
           }
-          data={allTasks}
-          keyExtractor={item => String(item.id)}
-          renderItem={({ item }) => {
-            const isSelected = selectedTaskIds.includes(item.id);
-            return (
-              <TouchableOpacity
-                style={[styles.taskOption, isSelected && styles.taskOptionSelected]}
-                onPress={() => toggleTaskSelection(item.id)}
-              >
-                <Text style={[styles.taskOptionName, isSelected && styles.taskOptionNameSelected]}>{item.name}</Text>
-                <Text style={styles.taskOptionTime}>{item.timeAllotmentMinutes} min</Text>
+          data={templateTasks}
+          keyExtractor={item => item._key}
+          ListEmptyComponent={<Text style={styles.noTasksText}>No tasks yet — add one below.</Text>}
+          renderItem={({ item }) => (
+            <View style={styles.taskOption}>
+              <TouchableOpacity style={styles.taskOptionMain} onPress={() => openEditTask(item)}>
+                <Text style={styles.taskOptionName}>{item.name}</Text>
+                <Text style={styles.taskOptionTime}>{item.timeAllotmentMinutes} min · tap to edit</Text>
               </TouchableOpacity>
-            );
-          }}
+              <TouchableOpacity style={styles.removeTaskBtn} onPress={() => removeTask(item._key)}>
+                <Text style={styles.removeTaskText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           ListFooterComponent={
             <>
+              <TouchableOpacity style={styles.addTaskRow} onPress={openAddTask}>
+                <Text style={styles.addTaskRowText}>+ New task</Text>
+              </TouchableOpacity>
+
               <TouchableOpacity style={[styles.saveBtn, saving && styles.saveBtnDisabled]} onPress={handleSave} disabled={saving}>
                 {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>{editCycle ? 'Save Changes' : 'Create Template'}</Text>}
               </TouchableOpacity>
@@ -232,6 +268,25 @@ export default function ServiceCyclesScreen({ navigation }) {
             </>
           }
         />
+
+        {/* Inline task add/edit */}
+        <Modal visible={taskModalVisible} transparent animationType="fade">
+          <View style={styles.taskModalOverlay}>
+            <View style={styles.taskModalCard}>
+              <Text style={styles.taskModalTitle}>{editingKey != null ? 'Edit Task' : 'New Task'}</Text>
+              <Text style={styles.label}>Task Name</Text>
+              <TextInput style={styles.input} value={newTaskName} onChangeText={setNewTaskName} placeholder="e.g. Vacuum living room" />
+              <Text style={styles.label}>Time (minutes)</Text>
+              <TextInput style={styles.input} value={newTaskMinutes} onChangeText={setNewTaskMinutes} placeholder="e.g. 30" keyboardType="number-pad" />
+              <TouchableOpacity style={[styles.saveBtn, { marginTop: 20 }]} onPress={handleSaveTask}>
+                <Text style={styles.saveBtnText}>{editingKey != null ? 'Save Task' : 'Add Task'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setTaskModalVisible(false)}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </Modal>
     </View>
     </SafeAreaView>
@@ -267,11 +322,19 @@ const styles = StyleSheet.create({
   freqBtnSelected: { borderColor: '#2563eb', backgroundColor: '#eff6ff' },
   freqBtnText: { color: '#555', fontSize: 14 },
   freqBtnTextSelected: { color: '#2563eb', fontWeight: '600' },
-  taskOption: { flexDirection: 'row', justifyContent: 'space-between', padding: 12, borderWidth: 1.5, borderColor: '#eee', borderRadius: 10, marginBottom: 6 },
-  taskOptionSelected: { borderColor: '#2563eb', backgroundColor: '#eff6ff' },
-  taskOptionName: { fontSize: 15, color: '#333' },
-  taskOptionNameSelected: { color: '#2563eb', fontWeight: '600' },
-  taskOptionTime: { fontSize: 13, color: '#888' },
+  taskHint: { fontSize: 12, color: '#9ca3af', marginTop: 2, marginBottom: 8, lineHeight: 17 },
+  noTasksText: { fontSize: 14, color: '#aaa', fontStyle: 'italic', marginBottom: 6 },
+  taskOption: { flexDirection: 'row', alignItems: 'center', padding: 12, borderWidth: 1.5, borderColor: '#eee', borderRadius: 10, marginBottom: 6 },
+  taskOptionMain: { flex: 1 },
+  taskOptionName: { fontSize: 15, color: '#333', fontWeight: '500' },
+  taskOptionTime: { fontSize: 13, color: '#888', marginTop: 2 },
+  removeTaskBtn: { paddingHorizontal: 10, paddingVertical: 4, marginLeft: 8 },
+  removeTaskText: { fontSize: 16, color: '#dc2626', fontWeight: '600' },
+  addTaskRow: { borderWidth: 1.5, borderColor: '#bfdbfe', borderStyle: 'dashed', borderRadius: 10, padding: 12, marginBottom: 6, alignItems: 'center' },
+  addTaskRowText: { fontSize: 14, color: '#2563eb', fontWeight: '600' },
+  taskModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', padding: 16 },
+  taskModalCard: { backgroundColor: '#fff', borderRadius: 16, padding: 20, width: '100%' },
+  taskModalTitle: { fontSize: 18, fontWeight: '600', color: '#1a1a1a', marginBottom: 4, textAlign: 'center' },
   saveBtn: { backgroundColor: '#2563eb', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 24 },
   saveBtnDisabled: { backgroundColor: '#93c5fd' },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },

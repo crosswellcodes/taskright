@@ -1,9 +1,12 @@
 const request = require('supertest');
 const {
   app, knex, truncateAllTables,
-  createTestBusiness, createTestTask, createTestServiceCycle,
+  createTestBusiness, createTestServiceCycle, getServiceTasksForCustomer,
   addCustomerToBusiness, assignCycleToCustomer
 } = require('./helpers');
+
+// Phase 2: template menus are inline task objects.
+const TASK = { name: 'Service task', timeAllotmentMinutes: 60 };
 
 let businessId, token;
 
@@ -30,8 +33,7 @@ describe('GET /api/businesses/:businessId/selections', () => {
   });
 
   it('returns upcoming services grouped by date after assigning customers', async () => {
-    const task = await createTestTask(businessId, token, { timeAllotmentMinutes: 60 });
-    const cycle = await createTestServiceCycle(businessId, token, [task.id]);
+    const cycle = await createTestServiceCycle(businessId, token, [TASK]);
 
     const c1 = await addCustomerToBusiness(businessId, token, { name: 'Alice', phoneNumber: '+13330001111' });
     const c2 = await addCustomerToBusiness(businessId, token, { name: 'Bob', phoneNumber: '+13330002222' });
@@ -56,8 +58,7 @@ describe('GET /api/businesses/:businessId/selections', () => {
   });
 
   it('reflects submitted selections in forecast', async () => {
-    const task = await createTestTask(businessId, token, { timeAllotmentMinutes: 60 });
-    const cycle = await createTestServiceCycle(businessId, token, [task.id]);
+    const cycle = await createTestServiceCycle(businessId, token, [TASK]);
 
     const customer = await addCustomerToBusiness(businessId, token, { name: 'Alice', phoneNumber: '+13330001111' });
     await assignCycleToCustomer(businessId, customer.id, cycle.id, token, 2);
@@ -70,11 +71,12 @@ describe('GET /api/businesses/:businessId/selections', () => {
     const custId = loginRes.body.customer.id;
 
     const scRow = await knex('selection_cycles').where('customer_id', custId).orderBy('service_date').first();
+    const [svcTask] = await getServiceTasksForCustomer(custId);
 
     await request(app)
       .post(`/api/customers/${custId}/selection-cycle/${scRow.id}/submit`)
       .set('Authorization', `Bearer ${custToken}`)
-      .send({ selectedTasks: [task.id], selectedTotalHours: 1 });
+      .send({ selectedTasks: [svcTask.id], selectedTotalHours: 1 });
 
     const res = await request(app)
       .get(`/api/businesses/${businessId}/selections`)
@@ -112,8 +114,7 @@ describe('GET /api/businesses/:businessId/selections', () => {
 
 describe('POST /api/businesses/:businessId/customers/:customerId/mark-service-complete', () => {
   it('marks a selection cycle as complete', async () => {
-    const task = await createTestTask(businessId, token, { timeAllotmentMinutes: 60 });
-    const cycle = await createTestServiceCycle(businessId, token, [task.id]);
+    const cycle = await createTestServiceCycle(businessId, token, [TASK]);
     const customer = await addCustomerToBusiness(businessId, token, { name: 'Alice', phoneNumber: '+13330001111' });
     await assignCycleToCustomer(businessId, customer.id, cycle.id, token, 2);
 
@@ -134,8 +135,7 @@ describe('POST /api/businesses/:businessId/customers/:customerId/mark-service-co
   });
 
   it('returns 409 when marking the same service complete twice', async () => {
-    const task = await createTestTask(businessId, token, { timeAllotmentMinutes: 60 });
-    const cycle = await createTestServiceCycle(businessId, token, [task.id]);
+    const cycle = await createTestServiceCycle(businessId, token, [TASK]);
     const customer = await addCustomerToBusiness(businessId, token, { name: 'Alice', phoneNumber: '+13330001111' });
     await assignCycleToCustomer(businessId, customer.id, cycle.id, token, 2);
 

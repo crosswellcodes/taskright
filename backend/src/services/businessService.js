@@ -96,64 +96,55 @@ async function getBusinessByPhone(phoneNumber) {
   return await knex('businesses').where('phone_number', phoneNumber).first();
 }
 
-// ─── TASKS ───────────────────────────────────────────────────────────────────
+// ─── TASKS (owned, not global) ───────────────────────────────────────────────
+// Phase 2 (SERVICE_TASK_OWNERSHIP.md): the global `tasks` table is retired.
+// Tasks are now owned rows on `service_tasks` (per customer_services) and
+// `template_tasks` (per service_templates). Shape at every boundary:
+//   { id?, name, timeAllotmentMinutes }
 
-async function createTask(businessId, name, timeAllotmentMinutes) {
-  const inserted = await knex('tasks')
-    .insert({
-      business_id: businessId,
-      name: name.trim(),
-      time_allotment_minutes: timeAllotmentMinutes,
-      is_optional: true,
-      created_at: knex.raw('CURRENT_TIMESTAMP'),
-      updated_at: knex.raw('CURRENT_TIMESTAMP')
-    })
-    .returning('*');
-
-  return inserted[0];
+// Normalize a service_tasks / template_tasks row to the API task shape.
+function taskShape(row) {
+  return { id: row.id, name: row.name, timeAllotmentMinutes: row.time_allotment_minutes };
 }
 
-async function getTasksByBusiness(businessId) {
-  return await knex('tasks')
-    .where('business_id', businessId)
-    .orderBy('created_at', 'asc');
-}
-
-async function getTaskById(taskId) {
-  return await knex('tasks').where('id', taskId).first();
-}
-
-async function updateTask(taskId, data) {
-  const updates = { updated_at: knex.raw('CURRENT_TIMESTAMP') };
-  if (data.name !== undefined) updates.name = data.name.trim();
-  if (data.timeAllotmentMinutes !== undefined) {
-    updates.time_allotment_minutes = data.timeAllotmentMinutes;
+// Validate an incoming task payload ({ id?, name, timeAllotmentMinutes }[]).
+function validateTasks(tasks) {
+  if (tasks === undefined) return;
+  if (!Array.isArray(tasks)) {
+    throw Object.assign(new Error('tasks must be an array'), { code: 'VALIDATION_ERROR', statusCode: 400 });
   }
-
-  const updated = await knex('tasks').where('id', taskId).update(updates).returning('*');
-  return updated[0];
-}
-
-async function deleteTask(taskId) {
-  return await knex('tasks').where('id', taskId).delete();
+  for (const t of tasks) {
+    if (!t || typeof t.name !== 'string' || !t.name.trim()) {
+      throw Object.assign(new Error('each task requires a non-empty name'), { code: 'VALIDATION_ERROR', statusCode: 400 });
+    }
+    if (typeof t.timeAllotmentMinutes !== 'number' || t.timeAllotmentMinutes < 0) {
+      throw Object.assign(new Error('each task requires a non-negative timeAllotmentMinutes'), { code: 'VALIDATION_ERROR', statusCode: 400 });
+    }
+  }
 }
 
 // ─── SERVICE TEMPLATES (business-global reusable library) ────────────────────
 // Formerly "service cycles". These are decoupled templates you optionally seed a
 // customer's Service from. Editing a template never touches existing services.
 
-async function createServiceTemplate(businessId, name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, taskIds) {
-  if (taskIds && taskIds.length > 0) {
-    const tasks = await knex('tasks')
-      .whereIn('id', taskIds)
-      .where('business_id', businessId);
-    if (tasks.length !== taskIds.length) {
-      const error = new Error('One or more task IDs not found');
-      error.code = 'TASK_NOT_FOUND';
-      error.statusCode = 404;
-      throw error;
-    }
-  }
+// Insert a template's task menu (owned template_tasks rows). Returns task shapes.
+async function insertTemplateTasks(templateId, tasks) {
+  if (!tasks || tasks.length === 0) return [];
+  const rows = await knex('template_tasks')
+    .insert(tasks.map(t => ({
+      template_id: templateId,
+      name: String(t.name).trim(),
+      time_allotment_minutes: t.timeAllotmentMinutes,
+      is_optional: true,
+      created_at: knex.raw('CURRENT_TIMESTAMP'),
+      updated_at: knex.raw('CURRENT_TIMESTAMP')
+    })))
+    .returning('*');
+  return rows.map(taskShape);
+}
+
+async function createServiceTemplate(businessId, name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, tasks = []) {
+  validateTasks(tasks);
 
   const inserted = await knex('service_templates')
     .insert({
@@ -168,20 +159,7 @@ async function createServiceTemplate(businessId, name, frequency, daysBeforeServ
     .returning('*');
 
   const cycle = inserted[0];
-
-  if (taskIds && taskIds.length > 0) {
-    const taskAssignments = taskIds.map(taskId => ({
-      task_id: taskId,
-      template_id: cycle.id,
-      created_at: knex.raw('CURRENT_TIMESTAMP'),
-      updated_at: knex.raw('CURRENT_TIMESTAMP')
-    }));
-    await knex('template_task_assignments').insert(taskAssignments);
-  }
-
-  const assignedTasks = taskIds && taskIds.length > 0
-    ? await knex('tasks').whereIn('id', taskIds)
-    : [];
+  const assignedTasks = await insertTemplateTasks(cycle.id, tasks);
 
   return { cycle, assignedTasks };
 }
@@ -192,8 +170,8 @@ async function getServiceTemplatesByBusiness(businessId) {
     .orderBy('created_at', 'asc');
 
   for (const cycle of cycles) {
-    const assignments = await knex('template_task_assignments').where('template_id', cycle.id);
-    cycle.assignedTasks = assignments.map(a => a.task_id);
+    const rows = await knex('template_tasks').where('template_id', cycle.id).orderBy('id', 'asc');
+    cycle.assignedTasks = rows.map(taskShape);
   }
 
   return cycles;
@@ -217,18 +195,12 @@ async function updateServiceTemplate(cycleId, data) {
   const updated = await knex('service_templates').where('id', cycleId).update(updates).returning('*');
   const cycle = updated[0];
 
-  if (data.taskIds !== undefined) {
-    await knex('template_task_assignments').where('template_id', cycleId).delete();
-    if (data.taskIds.length > 0) {
-      const taskAssignments = data.taskIds.map(taskId => ({
-        task_id: taskId,
-        template_id: cycleId,
-        created_at: knex.raw('CURRENT_TIMESTAMP'),
-        updated_at: knex.raw('CURRENT_TIMESTAMP')
-      }));
-      await knex('template_task_assignments').insert(taskAssignments);
-    }
-    cycle.assignedTasks = data.taskIds;
+  // Templates carry no live references (nothing keys off template_tasks.id), so a
+  // wholesale replace is safe here — unlike service_tasks, which selections point at.
+  if (data.tasks !== undefined) {
+    validateTasks(data.tasks);
+    await knex('template_tasks').where('template_id', cycleId).delete();
+    cycle.assignedTasks = await insertTemplateTasks(cycleId, data.tasks);
   }
 
   return cycle;
@@ -384,10 +356,70 @@ async function updateCustomerDetails(customerId, data) {
 // Copies the given task list into the Service's own menu, generates the upcoming
 // Service Calls, and fires the welcome SMS. Wrapped by createCustomerServiceForBusiness
 // (from-scratch or template-seeded).
+// Insert a Service's task menu (owned service_tasks rows). Returns task shapes.
+async function insertServiceTasks(serviceId, tasks) {
+  if (!tasks || tasks.length === 0) return [];
+  const rows = await knex('service_tasks')
+    .insert(tasks.map(t => ({
+      customer_service_id: serviceId,
+      name: String(t.name).trim(),
+      time_allotment_minutes: t.timeAllotmentMinutes,
+      is_optional: true,
+      created_at: knex.raw('CURRENT_TIMESTAMP'),
+      updated_at: knex.raw('CURRENT_TIMESTAMP')
+    })))
+    .returning('*');
+  return rows.map(taskShape);
+}
+
+// Diff-upsert a Service's task menu WITHOUT churning ids (SERVICE_TASK_OWNERSHIP §2.2).
+// selections.selected_tasks references service_tasks.id, so a wholesale delete+
+// reinsert would orphan live selections. Instead:
+//   item with a valid existing id → UPDATE in place
+//   item without id (or with a foreign id) → INSERT
+//   existing row absent from payload → DELETE
+async function diffUpsertServiceTasks(serviceId, tasks) {
+  const existing = await knex('service_tasks')
+    .where('customer_service_id', serviceId).select('id');
+  const existingIds = new Set(existing.map(r => r.id));
+  const keepIds = new Set();
+
+  for (const t of tasks) {
+    const name = String(t.name).trim();
+    if (t.id != null && existingIds.has(t.id)) {
+      await knex('service_tasks')
+        .where('id', t.id).where('customer_service_id', serviceId)
+        .update({
+          name,
+          time_allotment_minutes: t.timeAllotmentMinutes,
+          updated_at: knex.raw('CURRENT_TIMESTAMP')
+        });
+      keepIds.add(t.id);
+    } else {
+      const [row] = await knex('service_tasks')
+        .insert({
+          customer_service_id: serviceId,
+          name,
+          time_allotment_minutes: t.timeAllotmentMinutes,
+          is_optional: true,
+          created_at: knex.raw('CURRENT_TIMESTAMP'),
+          updated_at: knex.raw('CURRENT_TIMESTAMP')
+        })
+        .returning('id');
+      keepIds.add(row.id);
+    }
+  }
+
+  const toDelete = [...existingIds].filter(id => !keepIds.has(id));
+  if (toDelete.length > 0) {
+    await knex('service_tasks').whereIn('id', toDelete).delete();
+  }
+}
+
 async function createCustomerService(customerId, {
   templateId = null, name, frequency,
   daysBeforeServiceDeadline, daysBeforeAutoRepeat,
-  taskIds = [], totalHours, startDate = null, dayOfWeek = null, pricePerVisit = null,
+  tasks = [], totalHours, startDate = null, dayOfWeek = null, pricePerVisit = null,
 }) {
   const [service] = await knex('customer_services')
     .insert({
@@ -406,14 +438,7 @@ async function createCustomerService(customerId, {
     })
     .returning('*');
 
-  if (taskIds && taskIds.length > 0) {
-    await knex('service_task_assignments').insert(taskIds.map(taskId => ({
-      customer_service_id: service.id,
-      task_id: taskId,
-      created_at: knex.raw('CURRENT_TIMESTAMP'),
-      updated_at: knex.raw('CURRENT_TIMESTAMP')
-    })));
-  }
+  await insertServiceTasks(service.id, tasks);
 
   await generateUpcomingSelectionCycles(customerId, service, startDate, dayOfWeek);
 
@@ -455,17 +480,10 @@ async function getOwnedCustomerService(businessId, serviceId) {
   return svc;
 }
 
-async function validateTaskIds(businessId, taskIds) {
-  if (!taskIds || taskIds.length === 0) return;
-  const rows = await knex('tasks').whereIn('id', taskIds).where('business_id', businessId);
-  if (rows.length !== new Set(taskIds).size) {
-    throw Object.assign(new Error('One or more task IDs not found'), { code: 'TASK_NOT_FOUND', statusCode: 404 });
-  }
-}
-
 // Build a per-customer Service directly on the profile. Optionally seed defaults
 // from a template (templateId); any explicitly-provided field overrides the seed.
-// Decoupled after creation — no live link back to the template.
+// Decoupled after creation — the template's tasks are COPIED into this Service's
+// own service_tasks (no live link back).
 async function createCustomerServiceForBusiness(businessId, customerId, input = {}) {
   let seed = {};
   let templateId = null;
@@ -476,13 +494,14 @@ async function createCustomerServiceForBusiness(businessId, customerId, input = 
       throw Object.assign(new Error('Service template not found'), { code: 'TEMPLATE_NOT_FOUND', statusCode: 404 });
     }
     templateId = template.id;
-    const tTasks = await knex('template_task_assignments').where('template_id', template.id);
+    const tTasks = await knex('template_tasks').where('template_id', template.id).orderBy('id', 'asc');
     seed = {
       name: template.name,
       frequency: template.frequency,
       daysBeforeServiceDeadline: template.days_before_service_deadline,
       daysBeforeAutoRepeat: template.days_before_auto_repeat,
-      taskIds: tTasks.map(r => r.task_id),
+      // Copy-on-instantiate: drop template_tasks ids so these become fresh service_tasks.
+      tasks: tTasks.map(r => ({ name: r.name, timeAllotmentMinutes: r.time_allotment_minutes })),
     };
   }
 
@@ -492,7 +511,7 @@ async function createCustomerServiceForBusiness(businessId, customerId, input = 
     ? input.daysBeforeServiceDeadline : (seed.daysBeforeServiceDeadline != null ? seed.daysBeforeServiceDeadline : 3);
   const daysBeforeAutoRepeat = input.daysBeforeAutoRepeat != null
     ? input.daysBeforeAutoRepeat : (seed.daysBeforeAutoRepeat != null ? seed.daysBeforeAutoRepeat : 1);
-  const taskIds = input.taskIds != null ? input.taskIds : (seed.taskIds || []);
+  const tasks = input.tasks != null ? input.tasks : (seed.tasks || []);
   const totalHours = input.totalHours;
 
   if (!name || !String(name).trim()) {
@@ -504,7 +523,7 @@ async function createCustomerServiceForBusiness(businessId, customerId, input = 
   if (typeof totalHours !== 'number' || totalHours <= 0) {
     throw Object.assign(new Error('totalHours is required and must be a positive number'), { code: 'VALIDATION_ERROR', statusCode: 400 });
   }
-  await validateTaskIds(businessId, taskIds);
+  validateTasks(tasks);
 
   return createCustomerService(customerId, {
     templateId,
@@ -512,7 +531,7 @@ async function createCustomerServiceForBusiness(businessId, customerId, input = 
     frequency,
     daysBeforeServiceDeadline,
     daysBeforeAutoRepeat,
-    taskIds,
+    tasks,
     totalHours,
     startDate: input.startDate != null ? input.startDate : null,
     dayOfWeek: input.dayOfWeek != null ? input.dayOfWeek : null,
@@ -552,17 +571,9 @@ async function updateCustomerService(businessId, serviceId, data = {}) {
 
   const [updated] = await knex('customer_services').where('id', serviceId).update(updates).returning('*');
 
-  if (data.taskIds !== undefined) {
-    await validateTaskIds(businessId, data.taskIds);
-    await knex('service_task_assignments').where('customer_service_id', serviceId).delete();
-    if (data.taskIds.length > 0) {
-      await knex('service_task_assignments').insert(data.taskIds.map(taskId => ({
-        customer_service_id: serviceId,
-        task_id: taskId,
-        created_at: knex.raw('CURRENT_TIMESTAMP'),
-        updated_at: knex.raw('CURRENT_TIMESTAMP'),
-      })));
-    }
+  if (data.tasks !== undefined) {
+    validateTasks(data.tasks);
+    await diffUpsertServiceTasks(serviceId, data.tasks);
   }
 
   // Deadline change → recompute submission_deadline on OPEN calls only.
@@ -602,8 +613,8 @@ async function deleteCustomerService(businessId, serviceId) {
 // Full definition of one Service (for the C2 builder / edit view).
 async function getCustomerServiceDetail(businessId, serviceId) {
   const svc = await getOwnedCustomerService(businessId, serviceId);
-  const taskRows = await knex('service_task_assignments')
-    .where('customer_service_id', serviceId).select('task_id');
+  const taskRows = await knex('service_tasks')
+    .where('customer_service_id', serviceId).orderBy('id', 'asc');
   return {
     id: svc.id,
     customerId: svc.customer_id,
@@ -616,7 +627,7 @@ async function getCustomerServiceDetail(businessId, serviceId) {
     pricePerVisit: svc.price_per_visit,
     startDate: svc.start_date,
     dayOfWeek: svc.day_of_week,
-    taskIds: taskRows.map(r => r.task_id),
+    tasks: taskRows.map(taskShape),
   };
 }
 
@@ -716,12 +727,9 @@ async function getUpcomingCustomerSelections(customerId) {
     ? await knex('customer_services').where('id', selectionCycle.customer_service_id).first()
     : null;
 
-  const taskAssignments = await knex('service_task_assignments')
-    .where('customer_service_id', selectionCycle.customer_service_id);
-  const taskIds = taskAssignments.map(ta => ta.task_id);
-  const availableTasks = taskIds.length > 0
-    ? await knex('tasks').whereIn('id', taskIds)
-    : [];
+  const availableTasks = await knex('service_tasks')
+    .where('customer_service_id', selectionCycle.customer_service_id)
+    .orderBy('id', 'asc');
 
   const assignment = serviceCycle; // the Service row carries total_hours directly
 
@@ -1506,10 +1514,10 @@ async function getSelectionByToken(token) {
   const customer = await knex('customers').where('id', cycle.customer_id).first();
   const business = await knex('businesses').where('id', customer.business_id).first();
 
-  const tasks = await knex('tasks as t')
-    .join('service_task_assignments as ta', 'ta.task_id', 't.id')
-    .where('ta.customer_service_id', cycle.customer_service_id)
-    .select('t.id', 't.name', 't.time_allotment_minutes');
+  const tasks = await knex('service_tasks')
+    .where('customer_service_id', cycle.customer_service_id)
+    .orderBy('id', 'asc')
+    .select('id', 'name', 'time_allotment_minutes');
 
   const selection = await knex('selections')
     .where('selection_cycle_id', cycle.id)
@@ -1539,10 +1547,9 @@ async function submitSelectionByToken(token, selectedTaskIds) {
     throw Object.assign(new Error('Invalid or expired selection link'), { code: 'INVALID_TOKEN', statusCode: 404 });
   }
 
-  const availableTasks = await knex('tasks as t')
-    .join('service_task_assignments as ta', 'ta.task_id', 't.id')
-    .where('ta.customer_service_id', cycle.customer_service_id)
-    .select('t.id', 't.time_allotment_minutes');
+  const availableTasks = await knex('service_tasks')
+    .where('customer_service_id', cycle.customer_service_id)
+    .select('id', 'time_allotment_minutes');
 
   const availableIds = availableTasks.map(t => t.id);
   const invalid = selectedTaskIds.filter(id => !availableIds.includes(id));
@@ -1882,7 +1889,7 @@ async function computeEstimatedHours(selectionCycle) {
   if (!selection || !Array.isArray(selection.selected_tasks) || selection.selected_tasks.length === 0) {
     return 0;
   }
-  const tasks = await knex('tasks').whereIn('id', selection.selected_tasks);
+  const tasks = await knex('service_tasks').whereIn('id', selection.selected_tasks);
   const minutes = tasks.reduce((sum, t) => sum + (t.time_allotment_minutes || 0), 0);
   return round2(minutes / 60);
 }
@@ -2154,13 +2161,7 @@ module.exports = {
   getBusinessById,
   getBusinessByPhone,
   getBusinessByJoinCode,
-  // Tasks
-  createTask,
-  getTasksByBusiness,
-  getTaskById,
-  updateTask,
-  deleteTask,
-  // Service Cycles
+  // Service Templates
   createServiceTemplate,
   getServiceTemplatesByBusiness,
   getServiceTemplateById,

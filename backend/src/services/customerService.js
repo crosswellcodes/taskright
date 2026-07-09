@@ -83,12 +83,9 @@ async function getCurrentSelectionCycle(customerId) {
       ? await knex('businesses').where('id', customer.business_id).first()
       : null;
 
-    const taskAssignments = await knex('service_task_assignments')
-      .where('customer_service_id', openCycle.customer_service_id);
-    const taskIds = taskAssignments.map(ta => ta.task_id);
-    const availableTasks = taskIds.length > 0
-      ? await knex('tasks').whereIn('id', taskIds)
-      : [];
+    const availableTasks = await knex('service_tasks')
+      .where('customer_service_id', openCycle.customer_service_id)
+      .orderBy('id', 'asc');
 
     // The Service row carries total_hours directly.
     const totalHours = serviceCycle ? serviceCycle.total_hours : 0;
@@ -184,10 +181,10 @@ async function submitSelections(selectionCycleId, customerId, selectedTasks, sel
 
   const maxMinutes = assignment ? assignment.total_hours * 60 : 0;
 
-  // Validate all selected tasks are available for this Service
-  const taskAssignments = await knex('service_task_assignments')
+  // Validate all selected tasks are available for this Service (its own menu)
+  const menuTasks = await knex('service_tasks')
     .where('customer_service_id', selectionCycle.customer_service_id);
-  const availableTaskIds = taskAssignments.map(ta => ta.task_id);
+  const availableTaskIds = menuTasks.map(t => t.id);
 
   for (const taskId of selectedTasks) {
     if (!availableTaskIds.includes(taskId)) {
@@ -200,7 +197,7 @@ async function submitSelections(selectionCycleId, customerId, selectedTasks, sel
 
   // Calculate total time and validate against limit
   const tasks = selectedTasks.length > 0
-    ? await knex('tasks').whereIn('id', selectedTasks)
+    ? menuTasks.filter(t => selectedTasks.includes(t.id))
     : [];
   const totalMinutes = tasks.reduce((sum, t) => sum + t.time_allotment_minutes, 0);
 
@@ -277,26 +274,22 @@ async function getUpcomingServiceDates(customerId) {
 
   const hoursMap = Object.fromEntries(services.map(s => [s.id, s.total_hours]));
 
-  // Resolve available tasks per Service from each Service's own menu
-  const taskAssignments = await knex('service_task_assignments')
-    .whereIn('customer_service_id', serviceIds)
-    .select('customer_service_id', 'task_id');
-  const taskIds = [...new Set(taskAssignments.map(ta => ta.task_id))];
-  const tasks = taskIds.length > 0 ? await knex('tasks').whereIn('id', taskIds) : [];
-  const taskById = Object.fromEntries(tasks.map(t => [t.id, t]));
+  // Resolve available tasks per Service from each Service's own menu (owned rows)
+  const menuTasks = serviceIds.length > 0
+    ? await knex('service_tasks')
+        .whereIn('customer_service_id', serviceIds)
+        .orderBy('id', 'asc')
+    : [];
 
   // Group tasks by customer_service_id
   const tasksByServiceCycle = {};
-  taskAssignments.forEach(ta => {
-    if (!tasksByServiceCycle[ta.customer_service_id]) tasksByServiceCycle[ta.customer_service_id] = [];
-    const task = taskById[ta.task_id];
-    if (task) {
-      tasksByServiceCycle[ta.customer_service_id].push({
-        id: task.id,
-        name: task.name,
-        timeAllotmentMinutes: task.time_allotment_minutes,
-      });
-    }
+  menuTasks.forEach(task => {
+    if (!tasksByServiceCycle[task.customer_service_id]) tasksByServiceCycle[task.customer_service_id] = [];
+    tasksByServiceCycle[task.customer_service_id].push({
+      id: task.id,
+      name: task.name,
+      timeAllotmentMinutes: task.time_allotment_minutes,
+    });
   });
 
   // Check which cycles already have a submitted selection
@@ -358,7 +351,7 @@ async function getSelectionHistory(customerId) {
   });
 
   const tasks = allTaskIds.size > 0
-    ? await knex('tasks').whereIn('id', [...allTaskIds])
+    ? await knex('service_tasks').whereIn('id', [...allTaskIds])
     : [];
   const taskMap = Object.fromEntries(tasks.map(t => [t.id, { name: t.name, minutes: t.time_allotment_minutes }]));
 

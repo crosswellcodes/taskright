@@ -1,17 +1,8 @@
 import { get, post, put, patch, del } from './client';
 
-// Tasks
-export const getTasks = (businessId) =>
-  get(`/api/businesses/${businessId}/tasks`);
-
-export const createTask = (businessId, data) =>
-  post(`/api/businesses/${businessId}/tasks`, data);
-
-export const updateTask = (businessId, taskId, data) =>
-  put(`/api/businesses/${businessId}/tasks/${taskId}`, data);
-
-export const deleteTask = (businessId, taskId) =>
-  del(`/api/businesses/${businessId}/tasks/${taskId}`);
+// Tasks are owned per-service (service_tasks) and per-template (template_tasks) —
+// no global task endpoints. They are authored inline via the Service builder
+// (AssignCycleScreen) and the Templates editor (ServiceCyclesScreen).
 
 // Service Templates (reusable library — formerly "service cycles")
 export const getServiceTemplates = (businessId) =>

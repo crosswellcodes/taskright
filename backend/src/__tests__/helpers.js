@@ -16,11 +16,10 @@ async function truncateAllTables() {
       service_assignments,
       selections,
       selection_cycles,
-      service_task_assignments,
+      service_tasks,
       customer_services,
-      template_task_assignments,
+      template_tasks,
       service_templates,
-      tasks,
       team_memberships,
       team_members,
       teams,
@@ -76,27 +75,15 @@ async function createTestCustomer(businessId, overrides = {}) {
   return { customer: res.body.customer, token: res.body.token };
 }
 
-async function createTestTask(businessId, token, overrides = {}) {
-  const data = {
-    name: overrides.name || 'Vacuum living room',
-    timeAllotmentMinutes: overrides.timeAllotmentMinutes || 20
-  };
-
-  const res = await request(app)
-    .post(`/api/businesses/${businessId}/tasks`)
-    .set('Authorization', `Bearer ${token}`)
-    .send(data);
-
-  return res.body.task;
-}
-
-async function createTestServiceCycle(businessId, token, taskIds = [], overrides = {}) {
+// Phase 2: tasks are owned per-template/per-service (no global tasks table).
+// A template's menu is passed inline as [{ name, timeAllotmentMinutes }].
+async function createTestServiceCycle(businessId, token, tasks = [], overrides = {}) {
   const data = {
     name: overrides.name || 'Weekly Cleaning',
     frequency: overrides.frequency || 'weekly',
     daysBeforeServiceDeadline: overrides.daysBeforeServiceDeadline ?? 3,
     daysBeforeAutoRepeat: overrides.daysBeforeAutoRepeat ?? 1,
-    taskIds
+    tasks
   };
 
   const res = await request(app)
@@ -105,6 +92,15 @@ async function createTestServiceCycle(businessId, token, taskIds = [], overrides
     .send(data);
 
   return res.body.serviceTemplate;
+}
+
+// Resolve the owned service_tasks rows for a customer's (first) Service — the
+// canonical task ids selections must reference. Returns [{ id, name, timeAllotmentMinutes }].
+async function getServiceTasksForCustomer(customerId) {
+  const svc = await knex('customer_services').where('customer_id', customerId).orderBy('id').first();
+  if (!svc) return [];
+  const rows = await knex('service_tasks').where('customer_service_id', svc.id).orderBy('id', 'asc');
+  return rows.map(r => ({ id: r.id, name: r.name, timeAllotmentMinutes: r.time_allotment_minutes }));
 }
 
 async function addCustomerToBusiness(businessId, token, overrides = {}) {
@@ -140,8 +136,8 @@ module.exports = {
   truncateAllTables,
   createTestBusiness,
   createTestCustomer,
-  createTestTask,
   createTestServiceCycle,
+  getServiceTasksForCustomer,
   addCustomerToBusiness,
   assignCycleToCustomer
 };

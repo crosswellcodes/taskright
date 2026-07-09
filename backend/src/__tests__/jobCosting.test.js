@@ -1,12 +1,12 @@
 const request = require('supertest');
 const {
   app, knex, truncateAllTables,
-  createTestBusiness, createTestTask,
+  createTestBusiness,
   createTestServiceCycle, addCustomerToBusiness, assignCycleToCustomer
 } = require('./helpers');
 const businessService = require('../services/businessService');
 
-let businessId, bizToken, customerId, assignmentId, selectionCycleId, memberId, laborCategoryId, task1;
+let businessId, bizToken, customerId, assignmentId, selectionCycleId, memberId, laborCategoryId;
 
 beforeEach(async () => {
   await truncateAllTables();
@@ -15,8 +15,7 @@ beforeEach(async () => {
   businessId = biz.business.id;
   bizToken = biz.token;
 
-  task1 = await createTestTask(businessId, bizToken, { name: 'Mow lawn', timeAllotmentMinutes: 90 });
-  const cycle = await createTestServiceCycle(businessId, bizToken, [task1.id]);
+  const cycle = await createTestServiceCycle(businessId, bizToken, [{ name: 'Mow lawn', timeAllotmentMinutes: 90 }]);
 
   const customer = await addCustomerToBusiness(businessId, bizToken, { name: 'Alice', phoneNumber: '+13330002222' });
   customerId = customer.id;
@@ -107,7 +106,7 @@ describe('PATCH /customers/:customerId/assignments/:assignmentId', () => {
   });
 
   it('propagates to newly generated cycles (D2 creation-time copy)', async () => {
-    const cycle2 = await createTestServiceCycle(businessId, bizToken, [task1.id], { name: 'Biweekly' });
+    const cycle2 = await createTestServiceCycle(businessId, bizToken, [{ name: 'Mow lawn', timeAllotmentMinutes: 90 }], { name: 'Biweekly' });
     const startDate = new Date(Date.now() + 14 * 864e5).toISOString().split('T')[0];
     await request(app)
       .post(`/api/businesses/${businessId}/customers/${customerId}/services`)

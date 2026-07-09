@@ -13,7 +13,6 @@ import CustomerPreferencesScreen from '../screens/business/CustomerPreferencesSc
 import CustomerFeedbackDetailScreen from '../screens/business/CustomerFeedbackDetailScreen';
 import ServiceCallDetailScreen from '../screens/business/ServiceCallDetailScreen';
 import MessageThreadScreen from '../screens/business/MessageThreadScreen';
-import TasksScreen from '../screens/business/TasksScreen';
 import ServiceCyclesScreen from '../screens/business/ServiceCyclesScreen';
 import TeamScreen from '../screens/business/TeamScreen';
 import AddTeamMemberScreen from '../screens/business/AddTeamMemberScreen';
@@ -68,7 +67,6 @@ export default function BusinessNavigator() {
     <Tab.Navigator screenOptions={{ headerShown: false }}>
       <Tab.Screen name="Dashboard" component={DashboardStack} options={{ title: 'Dashboard' }} />
       <Tab.Screen name="Customers" component={CustomersStack} options={{ title: 'Customers' }} />
-      <Tab.Screen name="Tasks" component={TasksScreen} options={{ title: 'Tasks' }} />
       <Tab.Screen name="Cycles" component={ServiceCyclesScreen} options={{ title: 'Templates' }} />
       <Tab.Screen name="Team" component={TeamStack} options={{ title: 'Team' }} />
     </Tab.Navigator>

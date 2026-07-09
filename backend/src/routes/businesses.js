@@ -9,156 +9,9 @@ const notificationService = require('../services/notificationService');
 // All business routes require authentication + ownership check
 router.use(authenticate);
 
-// ─── TASKS ───────────────────────────────────────────────────────────────────
-
-/**
- * POST /api/businesses/:businessId/tasks
- * Create a new task
- */
-router.post('/:businessId/tasks', requireBusiness, async (req, res) => {
-  try {
-    const businessId = parseInt(req.params.businessId);
-    const { name, timeAllotmentMinutes } = req.body;
-
-    if (!name || typeof name !== 'string' || name.trim().length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Task name is required',
-        code: 'VALIDATION_ERROR'
-      });
-    }
-    if (!timeAllotmentMinutes || typeof timeAllotmentMinutes !== 'number' || timeAllotmentMinutes <= 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'timeAllotmentMinutes is required and must be a positive number',
-        code: 'VALIDATION_ERROR'
-      });
-    }
-
-    const task = await businessService.createTask(businessId, name, timeAllotmentMinutes);
-
-    return res.status(201).json({
-      success: true,
-      task: {
-        id: task.id,
-        businessId: task.business_id,
-        name: task.name,
-        timeAllotmentMinutes: task.time_allotment_minutes,
-        isOptional: task.is_optional,
-        createdAt: task.created_at
-      }
-    });
-  } catch (error) {
-    console.error('Create task error:', error);
-    return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
-  }
-});
-
-/**
- * GET /api/businesses/:businessId/tasks
- * Get all tasks for a business
- */
-router.get('/:businessId/tasks', requireBusiness, async (req, res) => {
-  try {
-    const businessId = parseInt(req.params.businessId);
-
-    const business = await businessService.getBusinessById(businessId);
-    if (!business) {
-      return res.status(404).json({ success: false, error: 'Business not found', code: 'BUSINESS_NOT_FOUND' });
-    }
-
-    const tasks = await businessService.getTasksByBusiness(businessId);
-
-    return res.status(200).json({
-      success: true,
-      tasks: tasks.map(t => ({
-        id: t.id,
-        name: t.name,
-        timeAllotmentMinutes: t.time_allotment_minutes,
-        isOptional: t.is_optional
-      })),
-      total: tasks.length
-    });
-  } catch (error) {
-    console.error('Get tasks error:', error);
-    return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
-  }
-});
-
-/**
- * PUT /api/businesses/:businessId/tasks/:taskId
- * Update a task
- */
-router.put('/:businessId/tasks/:taskId', requireBusiness, async (req, res) => {
-  try {
-    const businessId = parseInt(req.params.businessId);
-    const taskId = parseInt(req.params.taskId);
-    const { name, timeAllotmentMinutes } = req.body;
-
-    const task = await businessService.getTaskById(taskId);
-    if (!task || task.business_id !== businessId) {
-      return res.status(404).json({ success: false, error: 'Task not found', code: 'TASK_NOT_FOUND' });
-    }
-
-    if (name !== undefined && (typeof name !== 'string' || name.trim().length === 0)) {
-      return res.status(400).json({ success: false, error: 'Invalid task name', code: 'VALIDATION_ERROR' });
-    }
-    if (timeAllotmentMinutes !== undefined && (typeof timeAllotmentMinutes !== 'number' || timeAllotmentMinutes <= 0)) {
-      return res.status(400).json({
-        success: false,
-        error: 'timeAllotmentMinutes must be a positive number',
-        code: 'VALIDATION_ERROR'
-      });
-    }
-
-    const updated = await businessService.updateTask(taskId, { name, timeAllotmentMinutes });
-
-    return res.status(200).json({
-      success: true,
-      task: {
-        id: updated.id,
-        name: updated.name,
-        timeAllotmentMinutes: updated.time_allotment_minutes,
-        updatedAt: updated.updated_at
-      }
-    });
-  } catch (error) {
-    console.error('Update task error:', error);
-    return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
-  }
-});
-
-/**
- * DELETE /api/businesses/:businessId/tasks/:taskId
- * Delete a task
- */
-router.delete('/:businessId/tasks/:taskId', requireBusiness, async (req, res) => {
-  try {
-    const businessId = parseInt(req.params.businessId);
-    const taskId = parseInt(req.params.taskId);
-
-    const task = await businessService.getTaskById(taskId);
-    if (!task || task.business_id !== businessId) {
-      return res.status(404).json({ success: false, error: 'Task not found', code: 'TASK_NOT_FOUND' });
-    }
-
-    // A task is "in use" if any template OR any customer Service references it.
-    const inTemplate = await knex('template_task_assignments').where('task_id', taskId).first();
-    const inService = await knex('service_task_assignments').where('task_id', taskId).first();
-    if (inTemplate || inService) {
-      return res.status(409).json({ success: false, error: 'Task is assigned to a service or template and cannot be deleted', code: 'TASK_IN_USE' });
-    }
-
-    await businessService.deleteTask(taskId);
-
-    return res.status(200).json({ success: true, message: 'Task deleted successfully' });
-  } catch (error) {
-    console.error('Delete task error:', error);
-    return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
-  }
-});
-
 // ─── SERVICE TEMPLATES (reusable library) ────────────────────────────────────
+// Tasks are owned per-template (template_tasks) — no global /tasks routes anymore.
+// Task shape at the boundary: { id?, name, timeAllotmentMinutes }.
 
 /**
  * POST /api/businesses/:businessId/service-templates
@@ -167,7 +20,7 @@ router.delete('/:businessId/tasks/:taskId', requireBusiness, async (req, res) =>
 router.post('/:businessId/service-templates', requireBusiness, async (req, res) => {
   try {
     const businessId = parseInt(req.params.businessId);
-    const { name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, taskIds } = req.body;
+    const { name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, tasks } = req.body;
 
     const validFrequencies = ['weekly', 'biweekly', 'monthly', 'yearly'];
 
@@ -197,7 +50,7 @@ router.post('/:businessId/service-templates', requireBusiness, async (req, res) 
     }
 
     const { cycle, assignedTasks } = await businessService.createServiceTemplate(
-      businessId, name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, taskIds || []
+      businessId, name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, tasks || []
     );
 
     return res.status(201).json({
@@ -209,17 +62,13 @@ router.post('/:businessId/service-templates', requireBusiness, async (req, res) 
         frequency: cycle.frequency,
         daysBeforeServiceDeadline: cycle.days_before_service_deadline,
         daysBeforeAutoRepeat: cycle.days_before_auto_repeat,
-        assignedTasks: assignedTasks.map(t => ({
-          id: t.id,
-          name: t.name,
-          timeAllotmentMinutes: t.time_allotment_minutes
-        })),
+        tasks: assignedTasks, // [{ id, name, timeAllotmentMinutes }]
         createdAt: cycle.created_at
       }
     });
   } catch (error) {
-    if (error.code === 'TASK_NOT_FOUND') {
-      return res.status(404).json({ success: false, error: error.message, code: 'TASK_NOT_FOUND' });
+    if (error.code === 'VALIDATION_ERROR') {
+      return res.status(400).json({ success: false, error: error.message, code: 'VALIDATION_ERROR' });
     }
     console.error('Create service template error:', error);
     return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
@@ -247,7 +96,7 @@ router.get('/:businessId/service-templates', requireBusiness, async (req, res) =
         id: c.id,
         name: c.name,
         frequency: c.frequency,
-        assignedTasks: c.assignedTasks,
+        tasks: c.assignedTasks, // [{ id, name, timeAllotmentMinutes }]
         daysBeforeServiceDeadline: c.days_before_service_deadline,
         daysBeforeAutoRepeat: c.days_before_auto_repeat,
         createdAt: c.created_at
@@ -268,7 +117,7 @@ router.put('/:businessId/service-templates/:cycleId', requireBusiness, async (re
   try {
     const businessId = parseInt(req.params.businessId);
     const cycleId = parseInt(req.params.cycleId);
-    const { name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, taskIds } = req.body;
+    const { name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, tasks } = req.body;
 
     const cycle = await businessService.getServiceTemplateById(cycleId);
     if (!cycle || cycle.business_id !== businessId) {
@@ -285,7 +134,7 @@ router.put('/:businessId/service-templates/:cycleId', requireBusiness, async (re
     }
 
     const updated = await businessService.updateServiceTemplate(cycleId, {
-      name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, taskIds
+      name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, tasks
     });
 
     return res.status(200).json({
@@ -293,11 +142,14 @@ router.put('/:businessId/service-templates/:cycleId', requireBusiness, async (re
       serviceTemplate: {
         id: updated.id,
         name: updated.name,
-        assignedTasks: updated.assignedTasks,
+        tasks: updated.assignedTasks, // present only when tasks were updated
         updatedAt: updated.updated_at
       }
     });
   } catch (error) {
+    if (error.code === 'VALIDATION_ERROR') {
+      return res.status(400).json({ success: false, error: error.message, code: 'VALIDATION_ERROR' });
+    }
     console.error('Update service template error:', error);
     return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
   }
@@ -522,7 +374,8 @@ async function assertCustomerOwned(businessId, customerId) {
 /**
  * POST /api/businesses/:businessId/customers/:customerId/services
  * Create a Service on the customer. Body: { name, frequency, daysBeforeServiceDeadline?,
- * daysBeforeAutoRepeat?, taskIds?, totalHours, startDate?, dayOfWeek?, pricePerVisit?, templateId? }
+ * daysBeforeAutoRepeat?, tasks?: [{ id?, name, timeAllotmentMinutes }], totalHours,
+ * startDate?, dayOfWeek?, pricePerVisit?, templateId? }
  */
 router.post('/:businessId/customers/:customerId/services', requireBusiness, async (req, res) => {
   try {

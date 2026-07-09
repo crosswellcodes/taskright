@@ -1,7 +1,7 @@
 const request = require('supertest');
 const {
   app, knex, truncateAllTables,
-  createTestBusiness, createTestTask,
+  createTestBusiness,
   createTestServiceCycle, addCustomerToBusiness, assignCycleToCustomer
 } = require('./helpers');
 const businessService = require('../services/businessService');
@@ -15,8 +15,7 @@ beforeEach(async () => {
   businessId = biz.business.id;
   bizToken = biz.token;
 
-  const task1 = await createTestTask(businessId, bizToken, { name: 'Mow lawn', timeAllotmentMinutes: 90 });
-  const cycle = await createTestServiceCycle(businessId, bizToken, [task1.id]);
+  const cycle = await createTestServiceCycle(businessId, bizToken, [{ name: 'Mow lawn', timeAllotmentMinutes: 90 }]);
 
   const customer = await addCustomerToBusiness(businessId, bizToken, { name: 'Jane', phoneNumber: '+13330009999' });
   customerId = customer.id;
