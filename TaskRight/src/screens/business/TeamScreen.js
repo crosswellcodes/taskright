@@ -144,6 +144,9 @@ function MembersTab({ navigation, refreshSignal }) {
             </View>
             <View style={styles.hoursBadge}>
               <Text style={styles.hoursText}>{item.weeklyHours} hrs/week</Text>
+              {item.hourlyRate != null && (
+                <Text style={styles.rateText}>${item.hourlyRate}/hr</Text>
+              )}
             </View>
           </TouchableOpacity>
         </SwipeableRow>
@@ -343,6 +346,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6, borderRadius: 20,
   },
   hoursText: { fontSize: 13, color: '#2563eb', fontWeight: '600' },
+  rateText: { fontSize: 12, color: '#059669', fontWeight: '600', marginTop: 2 },
 
   // FAB
   fab: {

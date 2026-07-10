@@ -11,11 +11,12 @@ import { normalizePhone, displayPhone } from '../../utils/phoneUtils';
 export default function EditTeamMemberScreen({ route, navigation }) {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
-  const { member } = route.params; // { id, name, phoneNumber, weeklyHours }
+  const { member } = route.params; // { id, name, phoneNumber, weeklyHours, hourlyRate }
 
   const [name, setName] = useState(member.name || '');
   const [phoneNumber, setPhoneNumber] = useState(displayPhone(member.phoneNumber));
   const [weeklyHours, setWeeklyHours] = useState(String(member.weeklyHours ?? ''));
+  const [hourlyRate, setHourlyRate] = useState(member.hourlyRate != null ? String(member.hourlyRate) : '');
   const [loading, setLoading] = useState(false);
 
   const handleSave = async () => {
@@ -23,12 +24,20 @@ export default function EditTeamMemberScreen({ route, navigation }) {
     if (!phoneNumber.trim()) return Alert.alert('Error', 'Phone number is required');
     if (!weeklyHours.trim()) return Alert.alert('Error', 'Weekly hours is required');
 
+    // Hourly rate is optional; blank clears it. Validate when present.
+    let rate = null;
+    if (hourlyRate.trim() !== '') {
+      rate = parseFloat(hourlyRate);
+      if (Number.isNaN(rate) || rate < 0) return Alert.alert('Error', 'Enter a valid hourly rate, or leave it blank');
+    }
+
     setLoading(true);
     try {
       await updateTeamMember(user.businessId, member.id, {
         name: name.trim(),
         phoneNumber: normalizePhone(phoneNumber),
         weeklyHours: parseInt(weeklyHours, 10),
+        hourlyRate: rate,
       });
       navigation.goBack();
     } catch (err) {
@@ -71,6 +80,19 @@ export default function EditTeamMemberScreen({ route, navigation }) {
         />
         <Text style={styles.hint}>Maximum hours this team member can work per week</Text>
 
+        <Text style={styles.label}>Hourly Rate (optional)</Text>
+        <View style={styles.amountRow}>
+          <Text style={styles.amountPrefix}>$</Text>
+          <TextInput
+            style={styles.amountInput}
+            placeholder="0.00"
+            value={hourlyRate}
+            onChangeText={setHourlyRate}
+            keyboardType="decimal-pad"
+          />
+        </View>
+        <Text style={styles.hint}>Used to auto-calculate labor cost in job profitability. Leave blank if unknown.</Text>
+
         <TouchableOpacity
           style={[styles.btn, loading && styles.btnDisabled]}
           onPress={handleSave}
@@ -91,6 +113,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, backgroundColor: '#fafafa',
   },
   hint: { fontSize: 12, color: '#aaa', marginTop: 4 },
+  amountRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#ddd', borderRadius: 10, paddingHorizontal: 14, backgroundColor: '#fafafa' },
+  amountPrefix: { fontSize: 16, color: '#6b7280', marginRight: 4 },
+  amountInput: { flex: 1, paddingVertical: 12, fontSize: 16 },
   btn: {
     backgroundColor: '#2563eb', borderRadius: 10,
     paddingVertical: 14, alignItems: 'center', marginTop: 32,

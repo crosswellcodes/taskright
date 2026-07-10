@@ -693,7 +693,7 @@ router.patch('/:businessId/feedback/:feedbackId/business-notes', requireBusiness
 router.post('/:businessId/team-members', requireBusiness, async (req, res) => {
   try {
     const businessId = parseInt(req.params.businessId);
-    const { name, phoneNumber, weeklyHours } = req.body;
+    const { name, phoneNumber, weeklyHours, hourlyRate } = req.body;
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       return res.status(400).json({ success: false, error: 'Name is required', code: 'VALIDATION_ERROR' });
@@ -717,7 +717,16 @@ router.post('/:businessId/team-members', requireBusiness, async (req, res) => {
       });
     }
 
-    const member = await businessService.addTeamMember(businessId, name, phoneNumber, hours);
+    // hourlyRate is optional. When provided it must be a non-negative number.
+    let rate = null;
+    if (hourlyRate !== undefined && hourlyRate !== null && hourlyRate !== '') {
+      rate = parseFloat(hourlyRate);
+      if (Number.isNaN(rate) || rate < 0) {
+        return res.status(400).json({ success: false, error: 'Hourly rate must be a non-negative number', code: 'VALIDATION_ERROR' });
+      }
+    }
+
+    const member = await businessService.addTeamMember(businessId, name, phoneNumber, hours, rate);
 
     return res.status(201).json({
       success: true,
@@ -726,6 +735,7 @@ router.post('/:businessId/team-members', requireBusiness, async (req, res) => {
         name: member.name,
         phoneNumber: member.phone_number,
         weeklyHours: member.weekly_hours,
+        hourlyRate: member.hourly_rate == null ? null : Number(member.hourly_rate),
         inviteCode: member.invite_code,
         inviteAccepted: member.invite_accepted,
         createdAt: member.created_at,
@@ -759,6 +769,7 @@ router.get('/:businessId/team-members', requireBusiness, async (req, res) => {
         name: m.name,
         phoneNumber: m.phone_number,
         weeklyHours: m.weekly_hours,
+        hourlyRate: m.hourly_rate == null ? null : Number(m.hourly_rate),
         createdAt: m.created_at,
         groups: Array.isArray(m.groups) ? m.groups : [],
       })),
@@ -783,7 +794,17 @@ router.put('/:businessId/team-members/:memberId', requireBusiness, async (req, r
     if (name !== undefined) updates.name = name;
     if (phoneNumber !== undefined) updates.phoneNumber = phoneNumber;
     if (weeklyHours !== undefined) updates.weeklyHours = parseInt(weeklyHours, 10);
-    if (hourlyRate !== undefined) updates.hourlyRate = hourlyRate === null ? null : parseFloat(hourlyRate);
+    if (hourlyRate !== undefined) {
+      if (hourlyRate === null || hourlyRate === '') {
+        updates.hourlyRate = null;
+      } else {
+        const rate = parseFloat(hourlyRate);
+        if (Number.isNaN(rate) || rate < 0) {
+          return res.status(400).json({ success: false, error: 'Hourly rate must be a non-negative number', code: 'VALIDATION_ERROR' });
+        }
+        updates.hourlyRate = rate;
+      }
+    }
     const updated = await businessService.updateTeamMember(memberId, businessId, updates);
     return res.status(200).json({
       success: true,
@@ -792,7 +813,7 @@ router.put('/:businessId/team-members/:memberId', requireBusiness, async (req, r
         name: updated.name,
         phoneNumber: updated.phone_number,
         weeklyHours: updated.weekly_hours,
-        hourlyRate: updated.hourly_rate,
+        hourlyRate: updated.hourly_rate == null ? null : Number(updated.hourly_rate),
       },
     });
   } catch (error) {

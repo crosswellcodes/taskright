@@ -57,14 +57,43 @@ describe('GET /api/businesses/:id/cost-categories', () => {
 
 // ─── TEAM MEMBER HOURLY RATE ──────────────────────────────────────────────────
 
-describe('PUT team-members with hourlyRate', () => {
-  it('persists the hourly rate', async () => {
+describe('team-member hourlyRate', () => {
+  it('persists the hourly rate on update and returns it as a number', async () => {
     const res = await auth(request(app).put(`/api/businesses/${businessId}/team-members/${memberId}`))
       .send({ hourlyRate: 42.5 });
     expect(res.status).toBe(200);
-    expect(Number(res.body.teamMember.hourlyRate)).toBe(42.5);
+    expect(res.body.teamMember.hourlyRate).toBe(42.5);
     const row = await knex('team_members').where('id', memberId).first();
     expect(Number(row.hourly_rate)).toBe(42.5);
+  });
+
+  it('accepts hourlyRate on create', async () => {
+    const res = await auth(request(app).post(`/api/businesses/${businessId}/team-members`))
+      .send({ name: 'Rita', phoneNumber: '+13330004444', weeklyHours: 30, hourlyRate: 27.25 });
+    expect(res.status).toBe(201);
+    expect(res.body.teamMember.hourlyRate).toBe(27.25);
+  });
+
+  it('returns hourlyRate in the team-members list', async () => {
+    await auth(request(app).put(`/api/businesses/${businessId}/team-members/${memberId}`)).send({ hourlyRate: 50 });
+    const res = await auth(request(app).get(`/api/businesses/${businessId}/team-members`));
+    expect(res.status).toBe(200);
+    const bob = res.body.teamMembers.find(m => m.id === memberId);
+    expect(bob.hourlyRate).toBe(50);
+  });
+
+  it('rejects a negative hourly rate', async () => {
+    const res = await auth(request(app).put(`/api/businesses/${businessId}/team-members/${memberId}`))
+      .send({ hourlyRate: -10 });
+    expect(res.status).toBe(400);
+  });
+
+  it('clears the hourly rate when sent null', async () => {
+    await auth(request(app).put(`/api/businesses/${businessId}/team-members/${memberId}`)).send({ hourlyRate: 33 });
+    const res = await auth(request(app).put(`/api/businesses/${businessId}/team-members/${memberId}`))
+      .send({ hourlyRate: null });
+    expect(res.status).toBe(200);
+    expect(res.body.teamMember.hourlyRate).toBeNull();
   });
 });
 

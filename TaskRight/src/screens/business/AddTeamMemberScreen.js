@@ -15,6 +15,7 @@ export default function AddTeamMemberScreen({ navigation }) {
   const [name, setName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [weeklyHours, setWeeklyHours] = useState('');
+  const [hourlyRate, setHourlyRate] = useState('');
   const [loading, setLoading] = useState(false);
 
   // Invite code modal
@@ -28,12 +29,20 @@ export default function AddTeamMemberScreen({ navigation }) {
     if (!phoneNumber.trim()) return Alert.alert('Error', 'Phone number is required');
     if (!weeklyHours.trim()) return Alert.alert('Error', 'Weekly hours is required');
 
+    // Hourly rate is optional; validate when present.
+    let rate = null;
+    if (hourlyRate.trim() !== '') {
+      rate = parseFloat(hourlyRate);
+      if (Number.isNaN(rate) || rate < 0) return Alert.alert('Error', 'Enter a valid hourly rate, or leave it blank');
+    }
+
     setLoading(true);
     try {
       const data = await addTeamMember(user.businessId, {
         name: name.trim(),
         phoneNumber: normalizePhone(phoneNumber),
         weeklyHours: parseInt(weeklyHours, 10),
+        hourlyRate: rate,
       });
       // Show invite code modal before navigating away
       setInviteCode(data.teamMember?.inviteCode || '');
@@ -99,6 +108,19 @@ export default function AddTeamMemberScreen({ navigation }) {
           />
           <Text style={styles.hint}>Maximum hours this team member can work per week</Text>
 
+          <Text style={styles.label}>Hourly Rate (optional)</Text>
+          <View style={styles.amountRow}>
+            <Text style={styles.amountPrefix}>$</Text>
+            <TextInput
+              style={styles.amountInput}
+              placeholder="0.00"
+              value={hourlyRate}
+              onChangeText={setHourlyRate}
+              keyboardType="decimal-pad"
+            />
+          </View>
+          <Text style={styles.hint}>Used to auto-calculate labor cost in job profitability. Leave blank if unknown.</Text>
+
           <TouchableOpacity
             style={[styles.btn, loading && styles.btnDisabled]}
             onPress={handleAdd}
@@ -158,6 +180,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, backgroundColor: '#fafafa',
   },
   hint: { fontSize: 12, color: '#aaa', marginTop: 4 },
+  amountRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#ddd', borderRadius: 10, paddingHorizontal: 14, backgroundColor: '#fafafa' },
+  amountPrefix: { fontSize: 16, color: '#6b7280', marginRight: 4 },
+  amountInput: { flex: 1, paddingVertical: 12, fontSize: 16 },
   btn: {
     backgroundColor: '#2563eb', borderRadius: 10,
     paddingVertical: 14, alignItems: 'center', marginTop: 32,

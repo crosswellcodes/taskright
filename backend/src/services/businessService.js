@@ -986,7 +986,7 @@ function generateInviteCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
-async function addTeamMember(businessId, name, phoneNumber, weeklyHours) {
+async function addTeamMember(businessId, name, phoneNumber, weeklyHours, hourlyRate = null) {
   const existing = await knex('team_members')
     .where('business_id', businessId)
     .where('phone_number', phoneNumber)
@@ -1004,6 +1004,7 @@ async function addTeamMember(businessId, name, phoneNumber, weeklyHours) {
       name: name.trim(),
       phone_number: phoneNumber,
       weekly_hours: weeklyHours,
+      hourly_rate: hourlyRate,
       invite_code: inviteCode,
       invite_accepted: false,
       created_at: knex.raw('CURRENT_TIMESTAMP'),
@@ -1060,9 +1061,9 @@ async function getTeamMembersByBusiness(businessId) {
     .leftJoin('team_memberships as tm', 'm.id', 'tm.team_member_id')
     .leftJoin('teams as t', 'tm.team_id', 't.id')
     .where('m.business_id', businessId)
-    .groupBy('m.id', 'm.name', 'm.phone_number', 'm.weekly_hours', 'm.created_at', 'm.updated_at')
+    .groupBy('m.id', 'm.name', 'm.phone_number', 'm.weekly_hours', 'm.hourly_rate', 'm.created_at', 'm.updated_at')
     .select(
-      'm.id', 'm.name', 'm.phone_number', 'm.weekly_hours', 'm.created_at',
+      'm.id', 'm.name', 'm.phone_number', 'm.weekly_hours', 'm.hourly_rate', 'm.created_at',
       knex.raw(`COALESCE(
         json_agg(json_build_object('id', t.id, 'name', t.name) ORDER BY t.name)
         FILTER (WHERE t.id IS NOT NULL),

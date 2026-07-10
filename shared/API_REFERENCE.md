@@ -585,18 +585,22 @@ Cascades open Service Calls + menu. Refuses with `409 HAS_HISTORY` if any Servic
 ```json
 {
   "name": "John Smith",
-  "phoneNumber": "+14155551111"
+  "phoneNumber": "+14155551111",
+  "weeklyHours": 40,
+  "hourlyRate": 27.5
 }
 ```
+`hourlyRate` is optional (non-negative number, nullable). Returned as `teamMember.hourlyRate` (number or null).
 
 #### Get All Team Members
 **GET** `/businesses/:businessId/team-members`
+Each entry includes `hourlyRate` (number or null) alongside `weeklyHours`, `groups`, etc.
 
 #### Update Team Member
 **PUT** `/businesses/:businessId/team-members/:memberId`
 
 **Request Body** (all fields optional): `{ name, phoneNumber, weeklyHours, hourlyRate }`
-`hourlyRate` (decimal, nullable) feeds job-costing labor: labor `amount = hoursActual × hourlyRate` (0.00 if null). Returned as `teamMember.hourlyRate`.
+`hourlyRate` (non-negative number, nullable — send `null`/`""` to clear) feeds job-costing labor: the labor line is auto-computed on a **geofence departure** as `amount = hoursActual × hourlyRate` (0.00 if the rate is null at that time). Setting the rate applies to labor computed after it's set; existing per-job labor can be adjusted on the Service Call detail screen. Returned as `teamMember.hourlyRate` (number or null).
 
 #### Delete Team Member
 **DELETE** `/businesses/:businessId/team-members/:memberId`
