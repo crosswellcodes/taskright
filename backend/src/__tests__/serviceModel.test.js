@@ -59,6 +59,16 @@ describe('POST /customers/:id/services — create from scratch', () => {
     expect(bad3.status).toBe(400);
   });
 
+  it('accepts fractional totalHours (e.g. 1.5) and returns it as a number', async () => {
+    const res = await auth(request(app).post(`/api/businesses/${businessId}/customers/${customerId}/services`))
+      .send({ name: 'Half-hour Service', frequency: 'biweekly', tasks: [TASK1], totalHours: 1.5, startDate: futureDate(7) });
+    expect(res.status).toBe(201);
+    const serviceId = res.body.service.id;
+    const detail = await auth(request(app).get(`/api/businesses/${businessId}/customers/${customerId}/services/${serviceId}`));
+    expect(detail.status).toBe(200);
+    expect(detail.body.service.totalHours).toBe(1.5); // numeric column coerced back to Number
+  });
+
   it('generates exactly one Service Call for an ad-hoc one_time service', async () => {
     const res = await auth(request(app).post(`/api/businesses/${businessId}/customers/${customerId}/services`))
       .send({ name: 'One-off Deep Clean', frequency: 'one_time', tasks: [TASK1], totalHours: 4, startDate: futureDate(5) });

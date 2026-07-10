@@ -263,7 +263,7 @@ async function getCustomersByBusiness(businessId) {
       id: a.id,
       name: a.name,
       frequency: a.frequency,
-      totalHours: a.total_hours
+      totalHours: a.total_hours == null ? null : Number(a.total_hours)
     }));
   }
 
@@ -285,7 +285,7 @@ async function getCustomerDetails(customerId) {
     templateId: a.template_id,     // provenance only (nullable, decoupled)
     serviceCycleName: a.name,
     frequency: a.frequency,
-    totalHours: a.total_hours,
+    totalHours: a.total_hours == null ? null : Number(a.total_hours),
     // Job costing: the Service row id doubles as the "assignment" id so the
     // CustomerDetailScreen can PATCH .../assignments/:assignmentId (D2 source).
     assignmentId: a.id,
@@ -321,7 +321,7 @@ async function getCustomerDetails(customerId) {
 
   customer.lastSelection = lastSelection ? {
     selectedTasks: lastSelection.selected_tasks,
-    selectedTotalHours: lastSelection.selected_total_hours,
+    selectedTotalHours: lastSelection.selected_total_hours == null ? null : Number(lastSelection.selected_total_hours),
     submittedAt: lastSelection.submitted_at
   } : null;
 
@@ -625,7 +625,7 @@ async function getCustomerServiceDetail(businessId, serviceId) {
     frequency: svc.frequency,
     daysBeforeServiceDeadline: svc.days_before_service_deadline,
     daysBeforeAutoRepeat: svc.days_before_auto_repeat,
-    totalHours: svc.total_hours,
+    totalHours: svc.total_hours == null ? null : Number(svc.total_hours),
     pricePerVisit: svc.price_per_visit,
     startDate: svc.start_date,
     dayOfWeek: svc.day_of_week,
@@ -755,10 +755,10 @@ async function getUpcomingCustomerSelections(customerId) {
       name: t.name,
       timeAllotmentMinutes: t.time_allotment_minutes
     })),
-    totalHours: assignment ? assignment.total_hours : null,
+    totalHours: assignment ? Number(assignment.total_hours) : null,
     currentSelection: currentSelection ? {
       selectedTasks: currentSelection.selected_tasks,
-      selectedTotalHours: currentSelection.selected_total_hours,
+      selectedTotalHours: currentSelection.selected_total_hours == null ? null : Number(currentSelection.selected_total_hours),
       status: currentSelection.status
     } : null
   };

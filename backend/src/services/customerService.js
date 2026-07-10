@@ -87,8 +87,8 @@ async function getCurrentSelectionCycle(customerId) {
       .where('customer_service_id', openCycle.customer_service_id)
       .orderBy('id', 'asc');
 
-    // The Service row carries total_hours directly.
-    const totalHours = serviceCycle ? serviceCycle.total_hours : 0;
+    // The Service row carries total_hours directly. (numeric → coerce to Number)
+    const totalHours = serviceCycle ? Number(serviceCycle.total_hours) : 0;
 
     // ── Resolve who is assigned to this customer's service day ──────────────
     const serviceAssignment = await knex('service_assignments')
@@ -139,7 +139,7 @@ async function getCurrentSelectionCycle(customerId) {
       })),
       previousSelection: previousSelection ? {
         selectedTasks: previousSelection.selected_tasks,
-        selectedTotalHours: previousSelection.selected_total_hours,
+        selectedTotalHours: previousSelection.selected_total_hours == null ? null : Number(previousSelection.selected_total_hours),
         submittedAt: previousSelection.submitted_at
       } : null
     };
@@ -179,7 +179,7 @@ async function submitSelections(selectionCycleId, customerId, selectedTasks, sel
     ? await knex('customer_services').where('id', selectionCycle.customer_service_id).first()
     : null;
 
-  const maxMinutes = assignment ? assignment.total_hours * 60 : 0;
+  const maxMinutes = assignment ? Number(assignment.total_hours) * 60 : 0;
 
   // Validate all selected tasks are available for this Service (its own menu)
   const menuTasks = await knex('service_tasks')
@@ -272,7 +272,7 @@ async function getUpcomingServiceDates(customerId) {
     ? await knex('businesses').where('id', customer.business_id).first()
     : null;
 
-  const hoursMap = Object.fromEntries(services.map(s => [s.id, s.total_hours]));
+  const hoursMap = Object.fromEntries(services.map(s => [s.id, Number(s.total_hours)]));
 
   // Resolve available tasks per Service from each Service's own menu (owned rows)
   const menuTasks = serviceIds.length > 0
@@ -374,7 +374,7 @@ async function getSelectionHistory(customerId) {
       status: c.status,
       selectedTasks: taskIds,
       selectedTaskNames: taskIds.map(id => taskMap[id]).filter(Boolean),
-      selectedTotalHours: sel ? sel.selected_total_hours : null,
+      selectedTotalHours: sel ? Number(sel.selected_total_hours) : null,
       submittedAt: sel ? sel.submitted_at : null,
       hasFeedback: feedbackSet.has(c.id),
     };
