@@ -11,7 +11,15 @@ import {
   createCustomerService, getCustomerService, updateCustomerService, deleteCustomerService,
 } from '../../api/businessApi';
 
-const FREQUENCIES = ['weekly', 'biweekly', 'monthly', 'yearly'];
+// Picklist saves vertical space vs. a chip row and makes room for the one-time option.
+const FREQUENCY_OPTIONS = [
+  { value: 'one_time', label: 'One-time (single visit)' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'biweekly', label: 'Biweekly' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'yearly', label: 'Yearly' },
+];
+const frequencyLabel = (v) => FREQUENCY_OPTIONS.find(o => o.value === v)?.label || v;
 
 function getDefaultStartDate() {
   const d = new Date();
@@ -74,6 +82,7 @@ export default function AssignCycleScreen({ route, navigation }) {
   const [templates, setTemplates] = useState([]);
   const [forecast, setForecast] = useState([]);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [showFrequencyPicker, setShowFrequencyPicker] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -314,13 +323,10 @@ export default function AssignCycleScreen({ route, navigation }) {
         <TextInput style={styles.input} placeholder="e.g. Weekly Cleaning" value={name} onChangeText={setName} />
 
         <Text style={styles.label}>Frequency</Text>
-        <View style={styles.chipRow}>
-          {FREQUENCIES.map(f => (
-            <TouchableOpacity key={f} style={[styles.chip, frequency === f && styles.chipActive]} onPress={() => setFrequency(f)}>
-              <Text style={[styles.chipText, frequency === f && styles.chipTextActive]}>{f}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <TouchableOpacity style={styles.dropdown} onPress={() => setShowFrequencyPicker(true)}>
+          <Text style={styles.dropdownText}>{frequencyLabel(frequency)}</Text>
+          <Text style={styles.dropdownChevron}>▾</Text>
+        </TouchableOpacity>
 
         <Text style={styles.label}>Tasks</Text>
         <Text style={styles.hint}>Tasks belong to this service. Editing them affects only {customerName}.</Text>
@@ -349,12 +355,12 @@ export default function AssignCycleScreen({ route, navigation }) {
         <Text style={styles.label}>Selection Deadline (days before service)</Text>
         <TextInput style={styles.input} placeholder="3" value={deadlineDays} onChangeText={setDeadlineDays} keyboardType="number-pad" />
 
-        <Text style={styles.label}>Recurring Price per Visit (optional)</Text>
+        <Text style={styles.label}>Price for Visit (optional)</Text>
         <View style={styles.amountRow}>
           <Text style={styles.amountPrefix}>$</Text>
           <TextInput style={styles.amountInput} placeholder="0.00" value={pricePerVisit} onChangeText={setPricePerVisit} keyboardType="decimal-pad" />
         </View>
-        <Text style={styles.hint}>New service calls copy this automatically. Leave blank to clear.</Text>
+        <Text style={styles.hint}>Applied to the service call(s) — works for a one-time sale or a recurring service. Leave blank to clear.</Text>
 
         {isEdit ? (
           <Text style={styles.editNote}>
@@ -397,7 +403,7 @@ export default function AssignCycleScreen({ route, navigation }) {
           </>
         ) : (
           <>
-            <Text style={styles.label}>First Service Date</Text>
+            <Text style={styles.label}>{frequency === 'one_time' ? 'Service Date' : 'First Service Date'}</Text>
             <TouchableOpacity style={styles.dateButton} onPress={() => setShowCalendar(true)}>
               <Text style={styles.dateButtonText}>{formatDisplayDate(startDate)}</Text>
             </TouchableOpacity>
@@ -452,7 +458,7 @@ export default function AssignCycleScreen({ route, navigation }) {
               {templates.map(t => (
                 <TouchableOpacity key={t.id} style={styles.templateOption} onPress={() => applyTemplate(t)}>
                   <Text style={styles.templateName}>{t.name}</Text>
-                  <Text style={styles.templateFreq}>{t.frequency}</Text>
+                  <Text style={styles.templateFreq}>{frequencyLabel(t.frequency)}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -461,6 +467,28 @@ export default function AssignCycleScreen({ route, navigation }) {
             </TouchableOpacity>
           </View>
         </View>
+      </Modal>
+
+      {/* Frequency picklist */}
+      <Modal visible={showFrequencyPicker} transparent animationType="fade">
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowFrequencyPicker(false)}>
+          <View style={styles.calendarModal}>
+            <Text style={styles.calendarTitle}>Frequency</Text>
+            {FREQUENCY_OPTIONS.map(o => {
+              const on = frequency === o.value;
+              return (
+                <TouchableOpacity
+                  key={o.value}
+                  style={styles.freqOption}
+                  onPress={() => { setFrequency(o.value); setShowFrequencyPicker(false); }}
+                >
+                  <Text style={[styles.freqOptionText, on && styles.freqOptionTextActive]}>{o.label}</Text>
+                  {on && <Text style={styles.freqOptionCheck}>✓</Text>}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </TouchableOpacity>
       </Modal>
 
       {/* Inline task add/edit */}
@@ -499,11 +527,13 @@ const styles = StyleSheet.create({
 
   input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, backgroundColor: '#fafafa' },
 
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, borderWidth: 1.5, borderColor: '#ddd', backgroundColor: '#fafafa' },
-  chipActive: { borderColor: '#2563eb', backgroundColor: '#eff6ff' },
-  chipText: { fontSize: 13, color: '#555', textTransform: 'capitalize' },
-  chipTextActive: { color: '#2563eb', fontWeight: '700' },
+  dropdown: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#ddd', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, backgroundColor: '#fafafa' },
+  dropdownText: { fontSize: 16, color: '#1a1a1a' },
+  dropdownChevron: { fontSize: 14, color: '#6b7280' },
+  freqOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  freqOptionText: { fontSize: 16, color: '#333' },
+  freqOptionTextActive: { color: '#2563eb', fontWeight: '600' },
+  freqOptionCheck: { fontSize: 16, color: '#2563eb', fontWeight: '700' },
 
   taskRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#eee', borderRadius: 10, padding: 12, marginBottom: 6 },
   taskRowMain: { flex: 1 },

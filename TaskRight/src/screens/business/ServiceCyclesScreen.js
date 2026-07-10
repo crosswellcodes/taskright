@@ -9,8 +9,15 @@ import {
   getServiceTemplates, createServiceTemplate, updateServiceTemplate,
   deleteServiceTemplate
 } from '../../api/businessApi';
+import { frequencyLabel } from '../../utils/frequency';
 
-const FREQUENCIES = ['weekly', 'biweekly', 'monthly', 'yearly'];
+const FREQUENCIES = [
+  { value: 'one_time', label: 'One-time' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'biweekly', label: 'Biweekly' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'yearly', label: 'Yearly' },
+];
 
 export default function ServiceCyclesScreen({ navigation }) {
   const { user } = useAuth();
@@ -180,7 +187,7 @@ export default function ServiceCyclesScreen({ navigation }) {
           <View style={styles.card}>
             <View style={styles.cardLeft}>
               <Text style={styles.cycleName}>{item.name}</Text>
-              <Text style={styles.cycleFreq}>{item.frequency} · {item.tasks?.length || 0} tasks</Text>
+              <Text style={styles.cycleFreq}>{frequencyLabel(item.frequency)} · {item.tasks?.length || 0} tasks</Text>
               <Text style={styles.cycleDays}>
                 Selection deadline: {item.daysBeforeServiceDeadline}d before service
               </Text>
@@ -218,12 +225,12 @@ export default function ServiceCyclesScreen({ navigation }) {
               <View style={styles.freqRow}>
                 {FREQUENCIES.map(f => (
                   <TouchableOpacity
-                    key={f}
-                    style={[styles.freqBtn, frequency === f && styles.freqBtnSelected]}
-                    onPress={() => setFrequency(f)}
+                    key={f.value}
+                    style={[styles.freqBtn, frequency === f.value && styles.freqBtnSelected]}
+                    onPress={() => setFrequency(f.value)}
                   >
-                    <Text style={[styles.freqBtnText, frequency === f && styles.freqBtnTextSelected]}>
-                      {f.charAt(0).toUpperCase() + f.slice(1)}
+                    <Text style={[styles.freqBtnText, frequency === f.value && styles.freqBtnTextSelected]}>
+                      {f.label}
                     </Text>
                   </TouchableOpacity>
                 ))}

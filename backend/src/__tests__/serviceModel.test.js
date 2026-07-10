@@ -59,6 +59,14 @@ describe('POST /customers/:id/services — create from scratch', () => {
     expect(bad3.status).toBe(400);
   });
 
+  it('generates exactly one Service Call for an ad-hoc one_time service', async () => {
+    const res = await auth(request(app).post(`/api/businesses/${businessId}/customers/${customerId}/services`))
+      .send({ name: 'One-off Deep Clean', frequency: 'one_time', tasks: [TASK1], totalHours: 4, startDate: futureDate(5) });
+    expect(res.status).toBe(201);
+    const calls = await knex('selection_cycles').where('customer_service_id', res.body.service.id);
+    expect(calls.length).toBe(1); // single visit, no recurrence
+  });
+
   it('allows multiple Services on one customer', async () => {
     const res = await auth(request(app).post(`/api/businesses/${businessId}/customers/${customerId}/services`))
       .send({ name: 'Alice Monthly', frequency: 'monthly', tasks: [TASK1], totalHours: 5, startDate: futureDate(10) });

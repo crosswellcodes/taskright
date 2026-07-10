@@ -560,6 +560,8 @@ Service Call / `selection_cycles`).
 Scheduling validated per business format (`startDate` for date-based, `dayOfWeek` 0–6 for day-of-week).
 Multiple Services per customer are allowed.
 
+**`frequency`** ∈ `one_time | weekly | biweekly | monthly | yearly`. **`one_time`** is an ad-hoc single-visit sale — it generates **exactly one** Service Call (recurring frequencies generate 4 upcoming) and never recurs. (Same set is accepted on Service Templates.) `pricePerVisit` applies equally to a one-time sale or a recurring service.
+
 #### Get Service (full definition)
 **GET** `/businesses/:businessId/customers/:customerId/services/:serviceId`
 → `{ success, service: { id, customerId, templateId, name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, totalHours, pricePerVisit, startDate, dayOfWeek, tasks: [{ id, name, timeAllotmentMinutes }] } }`

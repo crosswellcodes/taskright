@@ -22,7 +22,7 @@ router.post('/:businessId/service-templates', requireBusiness, async (req, res) 
     const businessId = parseInt(req.params.businessId);
     const { name, frequency, daysBeforeServiceDeadline, daysBeforeAutoRepeat, tasks } = req.body;
 
-    const validFrequencies = ['weekly', 'biweekly', 'monthly', 'yearly'];
+    const validFrequencies = ['one_time', 'weekly', 'biweekly', 'monthly', 'yearly'];
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       return res.status(400).json({ success: false, error: 'Service template name is required', code: 'VALIDATION_ERROR' });
@@ -124,7 +124,7 @@ router.put('/:businessId/service-templates/:cycleId', requireBusiness, async (re
       return res.status(404).json({ success: false, error: 'Service template not found', code: 'TEMPLATE_NOT_FOUND' });
     }
 
-    const validFrequencies = ['weekly', 'biweekly', 'monthly', 'yearly'];
+    const validFrequencies = ['one_time', 'weekly', 'biweekly', 'monthly', 'yearly'];
     if (frequency !== undefined && !validFrequencies.includes(frequency)) {
       return res.status(400).json({
         success: false,

@@ -464,7 +464,9 @@ async function createCustomerService(customerId, {
 }
 
 // ─── PER-CUSTOMER SERVICE CRUD (customer-profile creation flow) ──────────────
-const VALID_FREQUENCIES = ['weekly', 'biweekly', 'monthly', 'yearly'];
+// 'one_time' is an ad-hoc single-visit sale — generates exactly one Service Call
+// (see generateUpcomingSelectionCycles) and never recurs.
+const VALID_FREQUENCIES = ['one_time', 'weekly', 'biweekly', 'monthly', 'yearly'];
 
 // Resolve a Service belonging to this business (via the customer) or throw 404.
 async function getOwnedCustomerService(businessId, serviceId) {
@@ -661,7 +663,10 @@ async function generateUpcomingSelectionCycles(customerId, serviceCycle, startDa
     currentDate = new Date(startDate);
   }
 
-  for (let i = 0; i < 4; i++) {
+  // Ad-hoc one-time sales get a single Service Call; recurring services get 4 upcoming.
+  const callsToGenerate = serviceCycle.frequency === 'one_time' ? 1 : 4;
+
+  for (let i = 0; i < callsToGenerate; i++) {
     const serviceDate = currentDate.toISOString().split('T')[0];
     const deadlineMs = currentDate.getTime() - serviceCycle.days_before_service_deadline * 24 * 60 * 60 * 1000;
     const submissionDeadline = new Date(deadlineMs).toISOString().split('T')[0];

@@ -11,6 +11,7 @@ import {
   getCustomerProfitability, updateCustomerDetails,
 } from '../../api/businessApi';
 import { formatPhone } from '../../utils/phoneUtils';
+import { frequencyLabel } from '../../utils/frequency';
 
 function money(n) {
   if (n === null || n === undefined || n === '') return '—';
@@ -256,7 +257,7 @@ export default function CustomerDetailScreen({ route, navigation }) {
                   <Text style={styles.rowLabel}>{c.serviceCycleName || `Service #${c.id}`}</Text>
                   <Text style={[styles.cyclePrice, !hasPrice && styles.cyclePriceUnset]}>
                     {hasPrice ? `${money(c.pricePerVisit)} / visit` : 'No recurring price'}
-                    {c.frequency ? `  ·  ${c.frequency}` : ''}
+                    {c.frequency ? `  ·  ${frequencyLabel(c.frequency)}` : ''}
                   </Text>
                 </View>
                 <View style={styles.rowRight}>
