@@ -1,6 +1,14 @@
 # Create-Flow Team Assignment — Spec
 
-**Status:** 📋 PLANNED (approved pre-build — July 10, 2026, via design discussion). No migration. Target: keep backend tests green through the change; RN sim verification is the user's.
+**Status:** ✅ BUILT (July 11, 2026). No migration. Backend **121/121** green (11 new tests in `createFlowAssignment.test.js`). Shipped exactly as planned; the only refinement was **validate-first-then-create** in place of a DB transaction (same "no half-create" guarantee, no `trx` plumbing — see §4.2). RN sim verification is the user's.
+
+**Build notes (what landed where):**
+- **Backend** (`businessService.js`): `assertAssigneeOwnedByBusiness` (XOR + member/group ownership → 400/404), `fanOutServiceAssignment` (open-Calls-only upsert), `assignServiceTeam` (service+assignee ownership → fan-out, returns `{ assignedCount }`). `createCustomerServiceForBusiness` validates the optional `assignee` **before** creating, then fans out. New route `PUT .../services/:serviceId/assignment` (`businesses.js`).
+- **Mobile**: shared controlled `components/AssigneePicker.js` (extracted from `ForecastDayScreen`, which now consumes it in immediate-write mode — behavior parity). `AssignCycleScreen` gained the optional create-only assign section (deferred mode; frequency-aware copy; group labor-note; hidden when no team) and threads `assignee` into the atomic create. Client `createCustomerService` unchanged (passes body through). Standalone-endpoint client helper deferred (not needed — create uses the atomic path).
+
+---
+
+**Original plan (as approved pre-build — July 10, 2026, via design discussion). No migration. Target: keep backend tests green through the change; RN sim verification is the user's.**
 
 **Goal:** make creating a service a **full-circle** experience — define the service, set its schedule, **and optionally assign a person or group to the resulting visits, all on one screen** — without disturbing the existing date-centric dispatch view. Two entry points to assignment, **one underlying model**.
 

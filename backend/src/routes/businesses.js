@@ -445,6 +445,22 @@ router.delete('/:businessId/customers/:customerId/services/:serviceId', requireB
 });
 
 /**
+ * PUT /api/businesses/:businessId/customers/:customerId/services/:serviceId/assignment
+ * Assign one person or group to ALL open Service Calls of a service (service-level
+ * fan-out; open-calls-only; ownership-validated). Body: { teamMemberId } | { teamId }.
+ */
+router.put('/:businessId/customers/:customerId/services/:serviceId/assignment', requireBusiness, async (req, res) => {
+  try {
+    const businessId = parseInt(req.params.businessId);
+    const serviceId = parseInt(req.params.serviceId);
+    const result = await businessService.assignServiceTeam(businessId, serviceId, req.body || {});
+    return res.status(200).json({ success: true, ...result });
+  } catch (err) {
+    return serviceModelError(res, err, 'Assign service team');
+  }
+});
+
+/**
  * GET /api/businesses/:businessId/customers/:customerId/selections/upcoming
  * Get customer's upcoming selection
  */

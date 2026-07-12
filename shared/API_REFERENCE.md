@@ -552,13 +552,16 @@ Service Call / `selection_cycles`).
   "totalHours": 3,
   "startDate": "2026-07-20",
   "dayOfWeek": null,
-  "pricePerVisit": 150
+  "pricePerVisit": 150,
+  "assignee": { "teamMemberId": 1 }
 }
 ```
 `201` → `{ success, service }`. Generates the upcoming Service Calls and the Service's own task menu
 (`service_tasks`). When seeded from a template, its `template_tasks` are copied into `service_tasks`.
 Scheduling validated per business format (`startDate` for date-based, `dayOfWeek` 0–6 for day-of-week).
 Multiple Services per customer are allowed.
+
+**`assignee`** (optional, create-flow team assignment) — `{ teamMemberId }` **or** `{ teamId }` (XOR). When present, after the Calls are generated the same person/group is assigned to **every generated open Call** (all 4 for recurring, the single Call for `one_time`) — the service-level fan-out. **Validated-first**: a bad assignee (not owned by the business, or both/neither id) fails the whole create (`400`/`404`, zero rows written — no half-create). Omit it → nothing assigned (the normal unassigned state). Per-visit override still lives on the dashboard (`PUT .../assignments/:selectionCycleId`, last-write-wins).
 
 **`frequency`** ∈ `one_time | weekly | biweekly | monthly | yearly`. **`one_time`** is an ad-hoc single-visit sale — it generates **exactly one** Service Call (recurring frequencies generate 4 upcoming) and never recurs. (Same set is accepted on Service Templates.) `pricePerVisit` applies equally to a one-time sale or a recurring service.
 
@@ -573,6 +576,10 @@ Accepts any subset of `{ name, frequency, daysBeforeServiceDeadline, daysBeforeA
 #### Delete Service
 **DELETE** `/businesses/:businessId/customers/:customerId/services/:serviceId`
 Cascades open Service Calls + menu. Refuses with `409 HAS_HISTORY` if any Service Call is completed (preserves job-costing / review history).
+
+#### Assign Service (fan out to all open Calls)
+**PUT** `/businesses/:businessId/customers/:customerId/services/:serviceId/assignment`
+Body: `{ teamMemberId }` **or** `{ teamId }` (XOR). Assigns one person/group to **every open Service Call** of the service (`upsert` per Call — idempotent; **never touches completed Calls**). Ownership-validated: the service **and** the assignee must belong to the business (`404` otherwise; `400` on XOR violation). → `{ success, assignedCount }`. Same fan-out the create-flow `assignee` uses, exposed for reuse (bulk reassign-all-visits). Per-visit override remains on the dashboard `PUT .../assignments/:selectionCycleId` (last-write-wins).
 
 ---
 

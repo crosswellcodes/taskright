@@ -6,10 +6,16 @@ import {
 import { Calendar } from 'react-native-calendars';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
+import AssigneePicker from '../../components/AssigneePicker';
 import {
   getServiceTemplates, getForecast, createServiceTemplate,
   createCustomerService, getCustomerService, updateCustomerService, deleteCustomerService,
+  getTeamMembers, getTeamGroups,
 } from '../../api/businessApi';
+
+// Server generates 4 Service Calls for a recurring service, 1 for a one_time sale
+// (see generateUpcomingSelectionCycles). Used for the frequency-aware assign copy.
+const RECURRING_CALL_COUNT = 4;
 
 // Picklist saves vertical space vs. a chip row and makes room for the one-time option.
 const FREQUENCY_OPTIONS = [
@@ -78,6 +84,12 @@ export default function AssignCycleScreen({ route, navigation }) {
   const [selectedDay, setSelectedDay] = useState(null); // 0–6 for day-of-week format
   const [showCalendar, setShowCalendar] = useState(false);
 
+  // Assign (create mode only) — optional, set-only. `assignee` holds the pending
+  // { type:'member'|'group', id, name } | null, applied atomically on Create.
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [teamGroups, setTeamGroups] = useState([]);
+  const [assignee, setAssignee] = useState(null);
+
   // Data
   const [templates, setTemplates] = useState([]);
   const [forecast, setForecast] = useState([]);
@@ -107,12 +119,16 @@ export default function AssignCycleScreen({ route, navigation }) {
   useEffect(() => {
     (async () => {
       try {
-        const [templateData, forecastData] = await Promise.all([
+        const [templateData, forecastData, membersData, groupsData] = await Promise.all([
           getServiceTemplates(user.businessId),
           isEdit ? Promise.resolve(null) : getForecast(user.businessId),
+          isEdit ? Promise.resolve(null) : getTeamMembers(user.businessId),
+          isEdit ? Promise.resolve(null) : getTeamGroups(user.businessId),
         ]);
         setTemplates(templateData.serviceTemplates || []);
         if (forecastData) setForecast(forecastData.summary?.upcomingServices || []);
+        if (membersData) setTeamMembers(membersData.teamMembers || []);
+        if (groupsData) setTeamGroups(groupsData.groups || []);
 
         if (isEdit) {
           const { service } = await getCustomerService(user.businessId, customerId, serviceId);
@@ -218,6 +234,10 @@ export default function AssignCycleScreen({ route, navigation }) {
           ...base,
           startDate,
           ...(isDayOfWeek ? { dayOfWeek: selectedDay } : {}),
+          // Optional atomic assignee — fans out to all generated open Calls server-side.
+          ...(assignee
+            ? { assignee: assignee.type === 'group' ? { teamId: assignee.id } : { teamMemberId: assignee.id } }
+            : {}),
         });
       }
       navigation.goBack();
@@ -410,6 +430,29 @@ export default function AssignCycleScreen({ route, navigation }) {
           </>
         )}
 
+        {/* Assign (optional) — create mode only; hidden when the business has no team.
+            Sets one person/group across the generated Calls (applied on Create). */}
+        {!isEdit && (teamMembers.length > 0 || teamGroups.length > 0) && (
+          <>
+            <Text style={styles.label}>
+              {frequency === 'one_time'
+                ? 'Assign to this visit (optional)'
+                : `Assign to all ${RECURRING_CALL_COUNT} upcoming visits (optional)`}
+            </Text>
+            <AssigneePicker
+              teamMembers={teamMembers}
+              teamGroups={teamGroups}
+              value={assignee}
+              onChange={setAssignee}
+              title="Assign this service"
+              style={styles.assigneePill}
+            />
+            {assignee?.type === 'group' && (
+              <Text style={styles.hint}>Team-assigned visits won't auto-calculate labor cost yet.</Text>
+            )}
+          </>
+        )}
+
         <TouchableOpacity style={[styles.btn, submitting && styles.btnDisabled]} onPress={handleSave} disabled={submitting}>
           {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>{isEdit ? 'Save Changes' : 'Create Service'}</Text>}
         </TouchableOpacity>
@@ -544,6 +587,8 @@ const styles = StyleSheet.create({
 
   addTaskRow: { borderWidth: 1.5, borderColor: '#bfdbfe', borderStyle: 'dashed', borderRadius: 10, padding: 12, marginBottom: 6, alignItems: 'center' },
   addTaskRowText: { fontSize: 14, color: '#2563eb', fontWeight: '600' },
+
+  assigneePill: { alignSelf: 'flex-start', maxWidth: 240, marginTop: 4 },
 
   amountRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#ddd', borderRadius: 10, paddingHorizontal: 14, backgroundColor: '#fafafa' },
   amountPrefix: { fontSize: 16, color: '#6b7280', marginRight: 4 },

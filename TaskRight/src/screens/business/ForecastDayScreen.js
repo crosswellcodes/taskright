@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActionSheetIOS, ActivityIndicator, LayoutAnimation,
+  TouchableOpacity, ActivityIndicator, LayoutAnimation,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
+import AssigneePicker from '../../components/AssigneePicker';
 import {
   getTeamMembers,
   getTeamGroups,
@@ -99,111 +100,29 @@ export default function ForecastDayScreen({ route, navigation }) {
     return unsubscribe;
   }, [navigation, loadData]);
 
-  // ─── Two-step assign flow ─────────────────────────────────────────────────
+  // ─── Assign flow (immediate-write; AssigneePicker drives the UI) ──────────
+  // The shared controlled picker resolves the two-step ActionSheet and hands us
+  // the chosen value (or null on remove); we persist it and update local state.
 
-  const handleAssignPress = (customer) => {
-    if (!customer.selectionCycleId) return;
-
-    const assigned = assignments[customer.selectionCycleId];
-    const hasMembers = teamMembers.length > 0;
-    const hasGroups = teamGroups.length > 0;
-
-    if (!hasMembers && !hasGroups) return;
-
-    // Step 1: Person or Group?
-    const step1Options = ['Cancel'];
-    if (hasMembers) step1Options.push('Assign a Person');
-    if (hasGroups) step1Options.push('Assign a Group');
-    if (assigned) step1Options.push('Remove Assignment');
-
-    ActionSheetIOS.showActionSheetWithOptions(
-      {
-        title: `Assign to ${customer.name}`,
-        message: assigned
-          ? `Currently: ${assigned.name} (${assigned.type === 'group' ? 'Group' : 'Person'})`
-          : undefined,
-        options: step1Options,
-        cancelButtonIndex: 0,
-        destructiveButtonIndex: assigned ? step1Options.length - 1 : undefined,
-      },
-      (step1Index) => {
-        if (step1Index === 0) return; // Cancel
-
-        const chosen = step1Options[step1Index];
-
-        if (chosen === 'Remove Assignment') {
-          removeServiceAssignment(user.businessId, customer.selectionCycleId)
-            .then(() => {
-              setAssignments(prev => {
-                const next = { ...prev };
-                delete next[customer.selectionCycleId];
-                return next;
-              });
-            })
-            .catch(err => console.error('Remove assignment error:', err));
-          return;
-        }
-
-        if (chosen === 'Assign a Person') {
-          // Step 2a: pick a team member
-          const memberOptions = ['Cancel', ...teamMembers.map(m => m.name)];
-          ActionSheetIOS.showActionSheetWithOptions(
-            {
-              title: `Choose a person for ${customer.name}`,
-              options: memberOptions,
-              cancelButtonIndex: 0,
-            },
-            async (step2Index) => {
-              if (step2Index === 0) return;
-              const member = teamMembers[step2Index - 1];
-              try {
-                await upsertServiceAssignment(
-                  user.businessId,
-                  customer.selectionCycleId,
-                  { teamMemberId: member.id }
-                );
-                setAssignments(prev => ({
-                  ...prev,
-                  [customer.selectionCycleId]: { type: 'member', id: member.id, name: member.name },
-                }));
-              } catch (err) {
-                console.error('Assign member error:', err);
-              }
-            }
-          );
-          return;
-        }
-
-        if (chosen === 'Assign a Group') {
-          // Step 2b: pick a group
-          const groupOptions = ['Cancel', ...teamGroups.map(g => g.name)];
-          ActionSheetIOS.showActionSheetWithOptions(
-            {
-              title: `Choose a group for ${customer.name}`,
-              options: groupOptions,
-              cancelButtonIndex: 0,
-            },
-            async (step2Index) => {
-              if (step2Index === 0) return;
-              const group = teamGroups[step2Index - 1];
-              try {
-                await upsertServiceAssignment(
-                  user.businessId,
-                  customer.selectionCycleId,
-                  { teamId: group.id }
-                );
-                setAssignments(prev => ({
-                  ...prev,
-                  [customer.selectionCycleId]: { type: 'group', id: group.id, name: group.name },
-                }));
-              } catch (err) {
-                console.error('Assign group error:', err);
-              }
-            }
-          );
-        }
+  const handleAssignChange = async (customer, next) => {
+    const cycleId = customer.selectionCycleId;
+    if (!cycleId) return;
+    try {
+      if (next === null) {
+        await removeServiceAssignment(user.businessId, cycleId);
+        setAssignments(prev => {
+          const map = { ...prev };
+          delete map[cycleId];
+          return map;
+        });
+      } else {
+        const assignee = next.type === 'group' ? { teamId: next.id } : { teamMemberId: next.id };
+        await upsertServiceAssignment(user.businessId, cycleId, assignee);
+        setAssignments(prev => ({ ...prev, [cycleId]: next }));
       }
-    );
+    } catch (err) {
+      console.error('Assign change error:', err);
+    }
   };
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -273,7 +192,6 @@ export default function ForecastDayScreen({ route, navigation }) {
 
         {!collapsed && !loading && allCustomers.length > 0 && allCustomers.map((c, idx) => {
           const assigned = c.selectionCycleId ? assignments[c.selectionCycleId] : null;
-          const isGroup = assigned?.type === 'group';
 
           return (
             <View
@@ -301,32 +219,16 @@ export default function ForecastDayScreen({ route, navigation }) {
                 </View>
               </View>
 
-              {/* Right: assign pill */}
-              <TouchableOpacity
-                onPress={() => handleAssignPress(c)}
-                disabled={!c.selectionCycleId || (teamMembers.length === 0 && teamGroups.length === 0)}
-                style={[
-                  styles.assignPill,
-                  assigned
-                    ? (isGroup ? styles.assignPillPurple : styles.assignPillGreen)
-                    : styles.assignPillGray,
-                ]}
-              >
-                {assigned && isGroup && (
-                  <Text style={styles.assignPillIcon}>●●</Text>
-                )}
-                <Text
-                  style={[
-                    styles.assignPillText,
-                    assigned
-                      ? (isGroup ? styles.assignPillTextPurple : styles.assignPillTextGreen)
-                      : styles.assignPillTextGray,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {assigned ? assigned.name : 'Assign'}
-                </Text>
-              </TouchableOpacity>
+              {/* Right: assign pill (shared controlled picker, immediate-write) */}
+              <AssigneePicker
+                teamMembers={teamMembers}
+                teamGroups={teamGroups}
+                value={assigned}
+                title={`Assign to ${c.name}`}
+                subject={c.name}
+                disabled={!c.selectionCycleId}
+                onChange={(next) => handleAssignChange(c, next)}
+              />
             </View>
           );
         })}
@@ -382,20 +284,5 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 12, fontWeight: '600' },
   statusTextAmber: { color: '#92400e' },
   statusTextGreen: { color: '#065f46' },
-
-  // Assign pill (right side)
-  assignPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
-    maxWidth: 130,
-  },
-  assignPillGray: { backgroundColor: '#f3f4f6' },
-  assignPillGreen: { backgroundColor: '#d1fae5' },
-  assignPillPurple: { backgroundColor: '#ede9fe' },
-  assignPillIcon: { fontSize: 8, color: '#7c3aed' },
-  assignPillText: { fontSize: 13, fontWeight: '600', flexShrink: 1 },
-  assignPillTextGray: { color: '#374151' },
-  assignPillTextGreen: { color: '#065f46' },
-  assignPillTextPurple: { color: '#5b21b6' },
   emptyText: { fontSize: 14, color: '#aaa', fontStyle: 'italic' },
 });

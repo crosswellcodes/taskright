@@ -527,7 +527,17 @@ async function createCustomerServiceForBusiness(businessId, customerId, input = 
   }
   validateTasks(tasks);
 
-  return createCustomerService(customerId, {
+  // Validate-first: resolve the OPTIONAL assignee's ownership BEFORE creating
+  // anything, so a bad assignee fails the whole create (400/404, zero rows).
+  // An assignee with neither field is treated as "no assignment" (D2 set-only).
+  const a = input.assignee;
+  const assigneePresent = a && (a.teamMemberId != null || a.teamId != null);
+  let ownedAssignee = null;
+  if (assigneePresent) {
+    ownedAssignee = await assertAssigneeOwnedByBusiness(businessId, a);
+  }
+
+  const service = await createCustomerService(customerId, {
     templateId,
     name,
     frequency,
@@ -539,6 +549,14 @@ async function createCustomerServiceForBusiness(businessId, customerId, input = 
     dayOfWeek: input.dayOfWeek != null ? input.dayOfWeek : null,
     pricePerVisit: input.pricePerVisit != null ? input.pricePerVisit : null,
   });
+
+  // Assignee already validated above → fan out across the freshly-generated
+  // open Calls (D3: all upcoming visits for recurring, the single Call for one_time).
+  if (ownedAssignee) {
+    await fanOutServiceAssignment(businessId, service.id, ownedAssignee);
+  }
+
+  return service;
 }
 
 // Definition-only edit (C1 decision). Never regenerates or deletes Service Calls.
@@ -1152,6 +1170,58 @@ async function removeServiceAssignment(businessId, selectionCycleId) {
     .where('business_id', businessId)
     .where('selection_cycle_id', selectionCycleId)
     .delete();
+}
+
+// Validate that an assignee belongs to this business and satisfies XOR (exactly
+// one of teamMemberId/teamId). Returns a normalized { teamMemberId } | { teamId }.
+// Throws 400 on XOR violation, 404 when the assignee isn't owned by the business.
+// Used by the service-level assignment path (create flow + standalone endpoint) —
+// closes the ownership gap that upsertServiceAssignment alone does not cover.
+async function assertAssigneeOwnedByBusiness(businessId, assignee = {}) {
+  const teamMemberId = assignee.teamMemberId != null ? parseInt(assignee.teamMemberId) : null;
+  const teamId = assignee.teamId != null ? parseInt(assignee.teamId) : null;
+  if ((teamMemberId != null) === (teamId != null)) {
+    throw Object.assign(
+      new Error('Exactly one of teamMemberId or teamId is required'),
+      { code: 'VALIDATION_ERROR', statusCode: 400 }
+    );
+  }
+  if (teamMemberId != null) {
+    const member = await knex('team_members')
+      .where('id', teamMemberId).where('business_id', businessId).first();
+    if (!member) {
+      throw Object.assign(new Error('Team member not found'), { code: 'NOT_FOUND', statusCode: 404 });
+    }
+    return { teamMemberId };
+  }
+  const team = await knex('teams')
+    .where('id', teamId).where('business_id', businessId).first();
+  if (!team) {
+    throw Object.assign(new Error('Team not found'), { code: 'NOT_FOUND', statusCode: 404 });
+  }
+  return { teamId };
+}
+
+// Fan a single (already-validated) assignee out across every OPEN Service Call of
+// a service. Idempotent (upsert per Call). Never touches completed Calls. Returns
+// the number of Calls assigned.
+async function fanOutServiceAssignment(businessId, serviceId, ownedAssignee) {
+  const openCalls = await knex('selection_cycles')
+    .where('customer_service_id', serviceId).where('status', 'open').select('id');
+  for (const call of openCalls) {
+    await upsertServiceAssignment(businessId, call.id, ownedAssignee);
+  }
+  return openCalls.length;
+}
+
+// Service-level assignment: assign one person/group to ALL open Calls of a service.
+// Validates both the service and the assignee belong to the business, then fans out.
+// Exposed via PUT .../services/:serviceId/assignment and reused by the create flow.
+async function assignServiceTeam(businessId, serviceId, assignee) {
+  await getOwnedCustomerService(businessId, serviceId);
+  const ownedAssignee = await assertAssigneeOwnedByBusiness(businessId, assignee);
+  const assignedCount = await fanOutServiceAssignment(businessId, serviceId, ownedAssignee);
+  return { assignedCount };
 }
 
 // ─── TEAM GROUPS ─────────────────────────────────────────────────────────────
@@ -2207,6 +2277,8 @@ module.exports = {
   getAssignmentsForDate,
   upsertServiceAssignment,
   removeServiceAssignment,
+  assertAssigneeOwnedByBusiness,
+  assignServiceTeam,
   // Team Groups
   createTeamGroup,
   getTeamGroups,
