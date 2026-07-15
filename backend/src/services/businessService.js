@@ -1342,17 +1342,61 @@ async function rescheduleSelectionCycle(selectionCycleId, businessId, newService
 
 // ─── TEAM MEMBER JOB VIEWS ────────────────────────────────────────────────────
 
+// A member is "on a Call" if they're assigned individually OR they belong to a
+// team assigned to it (team_memberships). This is the single predicate all four
+// member-facing resolvers share (TL1) so the rule lives in exactly one place.
+// service_assignments.selection_cycle_id is UNIQUE, so at most one row matches
+// per cycle — no row multiplication (TL4 dedup is structural, not query-level).
+async function isMemberAssignedToCall(teamMemberId, selectionCycleId) {
+  return knex('service_assignments as sa')
+    .where('sa.selection_cycle_id', selectionCycleId)
+    .where(function () {
+      this.where('sa.team_member_id', teamMemberId)
+        .orWhereIn('sa.team_id', function () {
+          this.select('team_id')
+            .from('team_memberships')
+            .where('team_member_id', teamMemberId);
+        });
+    })
+    .first();
+}
+
+// Gate helper: returns the matching assignment or throws 404. Used by
+// getJobDetail, completeJobForTeamMember, and recordGeofenceEvent.
+async function assertMemberAssignedToCall(teamMemberId, selectionCycleId) {
+  const assignment = await isMemberAssignedToCall(teamMemberId, selectionCycleId);
+  if (!assignment) {
+    const err = new Error('Job not found or not assigned to this team member');
+    err.code = 'NOT_FOUND';
+    err.statusCode = 404;
+    throw err;
+  }
+  return assignment;
+}
+
 async function getJobsForTeamMember(teamMemberId) {
   const today = new Date().toISOString().split('T')[0];
+  // Broadened to include group jobs: individual assignment OR membership in the
+  // assigned team. selection_cycle_id is UNIQUE in service_assignments, so the
+  // sa join yields at most one row per cycle — no dedup needed (TL4). teams is
+  // left-joined only to surface the "Team job" badge fields.
   return knex('service_assignments as sa')
     .join('selection_cycles as sc', 'sa.selection_cycle_id', 'sc.id')
     .join('customers as c', 'sc.customer_id', 'c.id')
     .leftJoin('customer_services as svc', 'sc.customer_service_id', 'svc.id')
+    .leftJoin('teams as t', 'sa.team_id', 't.id')
     .leftJoin('selections as sel', function() {
       this.on('sel.selection_cycle_id', 'sc.id')
           .andOn('sel.customer_id', 'sc.customer_id');
     })
-    .where('sa.team_member_id', teamMemberId)
+    .where(function() {
+      this.where('sa.team_member_id', teamMemberId)
+          .orWhereIn('sa.team_id', function() {
+            this.select('team_id')
+                .from('team_memberships')
+                .where('team_member_id', teamMemberId);
+          });
+    })
     .where('sc.service_date', '>=', today)
     .orderBy('sc.service_date', 'asc')
     .select(
@@ -1366,22 +1410,14 @@ async function getJobsForTeamMember(teamMemberId) {
       'svc.name as serviceCycleName',
       'sel.selected_tasks as selectedTasks',
       'sel.status as selectionStatus',
+      knex.raw('(sa.team_id IS NOT NULL) as "isTeamAssigned"'),
+      't.name as teamName',
     );
 }
 
 async function getJobDetail(teamMemberId, selectionCycleId) {
-  // Verify this team member is assigned to this job
-  const assignment = await knex('service_assignments')
-    .where('team_member_id', teamMemberId)
-    .where('selection_cycle_id', selectionCycleId)
-    .first();
-
-  if (!assignment) {
-    const err = new Error('Job not found or not assigned to this team member');
-    err.code = 'NOT_FOUND';
-    err.statusCode = 404;
-    throw err;
-  }
+  // Verify this team member is on this job (individually or via team) — 404 otherwise.
+  await assertMemberAssignedToCall(teamMemberId, selectionCycleId);
 
   const row = await knex('selection_cycles as sc')
     .join('customers as c', 'sc.customer_id', 'c.id')
@@ -1454,18 +1490,10 @@ async function getServiceCallDetail(businessId, selectionCycleId) {
 }
 
 async function completeJobForTeamMember(teamMemberId, selectionCycleId, notes) {
-  // Verify this team member is assigned to this job
-  const assignment = await knex('service_assignments')
-    .where('team_member_id', teamMemberId)
-    .where('selection_cycle_id', selectionCycleId)
-    .first();
-
-  if (!assignment) {
-    const err = new Error('Job not found or not assigned to this team member');
-    err.code = 'NOT_FOUND';
-    err.statusCode = 404;
-    throw err;
-  }
+  // Verify this team member is on this job (individually or via team) — 404 otherwise.
+  // Any member of the assigned team may complete; the first write wins and the
+  // rest hit the ALREADY_COMPLETED guards below (TL3, first-to-complete-wins).
+  await assertMemberAssignedToCall(teamMemberId, selectionCycleId);
 
   // Look up the cycle to get customer_id and check current status
   const cycle = await knex('selection_cycles').where('id', selectionCycleId).first();
@@ -1669,20 +1697,12 @@ async function submitSelectionByToken(token, selectedTaskIds) {
 // ─── GEOFENCE EVENTS ─────────────────────────────────────────────────────────
 
 async function recordGeofenceEvent(teamMemberId, selectionCycleId, { eventType, occurredAt, lat, lng, method }) {
-  // Verify this team member is actually assigned to this job before recording
-  // events or creating labor costs — matches getJobDetail/completeJobForTeamMember.
-  // The route's requireTeamMember only proves the JWT matches the URL's memberId.
-  const assignment = await knex('service_assignments')
-    .where('team_member_id', teamMemberId)
-    .where('selection_cycle_id', selectionCycleId)
-    .first();
-
-  if (!assignment) {
-    const err = new Error('Job not found or not assigned to this team member');
-    err.code = 'NOT_FOUND';
-    err.statusCode = 404;
-    throw err;
-  }
+  // Verify this team member is actually on this job (individually or via team)
+  // before recording events or creating labor costs — matches
+  // getJobDetail/completeJobForTeamMember. The route's requireTeamMember only
+  // proves the JWT matches the URL's memberId. Group members clock in and get
+  // their own per-member labor line at their own rate (TL1/TL2).
+  await assertMemberAssignedToCall(teamMemberId, selectionCycleId);
 
   const event = await knex('geofence_events')
     .insert({

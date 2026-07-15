@@ -448,7 +448,7 @@ export default function AssignCycleScreen({ route, navigation }) {
               style={styles.assigneePill}
             />
             {assignee?.type === 'group' && (
-              <Text style={styles.hint}>Team-assigned visits won't auto-calculate labor cost yet.</Text>
+              <Text style={styles.hint}>Each team member's hours are tracked individually and auto-calculate labor cost at their own rate.</Text>
             )}
           </>
         )}

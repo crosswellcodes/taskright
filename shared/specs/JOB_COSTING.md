@@ -148,6 +148,8 @@ Package: `@react-native-community/geolocation` (foreground only).
 
 ### Actual Labor Hours — Server-Side Calculation
 
+> **Team jobs (D3 → Option A shipped 2026-07-14, `TEAM_LABOR_COSTING.md`):** a Call assigned to a **team** now resolves to every member of that team individually — each clocks in and produces their own per-member labor line below at their own rate. The four member-facing resolvers gate on "individual OR member of the assigned team (`team_memberships`)" via `assertMemberAssignedToCall`. No change to the per-member calculation itself.
+
 On departure event receipt:
 1. Find the matching arrival event: same `team_member_id` + `selection_cycle_id`, most recent `event_type = 'arrival'`.
 2. If found: `hours_actual = (departure.occurred_at − arrival.occurred_at)` in decimal hours.

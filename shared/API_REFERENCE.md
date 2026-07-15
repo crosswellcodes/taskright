@@ -609,6 +609,8 @@ Each entry includes `hourlyRate` (number or null) alongside `weeklyHours`, `grou
 **Request Body** (all fields optional): `{ name, phoneNumber, weeklyHours, hourlyRate }`
 `hourlyRate` (non-negative number, nullable — send `null`/`""` to clear) feeds job-costing labor: the labor line is auto-computed on a **geofence departure** as `amount = hoursActual × hourlyRate` (0.00 if the rate is null at that time). Setting the rate applies to labor computed after it's set; existing per-job labor can be adjusted on the Service Call detail screen. Returned as `teamMember.hourlyRate` (number or null).
 
+**Team job resolution (2026-07-14, `TEAM_LABOR_COSTING.md` — no new endpoints):** the member-facing job views (`GET /api/team-members/:teamMemberId/jobs`, `/jobs/:selectionCycleId`, `PATCH .../complete`, `POST .../geofence`) now resolve a Call assigned to a **team** for every member of that team, not just individually-assigned members. `GET .../jobs` therefore includes group jobs and each row carries `isTeamAssigned` (bool) + `teamName` (nullable). Each group member records their own geofence → their own per-member labor line at their own rate, so a team-assigned Call's `laborLines`/profitability populate like an individual job's. Completion is first-to-complete-wins: a later member's `complete` returns `409 ALREADY_COMPLETED` (benign — the client treats it as "a teammate already completed this").
+
 #### Delete Team Member
 **DELETE** `/businesses/:businessId/team-members/:memberId`
 

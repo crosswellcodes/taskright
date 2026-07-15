@@ -1,6 +1,12 @@
 # Team Labor Costing — Spec
 
-**Status:** 📋 PLANNED (approved pre-build — July 13, 2026, via design discussion). **No migration.** Target: keep backend tests green through the change (currently 121/121); RN sim verification is the user's.
+**Status:** ✅ BUILT (July 14, 2026). **No migration.** Backend green (136/136 — added 15 §7 tests). RN member + owner screens updated (babel-checked; sim verification is the user's). Delivered exactly as planned: broadened the four member-facing resolvers via one shared `assertMemberAssignedToCall` gate; the whole downstream labor chain works unchanged.
+
+**Implementation notes (as-built):**
+- Shared helpers `isMemberAssignedToCall` / `assertMemberAssignedToCall` in `businessService.js` — predicate is `sa.team_member_id = member OR sa.team_id IN (member's team_memberships)`.
+- `getJobsForTeamMember` broadened + now returns `isTeamAssigned` / `teamName` (drives a "Team" badge in `MyJobsScreen`). **No DISTINCT needed:** `service_assignments.selection_cycle_id` is UNIQUE, so the sa join yields ≤1 row per cycle — TL4 dedup is structural, not query-level (the spec's "both individually and via team" case is impossible under that constraint; the OR-predicate still can't multiply a match).
+- `JobDetailScreen` renders the first-wins 409 as "A teammate already marked this service complete" and keeps Clock Out available when a member is still clocked in on a completed job (so manual-path hours still record).
+- Owner caveats removed: `ServiceCallDetailScreen` D3 empty-state gone (labor table lists each group member); `AssignCycleScreen` group note now states hours auto-calculate per member at their own rate.
 
 **Goal:** close the **D3 gap** — group-assigned Service Calls currently record **no labor**, so profitability is blank on the cost side for any job handed to a team. Make a group assignment mean *"every member of the team is individually on this job,"* reusing the existing per-member labor machinery wholesale. After this, a team job's labor table and profitability populate the same way an individually-assigned job's do.
 

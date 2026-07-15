@@ -221,7 +221,10 @@ export default function JobDetailScreen({ route, navigation }) {
               }));
             } catch (err) {
               if (err.code === 'ALREADY_COMPLETED') {
-                Alert.alert('Already Complete', 'This service has already been marked as complete.');
+                // First-to-complete-wins (TL3): a teammate on this job may have
+                // closed it first. Treat as success — refresh into the completed
+                // state rather than surfacing a raw error.
+                Alert.alert('Already Complete', 'A teammate already marked this service complete.');
                 fetchDetail();
               } else {
                 Alert.alert('Error', err.message || 'Failed to mark service complete');
@@ -238,7 +241,12 @@ export default function JobDetailScreen({ route, navigation }) {
   const isCompleted = job?.status === 'completed';
   const hasTasks = job?.selectedTasks && job.selectedTasks.length > 0;
   const hasCoords = job?.customerLat != null && job?.customerLng != null;
-  const showManualClock = !isCompleted && (!hasCoords || locationPermission === false);
+  // Normally manual clock is for jobs with no coords / denied permission. But if
+  // a teammate completed this job first (TL3) while this member is still clocked
+  // in, keep Clock Out available so their hours still record as labor.
+  const showManualClock =
+    (!isCompleted && (!hasCoords || locationPermission === false)) ||
+    (isCompleted && clockedIn);
 
   if (loading) {
     return (
@@ -310,7 +318,9 @@ export default function JobDetailScreen({ route, navigation }) {
         {showManualClock && (
           <View style={styles.clockCard}>
             <Text style={styles.clockLabel}>CLOCK IN / OUT</Text>
-            {!hasCoords ? (
+            {isCompleted ? (
+              <Text style={styles.clockSubtext}>A teammate completed this job — clock out to log your hours</Text>
+            ) : !hasCoords ? (
               <Text style={styles.clockSubtext}>No address on file — using manual tracking</Text>
             ) : locationPermission === false ? (
               <Text style={styles.clockSubtext}>Location access denied — using manual tracking</Text>

@@ -43,7 +43,7 @@ There is **one source of truth and two thin views over it**, not two systems. "N
 | Assignment write | `upsertServiceAssignment(businessId, selectionCycleId, {teamMemberId}|{teamId})`; `PUT /assignments/:selectionCycleId`. **Note: does not currently validate assignee/cycle ownership** — the new service-level path will. |
 | Dispatch UI (kept) | `ForecastDayScreen` — iOS `ActionSheetIOS` two-step picker (step 1 person/group/remove; step 2 pick member/group); immediate write on choose |
 | Team data (mobile) | `getTeamMembers` (businessApi:78), `getTeamGroups` (businessApi:145) |
-| Labor gap | Auto labor is **individual-only** (D3): a **group**-assigned Call gets no auto labor lines → profitability blank on cost side. See Deferred. |
+| Labor gap | ✅ **CLOSED** (2026-07-14, `TEAM_LABOR_COSTING.md`). ~~Auto labor was individual-only (D3)~~ — group-assigned Calls now resolve to each team member individually, so each records their own per-member labor line. D7's copy caveat was removed. |
 
 ---
 
@@ -57,7 +57,7 @@ There is **one source of truth and two thin views over it**, not two systems. "N
   - a **standalone service-level endpoint** for reuse (bulk reassign-all-visits later).
 - **D5 — Shared picker is a controlled component** (`value` + `onChange`). Dashboard = immediate-write mode (`onChange` → PUT now). Create = deferred mode (`onChange` → local state → applied on "Create Service"). Same UI/code, behavior driven by the parent.
 - **D6 — UX = single scroll, not a stepped wizard.** The assign section is an optional block **after** the schedule section in the existing create scroll. **Edit mode is unchanged** (create-flow assignment is a convenience; editing assignments already has a home on the dashboard).
-- **D7 — Labor gap acknowledged in copy, not solved.** When a **group** is selected, show a note: "Team-assigned visits won't auto-calculate labor cost yet." (Team labor is the next-up spec — see Deferred.)
+- **D7 — Labor gap ~~acknowledged in copy~~ → CLOSED (2026-07-14, `TEAM_LABOR_COSTING.md`).** The group note ("Team-assigned visits won't auto-calculate labor cost yet") has been **replaced** — group-assigned visits now auto-calculate labor per member at their own rate, so `AssignCycleScreen` states that instead.
 
 ---
 
@@ -68,7 +68,7 @@ There is **one source of truth and two thin views over it**, not two systems. "N
 | `ForecastDayScreen` dispatch view | **No change.** Still the authoritative day-centric manage/override surface. |
 | `service_assignments` shape + `PUT /assignments/:callId` + DELETE | **No change.** Create-flow reuses the same upsert logic. |
 | `ServiceCallDetailScreen` (assignment display, `isTeamAssigned`) | **No change.** |
-| Job costing / profitability | **No change** to logic. Group-assigned visits still get no auto labor (Deferred). |
+| Job costing / profitability | Group-assigned visits now produce per-member auto labor (D3 → Option A shipped 2026-07-14, `TEAM_LABOR_COSTING.md`). |
 | Edit-service flow | **No change.** |
 
 **No migration.** Nothing about the data model changes.
@@ -109,7 +109,7 @@ Extract the member/group selection out of `ForecastDayScreen` into a reusable co
 - Loads `getTeamMembers` + `getTeamGroups`. If both empty → **hide the section** (or show a subtle "Add team members to assign here").
 - Uses `AssigneePicker` in **deferred** mode → holds a pending `assignee` in local state.
 - **Frequency-aware copy:** `one_time` → "Assign to this visit (optional)"; recurring → "Assign to all N upcoming visits (optional)" (N = generated call count, i.e. 4).
-- **Group-selected note (D7):** "Team-assigned visits won't auto-calculate labor cost yet."
+- **Group-selected note (D7 → updated 2026-07-14):** now "Each team member's hours are tracked individually and auto-calculate labor cost at their own rate." (was "Team-assigned visits won't auto-calculate labor cost yet")
 - On **Create Service**: include `assignee` in the create payload (atomic). No separate assign call from the client.
 
 ### 5.3 Client (`businessApi.js`)
@@ -143,6 +143,6 @@ Each step independently verifiable; backend suite green from Step A onward.
 
 ## 8. Deferred / Next-up
 
-- **Team labor costing (top of mind — see memory `project-team-labor-deferred`).** Auto labor is individual-only (D3); group-assigned visits get **no** labor lines → profitability incomplete. This change makes that gap more visible (easy to group-assign all visits). **This spec only acknowledges it in copy.** The natural follow-on spec: a team-labor model (per-member hours within a group job, or a group rate/allocation) so group visits roll into profitability.
+- **Team labor costing — ✅ SHIPPED 2026-07-14 (`TEAM_LABOR_COSTING.md`).** Chosen model: Option A (each group member clocks in individually → per-member labor at their own rate). Group-assigned visits now roll into profitability. The copy caveat this spec added has been removed.
 - **Clear-all-visits DELETE** on the service-level endpoint — deferred (dashboard handles per-visit removal).
 - **Option (c) "default assignee" on the service** that auto-applies to *future regenerated* Calls — deferred; additive upgrade if auto-repeat/regeneration ever lands.

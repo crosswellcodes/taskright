@@ -7,7 +7,7 @@
 
 - **D1 → `job_costs.source`** (`'auto'|'manual'`). Geofence recompute skips `source='manual'`; `POST`/`PATCH /costs` stamp `'manual'`.
 - **D2 → creation-time copy + backfill.** `generateUpcomingSelectionCycles()` copies `customer_cycle_assignments.price_per_visit → selection_cycles.price`; migration 019 backfilled existing **open** cycles.
-- **D3 → Option B (individual-only for v1).** Auto labor requires an individual `service_assignments.team_member_id`. Team-assigned jobs show price/materials/overhead but an empty labor table. Union-with-`team_group_members` (Option A) tracked as a follow-up.
+- **D3 → Option A SHIPPED (2026-07-14, `TEAM_LABOR_COSTING.md`).** ~~Option B (individual-only for v1)~~ superseded. The four member-facing resolvers now admit a member assigned individually **OR** via `team_memberships` (shared `assertMemberAssignedToCall` gate), so each group member clocks in individually and produces their own per-member labor line at their own rate. Team-assigned jobs now populate the labor table + profitability exactly like individual jobs. No migration.
 - **FK ON DELETE:** `job_costs.selection_cycle_id` CASCADE, `job_costs.team_member_id` SET NULL (preserve $ history), `geofence_events.*` CASCADE.
 - **Labor cross-table rule:** enforced app-level in the costs service (`validateCostLineShape`), by decision.
 **Related:** [`JOB_COSTING.md`](JOB_COSTING.md) (feature spec), [`SESSION9_REVIEW_FINDINGS.md`](SESSION9_REVIEW_FINDINGS.md) (fixed), [`REVIEW_REQUESTS.md`](REVIEW_REQUESTS.md) (consumes geofence departure)
@@ -60,7 +60,9 @@ These are not just columns; they are product/model decisions that ripple into th
   3. **Ad hoc jobs** (no assignment): remain null; set via `PATCH /jobs/:id/price` (Rule 5).
 - **Downstream impact:** API `PATCH .../price` endpoint; UI price field pre-fills instead of always blank.
 
-### D3. Team-assigned job costing scope  *(confirmed gap)*
+### D3. Team-assigned job costing scope  *(✅ RESOLVED — Option A shipped 2026-07-14, `TEAM_LABOR_COSTING.md`)*
+
+> Resolved as **Option A**: the resolvers now union `team_memberships` (the real junction name — the `team_group_members` below is stale) via a shared `assertMemberAssignedToCall` gate. Each group member clocks in individually → per-member labor at their own rate. No migration. The original analysis is preserved below for history.
 
 - **Problem:** `getJobsForTeamMember()` and the assignment checks in `getJobDetail()` / `completeJobForTeamMember()` / `recordGeofenceEvent()` all match `service_assignments.team_member_id` **only**. Jobs assigned to a **team** (`service_assignments.team_id` set, `team_member_id` null) never appear for that team's individual members — so no geofence events and no per-member labor lines are ever recorded for team jobs. Since `job_costs` is per-member, team-job labor costing currently produces nothing.
 - **Decision needed:** Does v1 job costing support team-assigned jobs?

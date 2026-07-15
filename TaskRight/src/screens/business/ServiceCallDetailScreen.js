@@ -223,8 +223,8 @@ export default function ServiceCallDetailScreen({ route }) {
   const isOpen = displayStatus === 'open';
   const hasTasks = detail?.selectedTasks && detail.selectedTasks.length > 0;
 
-  // Job costing (D3: auto labor is individual-only in v1 — team-assigned jobs have no auto lines)
-  const isTeamAssigned = !!detail?.team && !detail?.teamMember;
+  // Job costing. Labor lines populate per team member for both individual and
+  // team assignments (each group member is tracked individually — TEAM_LABOR_COSTING).
   const laborLines = costs?.laborLines || [];
   const laborSubtotal = laborLines.reduce((sum, l) => sum + Number(l.amount || 0), 0);
   const priceSet = costs?.price !== null && costs?.price !== undefined;
@@ -391,14 +391,7 @@ export default function ServiceCallDetailScreen({ route }) {
               {/* Labor */}
               <View style={styles.costGroup}>
                 <Text style={styles.costGroupLabel}>Labor</Text>
-                {isTeamAssigned ? (
-                  <View style={styles.emptyRowFlush}>
-                    <Text style={styles.emptyText}>
-                      Automatic labor tracking is individual-only for now. Add labor
-                      costs manually for team-assigned jobs.
-                    </Text>
-                  </View>
-                ) : laborLines.length > 0 ? (
+                {laborLines.length > 0 ? (
                   <>
                     <View style={[styles.laborRow, styles.laborHeaderRow]}>
                       <Text style={[styles.laborCell, styles.laborMemberCell, styles.laborHeadText]}>Member</Text>

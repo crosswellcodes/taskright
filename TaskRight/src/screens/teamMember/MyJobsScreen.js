@@ -64,7 +64,14 @@ export default function MyJobsScreen({ navigation }) {
           <Text style={styles.badgeText}>{item.status}</Text>
         </View>
       </View>
-      <Text style={styles.cycleName}>{item.serviceCycleName}</Text>
+      <View style={styles.cycleRow}>
+        <Text style={styles.cycleName}>{item.serviceCycleName}</Text>
+        {item.isTeamAssigned ? (
+          <View style={styles.teamBadge}>
+            <Text style={styles.teamBadgeText}>{item.teamName ? `Team · ${item.teamName}` : 'Team'}</Text>
+          </View>
+        ) : null}
+      </View>
       {item.customerAddress ? (
         <TouchableOpacity
           style={styles.addressRow}
@@ -183,7 +190,10 @@ const styles = StyleSheet.create({
   },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   customerName: { fontSize: 16, fontWeight: '700', color: '#1a1a1a', flex: 1 },
-  cycleName: { fontSize: 13, color: '#888', marginBottom: 6 },
+  cycleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+  cycleName: { fontSize: 13, color: '#888', flexShrink: 1 },
+  teamBadge: { backgroundColor: '#ede9fe', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, marginLeft: 8 },
+  teamBadgeText: { fontSize: 11, fontWeight: '600', color: '#6d28d9' },
   addressRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   addressText: { fontSize: 13, color: '#555', flex: 1, marginRight: 8 },
   directionsLink: { fontSize: 13, color: '#2563eb', fontWeight: '600', flexShrink: 0 },
