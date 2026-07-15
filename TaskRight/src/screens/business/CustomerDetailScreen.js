@@ -375,9 +375,21 @@ export default function CustomerDetailScreen({ route, navigation }) {
               >
                 <Text style={styles.rowLabel}>{date}</Text>
                 <View style={styles.rowRight}>
-                  <View style={[styles.badge, s.status === 'open' ? styles.badgeOpen : styles.badgeCompleted]}>
-                    <Text style={styles.badgeText}>{s.status}</Text>
-                  </View>
+                  {(() => {
+                    // Lifecycle badge so the list shows "what's in flight" (§5.3).
+                    const state = s.lifecycleState || (s.status === 'completed' ? 'completed' : 'proposed');
+                    const badgeStyle = state === 'confirmed' ? styles.badgeConfirmed
+                      : state === 'completed' ? styles.badgeCompleted
+                      : styles.badgeProposed;
+                    const label = state === 'confirmed' ? 'Confirmed'
+                      : state === 'completed' ? 'Completed'
+                      : 'Proposed';
+                    return (
+                      <View style={[styles.badge, badgeStyle]}>
+                        <Text style={styles.badgeText}>{label}</Text>
+                      </View>
+                    );
+                  })()}
                   <Text style={styles.rowChevron}>›</Text>
                 </View>
               </TouchableOpacity>
@@ -437,7 +449,8 @@ const styles = StyleSheet.create({
   assignBtn: { marginTop: 12, paddingVertical: 10, borderRadius: 8, borderWidth: 1.5, borderColor: '#2563eb', alignItems: 'center' },
   assignBtnText: { color: '#2563eb', fontWeight: '600' },
   badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  badgeOpen: { backgroundColor: '#dbeafe' },
+  badgeProposed: { backgroundColor: '#fef9c3' },
+  badgeConfirmed: { backgroundColor: '#dbeafe' },
   badgeCompleted: { backgroundColor: '#d1fae5' },
   badgeText: { fontSize: 12, fontWeight: '600', color: '#374151', textTransform: 'capitalize' },
   feedbackDate: { fontSize: 13, color: '#888', marginBottom: 6 },

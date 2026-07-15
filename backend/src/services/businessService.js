@@ -298,6 +298,21 @@ async function getCustomerDetails(customerId) {
     .orderBy('service_date', 'asc')
     .limit(5);
 
+  // Which of these open Calls the customer has already confirmed (submitted a
+  // selection for) — drives the lifecycle badge (§5.3). These rows are all `open`,
+  // so the state is proposed (no submitted selection) or confirmed (has one).
+  const upcomingIds = upcomingServiceRows.map(s => s.id);
+  const submittedCycleIds = upcomingIds.length
+    ? new Set(
+        (await knex('selections')
+          .whereIn('selection_cycle_id', upcomingIds)
+          .where('customer_id', customerId)
+          .where('status', 'submitted')
+          .select('selection_cycle_id'))
+          .map(r => r.selection_cycle_id)
+      )
+    : new Set();
+
   const upcomingServices = [];
   for (const s of upcomingServiceRows) {
     const cycle = s.customer_service_id
@@ -308,7 +323,8 @@ async function getCustomerDetails(customerId) {
       serviceCycleName: cycle ? cycle.name : null,
       serviceDate: s.service_date,
       submissionDeadline: s.submission_deadline,
-      status: s.status
+      status: s.status,
+      lifecycleState: submittedCycleIds.has(s.id) ? 'confirmed' : 'proposed',
     });
   }
   customer.upcomingServices = upcomingServices;
@@ -1452,6 +1468,11 @@ async function getJobDetail(teamMemberId, selectionCycleId) {
   return row;
 }
 
+// Owner Call detail — the proposed → confirmed → completed lifecycle view.
+// SCL4/SCL6: derive one `lifecycleState` + a resolved `tasks[]` (ids→names) so the
+// client renders without re-deriving. No migration — everything reads from the
+// service definition (`customer_services` + default `service_tasks` menu), the
+// customer's `selections`, and `service_completions`. See SERVICE_CALL_LIFECYCLE.md.
 async function getServiceCallDetail(businessId, selectionCycleId) {
   const row = await knex('selection_cycles as sc')
     .join('customers as c', 'sc.customer_id', 'c.id')
@@ -1471,9 +1492,15 @@ async function getServiceCallDetail(businessId, selectionCycleId) {
       'sc.service_date as serviceDate',
       'sc.submission_deadline as submissionDeadline',
       'sc.status',
+      'sc.price as expectedPriceRaw',       // D2 copy of price_per_visit (nullable)
+      'sc.customer_service_id as customerServiceId',
       'c.id as customerId',
       'c.name as customerName',
       'svc.name as serviceCycleName',
+      'svc.total_hours as totalHours',       // the proposed/expected baseline
+      'svc.price_per_visit as pricePerVisit',
+      'svc.frequency as frequency',
+      'svc.day_of_week as dayOfWeek',
       'sel.selected_tasks as selectedTasks',
       'sel.status as selectionStatus',
       'comp.completed_at as completedAt',
@@ -1486,7 +1513,66 @@ async function getServiceCallDetail(businessId, selectionCycleId) {
     )
     .first();
 
-  return row || null;
+  if (!row) return null;
+
+  // Proposed scope: the service's default task menu (per customer_service_id).
+  const menuRows = row.customerServiceId
+    ? await knex('service_tasks')
+        .where('customer_service_id', row.customerServiceId)
+        .orderBy('id', 'asc')
+        .select('id', 'name', 'time_allotment_minutes')
+    : [];
+  const menu = menuRows.map(t => ({
+    id: t.id,
+    name: t.name,
+    minutes: t.time_allotment_minutes || 0,
+  }));
+  const menuById = new Map(menu.map(t => [t.id, t]));
+
+  // Confirmed scope: resolve the customer's selected_tasks ids → names (fixes the
+  // "Task N" render bug, §1.1). selected_tasks is a jsonb array of service_tasks ids.
+  const selectedIds = Array.isArray(row.selectedTasks) ? row.selectedTasks : [];
+  const confirmedTasks = selectedIds
+    .map(id => menuById.get(id))
+    .filter(Boolean)
+    .map(t => ({ id: t.id, name: t.name, minutes: t.minutes, source: 'confirmed' }));
+
+  const hasSubmitted = row.selectionStatus === 'submitted';
+  const isCompleted = row.status === 'completed';
+
+  // SCL4: completed > confirmed > proposed. A draft selection is NOT a confirmation.
+  const lifecycleState = isCompleted ? 'completed' : (hasSubmitted ? 'confirmed' : 'proposed');
+
+  // SCL3/SCL7: the tasks[] to render, each flagged proposed|confirmed. Never empty
+  // in the completed-without-confirmation case — fall back to the menu (scopeIsAssumed).
+  let tasks;
+  let scopeIsAssumed = false;
+  if (lifecycleState === 'confirmed') {
+    tasks = confirmedTasks;
+  } else if (lifecycleState === 'completed' && hasSubmitted) {
+    tasks = confirmedTasks;
+  } else {
+    // proposed, or completed-without-a-submitted-selection (SCL7)
+    tasks = menu.map(t => ({ id: t.id, name: t.name, minutes: t.minutes, source: 'proposed' }));
+    scopeIsAssumed = isCompleted;
+  }
+
+  // SCL6: expected hours (definition) vs confirmed hours (Σ selected minutes ÷ 60).
+  const expectedHours = row.totalHours == null ? null : Number(row.totalHours);
+  const confirmedHours = hasSubmitted
+    ? round2(confirmedTasks.reduce((sum, t) => sum + t.minutes, 0) / 60)
+    : null;
+  const expectedPrice = row.expectedPriceRaw == null ? null : Number(row.expectedPriceRaw);
+
+  return {
+    ...row,
+    lifecycleState,
+    tasks,
+    expectedHours,
+    confirmedHours,
+    expectedPrice,
+    scopeIsAssumed,
+  };
 }
 
 async function completeJobForTeamMember(teamMemberId, selectionCycleId, notes) {

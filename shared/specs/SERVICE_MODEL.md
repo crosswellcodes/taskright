@@ -147,6 +147,16 @@ Each Service owns its own task menu so per-customer tweaks are possible (the who
 
 Rename scope: DB tables + service-layer identifiers (mechanical, ~5 backend files + tests) and UI labels. `selection_cycles` table name is retained to avoid churning every downstream FK; it is relabeled "Service Call" only in UI. **Decision E (resolved):** physically rename tables/identifiers, not UI-only.
 
+### 2.6 Service Call lifecycle view (read layer — built July 14, 2026)
+
+A pure **read/presentation** layer over this model makes a created service's Calls legible from creation onward (full spec: `SERVICE_CALL_LIFECYCLE.md`). No schema change — it derives a `lifecycleState` ∈ `proposed | confirmed | completed` from the pieces this model already defines:
+
+- **proposed** — the Call exists but the customer hasn't submitted a selection. The owner sees the *expected* scope pulled straight from the service definition: the default `service_tasks` menu, `customer_services.total_hours` (as `expectedHours`), `selection_cycles.price` (the D2 copy, as `expectedPrice`), and any assignment.
+- **confirmed** — a `submitted` `selections` row exists. The task list switches to the customer's selected subset (ids resolved → names) and hours to `confirmedHours` (Σ selected minutes ÷ 60).
+- **completed** — `selection_cycles.status = 'completed'`; actuals (completion, labor, margin) render. If completed with no submitted selection, the default menu is shown flagged `scopeIsAssumed` (never empty).
+
+`getServiceCallDetail` returns the derived `lifecycleState` + resolved `tasks[]`; `getCustomerDetails.upcomingServices[]` carries a `proposed`/`confirmed` badge state. This is the read counterpart to the per-customer definition — it never writes `selections`, so the customer selection flow is untouched.
+
 ---
 
 ## 3. Downstream Preservation (make-or-break)

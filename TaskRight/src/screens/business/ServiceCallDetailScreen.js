@@ -221,7 +221,29 @@ export default function ServiceCallDetailScreen({ route }) {
   const displayCycleName = detail?.serviceCycleName || paramCycleName;
   const displayDeadline = detail?.submissionDeadline || paramDeadline;
   const isOpen = displayStatus === 'open';
-  const hasTasks = detail?.selectedTasks && detail.selectedTasks.length > 0;
+
+  // Lifecycle: proposed → confirmed → completed (SERVICE_CALL_LIFECYCLE.md §5).
+  // Derived server-side; fall back sensibly while the detail is still loading.
+  const lifecycleState = detail?.lifecycleState
+    || (displayStatus === 'completed' ? 'completed' : 'proposed');
+  const lifecycle = LIFECYCLE_META[lifecycleState] || LIFECYCLE_META.proposed;
+  const isProposedScope = lifecycleState === 'proposed';
+
+  // Tasks now come pre-resolved (ids → names) as detail.tasks. Fall back to the
+  // legacy selectedTasks shape only if an older payload is in flight.
+  const tasks = detail?.tasks || [];
+  const hasTasks = tasks.length > 0;
+
+  // Expected (definition) vs confirmed (customer's submitted selection) hours.
+  const showConfirmedHours = detail?.confirmedHours !== null && detail?.confirmedHours !== undefined;
+  const hoursLabel = showConfirmedHours ? 'Confirmed Hours' : 'Expected Hours';
+  const hoursValue = showConfirmedHours ? detail.confirmedHours : detail?.expectedHours;
+
+  // Scope caption color: amber when the shown scope is only expected/assumed,
+  // green once it reflects the customer's confirmed selection.
+  const scopeBadgeStyle = (isProposedScope || detail?.scopeIsAssumed)
+    ? styles.scopeBadgeProposed
+    : styles.scopeBadgeConfirmed;
 
   // Job costing. Labor lines populate per team member for both individual and
   // team assignments (each group member is tracked individually — TEAM_LABOR_COSTING).
@@ -258,11 +280,14 @@ export default function ServiceCallDetailScreen({ route }) {
               </TouchableOpacity>
             )}
           </View>
-          <View style={[styles.statusPill, isOpen ? styles.pillOpen : styles.pillCompleted]}>
-            <Text style={[styles.statusPillText, isOpen ? styles.pillOpenText : styles.pillCompletedText]}>
-              {isOpen ? 'Open' : 'Completed'}
+          <View style={[styles.statusPill, lifecycle.pill]}>
+            <Text style={[styles.statusPillText, lifecycle.pillText]}>
+              {lifecycle.label}
             </Text>
           </View>
+          {lifecycle.caption ? (
+            <Text style={styles.headerCaption}>{lifecycle.caption}</Text>
+          ) : null}
         </View>
 
         {loading ? (
@@ -281,6 +306,10 @@ export default function ServiceCallDetailScreen({ route }) {
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Submission Deadline</Text>
                 <Text style={styles.detailValue}>{formatShortDate(displayDeadline)}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{hoursLabel}</Text>
+                <Text style={styles.detailValue}>{formatHours(hoursValue)}</Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Reference ID</Text>
@@ -318,42 +347,35 @@ export default function ServiceCallDetailScreen({ route }) {
               )}
             </View>
 
-            {/* Tasks */}
+            {/* Tasks — proposed (expected menu) → confirmed (customer selection) → done scope */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Tasks</Text>
               {hasTasks ? (
-                detail.selectedTasks.map((task, idx) => (
-                  <View key={idx} style={styles.taskRow}>
-                    <View style={styles.taskBullet} />
+                tasks.map((task, idx) => (
+                  <View key={task.id ?? idx} style={styles.taskRow}>
+                    <View style={[styles.taskBullet, isProposedScope && styles.taskBulletMuted]} />
                     <View style={styles.taskInfo}>
-                      <Text style={styles.taskName}>
-                        {task.name || task.taskName || `Task ${idx + 1}`}
+                      <Text style={[styles.taskName, isProposedScope && styles.taskNameMuted]}>
+                        {task.name}
                       </Text>
-                      {task.description ? (
-                        <Text style={styles.taskDesc}>{task.description}</Text>
-                      ) : null}
                     </View>
                   </View>
                 ))
               ) : (
                 <View style={styles.emptyRow}>
-                  <Text style={styles.emptyText}>
-                    {detail?.selectionStatus === 'submitted'
-                      ? 'Tasks submitted but none listed'
-                      : 'Customer has not submitted their task selection yet'}
-                  </Text>
+                  <Text style={styles.emptyText}>No tasks defined for this service yet</Text>
                 </View>
               )}
-              {detail?.selectionStatus && (
-                <View style={[
-                  styles.selBadgeRow,
-                  detail.selectionStatus === 'submitted' ? styles.selBadgeSubmitted : styles.selBadgeDraft,
-                ]}>
-                  <Text style={styles.selBadgeText}>
-                    {detail.selectionStatus === 'submitted' ? 'Selection submitted' : 'Draft saved'}
-                  </Text>
-                </View>
-              )}
+              {/* Scope caption: what the task list above represents in this state. */}
+              <View style={[styles.selBadgeRow, scopeBadgeStyle]}>
+                <Text style={styles.selBadgeText}>
+                  {lifecycleState === 'proposed'
+                    ? "Expected scope — the customer hasn't confirmed yet"
+                    : detail?.scopeIsAssumed
+                      ? 'Assumed scope — the customer never confirmed a selection'
+                      : 'Confirmed by customer'}
+                </Text>
+              </View>
             </View>
 
             {/* Completion */}
@@ -379,7 +401,9 @@ export default function ServiceCallDetailScreen({ route }) {
 
               {/* Price */}
               <TouchableOpacity style={styles.detailRow} onPress={openPriceEditor} activeOpacity={0.6}>
-                <Text style={styles.detailLabel}>Price</Text>
+                <Text style={styles.detailLabel}>
+                  {lifecycleState === 'completed' ? 'Price' : 'Price (Expected)'}
+                </Text>
                 <View style={styles.editableValueWrap}>
                   <Text style={[styles.detailValueInline, !priceSet && styles.valueUnset]}>
                     {priceSet ? money(costs.price) : 'Set price'}
@@ -660,11 +684,16 @@ const styles = StyleSheet.create({
   },
   changeDateBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   statusPill: { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
-  pillOpen: { backgroundColor: 'rgba(255,255,255,0.2)' },
+  pillProposed: { backgroundColor: 'rgba(251,191,36,0.28)' },
+  pillConfirmed: { backgroundColor: 'rgba(191,219,254,0.30)' },
   pillCompleted: { backgroundColor: 'rgba(16,185,129,0.25)' },
   statusPillText: { fontSize: 13, fontWeight: '600' },
-  pillOpenText: { color: '#fff' },
+  pillProposedText: { color: '#fde68a' },
+  pillConfirmedText: { color: '#dbeafe' },
   pillCompletedText: { color: '#6ee7b7' },
+  headerCaption: {
+    fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 8,
+  },
 
   loadingRow: { paddingTop: 48, alignItems: 'center' },
 
@@ -702,14 +731,16 @@ const styles = StyleSheet.create({
   },
   taskInfo: { flex: 1 },
   taskName: { fontSize: 14, fontWeight: '600', color: '#1a1a1a' },
-  taskDesc: { fontSize: 13, color: '#888', marginTop: 2 },
+  // Proposed/expected scope reads muted — it isn't the customer's confirmed choice yet.
+  taskBulletMuted: { backgroundColor: '#c7d2fe' },
+  taskNameMuted: { color: '#6b7280', fontWeight: '500' },
 
   selBadgeRow: {
     marginTop: 12, alignSelf: 'flex-start',
     borderRadius: 16, paddingHorizontal: 10, paddingVertical: 4,
   },
-  selBadgeSubmitted: { backgroundColor: '#d1fae5' },
-  selBadgeDraft: { backgroundColor: '#fef9c3' },
+  scopeBadgeProposed: { backgroundColor: '#fef9c3' },
+  scopeBadgeConfirmed: { backgroundColor: '#d1fae5' },
   selBadgeText: { fontSize: 12, fontWeight: '600', color: '#374151' },
 
   notesBox: { marginTop: 8, backgroundColor: '#f8fafc', borderRadius: 8, padding: 12 },
@@ -814,3 +845,26 @@ const styles = StyleSheet.create({
   },
   modalCancelText: { fontSize: 15, fontWeight: '600', color: '#374151' },
 });
+
+// Header chip presentation per lifecycle state (§5.1). Defined after `styles`
+// so the style references resolve at module load.
+const LIFECYCLE_META = {
+  proposed: {
+    label: 'Proposed',
+    caption: 'Proposed · awaiting customer confirmation',
+    pill: styles.pillProposed,
+    pillText: styles.pillProposedText,
+  },
+  confirmed: {
+    label: 'Confirmed',
+    caption: 'Confirmed by customer',
+    pill: styles.pillConfirmed,
+    pillText: styles.pillConfirmedText,
+  },
+  completed: {
+    label: 'Completed',
+    caption: null,
+    pill: styles.pillCompleted,
+    pillText: styles.pillCompletedText,
+  },
+};

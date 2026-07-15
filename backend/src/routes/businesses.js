@@ -593,8 +593,16 @@ router.get('/:businessId/selection-cycles/:selectionCycleId', requireBusiness, a
         customerId: detail.customerId,
         customerName: detail.customerName,
         serviceCycleName: detail.serviceCycleName,
+        // Backward-compatible: keep the raw selection fields for existing readers…
         selectedTasks: detail.selectedTasks || [],
         selectionStatus: detail.selectionStatus || null,
+        // …and add the derived proposed → confirmed → completed lifecycle view.
+        lifecycleState: detail.lifecycleState,
+        tasks: detail.tasks,
+        expectedHours: detail.expectedHours,
+        confirmedHours: detail.confirmedHours,
+        expectedPrice: detail.expectedPrice,
+        scopeIsAssumed: detail.scopeIsAssumed,
         completedAt: detail.completedAt || null,
         completionNotes: detail.completionNotes || null,
         teamMember: detail.teamMemberId ? {

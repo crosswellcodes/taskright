@@ -1,6 +1,8 @@
 # Service Call Lifecycle — Proposed → Confirmed → Actual — Spec
 
-**Status:** 📋 PLANNED (approved pre-build — July 14, 2026, via design discussion). **No migration** (all data derivable from existing tables). Target: keep backend tests green (currently 136/136); RN sim verification is the user's.
+**Status:** ✅ **BUILT (July 14, 2026)**. **No migration; no new endpoints.** Backend `getServiceCallDetail` enriched with `lifecycleState` + resolved `tasks[]` + `expectedHours`/`confirmedHours`/`expectedPrice`/`scopeIsAssumed`; `ServiceCallDetailScreen` renders the three states (header chip, muted proposed scope, expected↔confirmed hours, "Price (Expected)" qualifier); `CustomerDetailScreen` upcoming rows carry a lifecycle badge (`getCustomerDetails` derives proposed/confirmed). Fixes the latent "Task N" render bug (§1.1). **144/144 backend tests** (+8). RN sim verification is the user's.
+
+**Resolved-during-build note:** §5.2's "Job Costing (labor/margin) — render only in `completed`" conflicts with the same section's Price bullet (Price row shows an "Expected" qualifier *while proposed/confirmed*, so it must be visible pre-completion) and with "as today" (the section already renders always). Resolution: **kept Job Costing always-visible** (preserves early price/materials entry; labor/margin naturally show empty states until completion) and added the "Price (Expected)" qualifier while not completed. The route path is `GET /businesses/:businessId/**selection-cycles**/:selectionCycleId` (this spec calls it `service-calls` in §1.2/§4.3 — the live path was kept, not renamed).
 
 **Goal:** after an owner completes the service-create flow, the created service's **Service Calls should be legible immediately** — showing the *proposed / expected* scope (default tasks, expected hours, expected price, assignment) while a Call is in flight, then **switching to real data** as the customer confirms their task selection and/or the job is completed. Today a freshly-created Call's detail screen is nearly empty until the customer acts, so the owner can't see "what's in flight."
 
@@ -102,14 +104,14 @@ A state chip in the header card reflecting `lifecycleState`:
 
 ---
 
-## 6. Phased Plan
+## 6. Phased Plan — ✅ all steps built (July 14, 2026)
 
-- **Step A — Backend.** Extend `getServiceCallDetail` (§4) + map into the route payload. Add §7 tests (derivation of `lifecycleState`, resolved names, expected vs confirmed hours, SCL7 fallback). Keep the suite green.
-- **Step B — Mobile Call detail.** State chip + sectional proposed/confirmed/actual rendering (§5.1–5.2). Babel-check.
-- **Step C — Access list polish.** Lifecycle badge on `CustomerDetailScreen` upcoming rows (§5.3). Babel-check.
-- **Step D — Docs + memory.** This spec → built; sync `API_REFERENCE.md` (enriched `service-calls/:id` payload — no new endpoints), `SERVICE_MODEL.md` (Call lifecycle view), `HANDOFF.md`, `DOC_REGISTRY.md`; memory.
+- **Step A — Backend.** ✅ Extended `getServiceCallDetail` (businessService.js) + route payload; new `serviceCallLifecycle.test.js` covers `lifecycleState` derivation, resolved names, expected vs confirmed hours, and the SCL7 fallback (7 tests). Backward-compatible (kept `selectedTasks`/`selectionStatus`).
+- **Step B — Mobile Call detail.** ✅ Lifecycle header chip (`LIFECYCLE_META`) + sectional rendering: muted proposed tasks with scope caption, expected↔confirmed hours row, "Price (Expected)" qualifier. Babel-checked.
+- **Step C — Access list polish.** ✅ `getCustomerDetails` derives per-Call `lifecycleState` (proposed/confirmed) via a batched `selections` lookup; `CustomerDetailScreen` upcoming rows show the badge. +1 test in `customers.test.js`. Babel-checked.
+- **Step D — Docs + memory.** ✅ This spec → built; synced `API_REFERENCE.md` (enriched `selection-cycles/:id` payload — no new endpoints), `SERVICE_MODEL.md` (Call lifecycle view), `HANDOFF.md`, `DOC_REGISTRY.md`; memory.
 
-*(No migration step.)*
+*(No migration step.)* **144/144 backend tests.**
 
 ---
 

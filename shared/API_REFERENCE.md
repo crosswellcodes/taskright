@@ -711,6 +711,46 @@ Each entry includes `hourlyRate` (number or null) alongside `weeklyHours`, `grou
 }
 ```
 
+#### Get Service Call Detail
+**GET** `/businesses/:businessId/selection-cycles/:selectionCycleId`
+
+Full detail for a single Service Call, framed as a **proposed → confirmed → completed lifecycle** (see `shared/specs/SERVICE_CALL_LIFECYCLE.md`, built 2026-07-14). **No new endpoint** — this documents the enriched payload. 404 if the Call isn't owned by the business.
+
+The `lifecycleState` is derived: `completed` if the cycle is completed; else `confirmed` if a `submitted` selection exists; else `proposed` (a `draft` selection is **not** a confirmation). `tasks[]` is the resolved list to render — the full default `service_tasks` menu (`source: "proposed"`) before confirmation, the customer's submitted subset with **resolved names** (`source: "confirmed"`) after. On a completed Call with no submitted selection the menu is shown flagged `scopeIsAssumed: true` (never an empty list). Numeric fields are coerced (`expectedHours`/`confirmedHours`/`expectedPrice`).
+
+**Response (200)**:
+```json
+{
+  "success": true,
+  "serviceCall": {
+    "selectionCycleId": 10,
+    "serviceDate": "2026-07-22",
+    "submissionDeadline": "2026-07-19",
+    "status": "open",
+    "customerId": 5,
+    "customerName": "Sarah Johnson",
+    "serviceCycleName": "Weekly Cleaning",
+    "lifecycleState": "proposed",
+    "tasks": [
+      { "id": 31, "name": "Wipe counters", "minutes": 60, "source": "proposed" },
+      { "id": 32, "name": "Vacuum floors", "minutes": 90, "source": "proposed" }
+    ],
+    "expectedHours": 3,
+    "confirmedHours": null,
+    "expectedPrice": 150,
+    "scopeIsAssumed": false,
+    "selectedTasks": [],
+    "selectionStatus": null,
+    "completedAt": null,
+    "completionNotes": null,
+    "teamMember": null,
+    "team": null
+  }
+}
+```
+
+**Backward-compat:** `selectedTasks` (raw `service_tasks` ids) and `selectionStatus` (`draft`/`submitted`/null) are retained alongside the new fields. The `upcomingServices[]` rows on **Get Customer Details** likewise carry a derived `lifecycleState` (`proposed`/`confirmed`) for the list badge.
+
 #### Get Customer Feedback
 **GET** `/businesses/:businessId/customers/:customerId/feedback/latest`
 

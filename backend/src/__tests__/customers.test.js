@@ -120,7 +120,34 @@ describe('GET /api/businesses/:businessId/customers/:customerId', () => {
     expect(res.body.customer.assignedCycles).toHaveLength(1);
     expect(Array.isArray(res.body.customer.upcomingServices)).toBe(true);
     expect(res.body.customer.upcomingServices.length).toBeGreaterThan(0);
+    // §5.3 lifecycle badge: unconfirmed open Calls read as proposed.
+    expect(res.body.customer.upcomingServices.every(s => s.lifecycleState === 'proposed')).toBe(true);
     expect(res.body.customer.lastSelection).toBeNull();
+  });
+
+  it('marks an upcoming service confirmed once the customer submits a selection', async () => {
+    const customer = await addCustomerToBusiness(businessId, token, { name: 'Cara', phoneNumber: '+13330003333' });
+    await assignCycleToCustomer(businessId, customer.id, cycle.id, token, 2);
+
+    const svc = await knex('customer_services').where('customer_id', customer.id).first();
+    const task = await knex('service_tasks').where('customer_service_id', svc.id).orderBy('id').first();
+    const firstCycle = await knex('selection_cycles')
+      .where('customer_id', customer.id).orderBy('service_date', 'asc').first();
+
+    const login = await request(app)
+      .post('/api/auth/customers/login')
+      .send({ phoneNumber: '+13330003333' });
+    await request(app)
+      .post(`/api/customers/${customer.id}/selection-cycle/${firstCycle.id}/submit`)
+      .set('Authorization', `Bearer ${login.body.token}`)
+      .send({ selectedTasks: [task.id], selectedTotalHours: 1 });
+
+    const res = await request(app)
+      .get(`/api/businesses/${businessId}/customers/${customer.id}`)
+      .set('Authorization', `Bearer ${token}`);
+
+    const confirmed = res.body.customer.upcomingServices.find(s => s.id === firstCycle.id);
+    expect(confirmed.lifecycleState).toBe('confirmed');
   });
 
   it('returns 404 for non-existent customer', async () => {
