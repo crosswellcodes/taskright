@@ -295,6 +295,9 @@ React Navigation requires all params to be plain serializable data. Functions ca
 - [ ] **Blog infrastructure** — Routes, templates, content. Phase 2.
 - [ ] **Wire EarlyAccessForm to backend** — Currently client-side only. Phase 2.
 
+### Next-Up Spec (planned, not built)
+- [ ] **Service Call Lifecycle — proposed → confirmed → actual** (`shared/specs/SERVICE_CALL_LIFECYCLE.md`, planned July 14, 2026). Make a created service's Calls legible immediately: `ServiceCallDetailScreen` shows the **proposed/expected** scope (default `service_tasks` menu + `total_hours` + `price_per_visit` + assignment) while in flight, then switches to **confirmed** (customer's submitted selection) and **actual** (completion + labor/margin) as reality arrives. Backend enriches `getServiceCallDetail` with a derived `lifecycleState` + resolved `tasks[]` (also fixes the latent ids-render-as-"Task N" bug). **No migration, no new endpoints.** Decisions SCL1–SCL7 in the spec (per-Call screen only; post-create nav unchanged + list badges; full proposed scope; completed-without-confirmation falls back to the default menu). Execute Steps A→D.
+
 ### Planned Features (Partially Implemented)
 - **Job Costing — infrastructure complete + review findings fixed (Session 9)**
   - **All 10 code review findings fixed (July 3, 2026)** — see `shared/specs/SESSION9_REVIEW_FINDINGS.md` for per-item detail. 76/76 tests passing. Highlights:
