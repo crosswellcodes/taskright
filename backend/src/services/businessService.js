@@ -2076,6 +2076,31 @@ async function computeEstimatedHours(selectionCycle) {
   return round2(minutes / 60);
 }
 
+// Resolve the assignee(s) for a Call into a rate breakdown for PROPOSED labor.
+// Individual → one member; group → every team_memberships member (PJC1). Rates are
+// the *current* card rate (actuals snapshot at clock-in — this is a live forecast).
+async function resolveAssigneeRates(selectionCycleId) {
+  const assignment = await knex('service_assignments')
+    .where('selection_cycle_id', selectionCycleId)
+    .first('team_member_id', 'team_id');
+  if (!assignment) return [];
+
+  if (assignment.team_member_id) {
+    const m = await knex('team_members')
+      .where('id', assignment.team_member_id)
+      .first('id', 'name', 'hourly_rate');
+    return m ? [m] : [];
+  }
+  if (assignment.team_id) {
+    return knex('team_members as m')
+      .join('team_memberships as tm', 'm.id', 'tm.team_member_id')
+      .where('tm.team_id', assignment.team_id)
+      .orderBy('m.id')
+      .select('m.id', 'm.name', 'm.hourly_rate');
+  }
+  return [];
+}
+
 // GET /jobs/:selectionCycleId/costs — the full per-job costing payload.
 async function getJobCosts(businessId, selectionCycleId) {
   const cycle = await assertCycleOwnedByBusiness(selectionCycleId, businessId);
@@ -2123,7 +2148,55 @@ async function getJobCosts(businessId, selectionCycleId) {
   const marginDollars = price != null ? round2(price - totalCost) : null;
   const marginPercent = price != null && price !== 0 ? round2((marginDollars / price) * 100) : null;
 
-  const estimatedHours = await computeEstimatedHours(cycle);
+  // ─── PROPOSED costing (before the job runs) — SERVICE_CALL_LIFECYCLE §9 ─────
+  // Expected hours from the service definition; confirmed hours from a submitted
+  // selection (Σ minutes ÷ 60). Proposed labor uses confirmed once the customer
+  // has confirmed, else the expected budget.
+  const svc = cycle.customer_service_id
+    ? await knex('customer_services').where('id', cycle.customer_service_id).first('total_hours')
+    : null;
+  const expectedHours = svc && svc.total_hours != null ? Number(svc.total_hours) : null;
+
+  const submitted = await knex('selections')
+    .where('selection_cycle_id', cycle.id)
+    .where('customer_id', cycle.customer_id)
+    .where('status', 'submitted')
+    .first('selected_tasks');
+  let confirmedHours = null;
+  if (submitted && Array.isArray(submitted.selected_tasks) && submitted.selected_tasks.length) {
+    const t = await knex('service_tasks').whereIn('id', submitted.selected_tasks).select('time_allotment_minutes');
+    confirmedHours = round2(t.reduce((s, r) => s + (r.time_allotment_minutes || 0), 0) / 60);
+  }
+
+  const proposedLaborHours = confirmedHours != null ? confirmedHours : expectedHours;
+
+  // PJC1: proposed labor = hours × Σ(assignee rates). Group = every member's rate
+  // summed (assumes the whole crew on-site for the full duration). An unrated member
+  // counts as $0 and flags the estimate incomplete (owner still sees a floor).
+  const assigneeRates = await resolveAssigneeRates(cycle.id);
+  const proposedLaborBreakdown = assigneeRates.map((m) => ({
+    teamMemberId: m.id,
+    name: m.name,
+    hourlyRate: m.hourly_rate != null ? round2(m.hourly_rate) : null,
+  }));
+  const sumRates = proposedLaborBreakdown.reduce((s, m) => s + (m.hourlyRate || 0), 0);
+  const hasAssignee = proposedLaborBreakdown.length > 0;
+  const anyUnrated = proposedLaborBreakdown.some((m) => m.hourlyRate == null);
+  // Incomplete when we can't fully cost the labor: no assignee, unknown hours, or
+  // any member missing a rate. The number shown is a floor, never silently wrong.
+  const expectedLaborIncomplete = !hasAssignee || proposedLaborHours == null || anyUnrated;
+  const proposedLabor = (hasAssignee && proposedLaborHours != null)
+    ? round2(proposedLaborHours * sumRates)
+    : null;
+
+  const expectedTotalCost = round2((proposedLabor || 0) + materialsAmount + overheadAmount);
+  const expectedMarginDollars = price != null ? round2(price - expectedTotalCost) : null;
+  const expectedMarginPercent = price != null && price !== 0
+    ? round2((expectedMarginDollars / price) * 100) : null;
+
+  // "Est" column fix: fall back to the expected hours when nothing is confirmed yet,
+  // so the labor table's estimate isn't blank pre-selection.
+  const estimatedHours = proposedLaborHours != null ? proposedLaborHours : 0;
 
   return {
     selectionCycleId: cycle.id,
@@ -2139,6 +2212,16 @@ async function getJobCosts(businessId, selectionCycleId) {
     totalCost,
     marginDollars,
     marginPercent,
+    // Proposed / expected block (rendered pre-completion; actuals take over at completed).
+    expectedHours,
+    confirmedHours,
+    proposedLaborHours,
+    proposedLabor,
+    proposedLaborBreakdown,
+    expectedLaborIncomplete,
+    expectedTotalCost,
+    expectedMarginDollars,
+    expectedMarginPercent,
   };
 }
 

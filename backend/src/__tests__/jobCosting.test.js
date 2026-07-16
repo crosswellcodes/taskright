@@ -289,7 +289,7 @@ describe('GET /jobs/:selectionCycleId/costs', () => {
     expect(c.totalCost).toBe(80);
     expect(c.marginDollars).toBe(120);
     expect(c.marginPercent).toBe(60);
-    expect(c.estimatedHours).toBe(0); // no selection submitted
+    expect(c.estimatedHours).toBe(3); // no selection → falls back to expected total_hours (was 0 before the proposed-costing fix)
     // Single-line ids let the UI PATCH the existing materials/overhead value.
     expect(c.materialsCostId).toBe(matCreated.body.data.id);
     expect(c.overheadCostId).toBe(ovhCreated.body.data.id);

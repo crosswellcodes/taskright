@@ -254,6 +254,14 @@ export default function ServiceCallDetailScreen({ route }) {
     (l) => l.hourlyRate === null || l.hourlyRate === undefined
   );
 
+  // Proposed costing: before completion the section shows the *expected* labor
+  // (hours × assignee rate[s]) + expected margin; at completion it switches to the
+  // actual per-member labor table (SERVICE_CALL_LIFECYCLE §9).
+  const isCompleted = lifecycleState === 'completed';
+  const proposedBreakdown = costs?.proposedLaborBreakdown || [];
+  const isGroupProposal = proposedBreakdown.length > 1;
+  const anyProposedUnrated = proposedBreakdown.some((m) => m.hourlyRate === null || m.hourlyRate === undefined);
+
   return (
     <>
       <ScrollView
@@ -412,7 +420,49 @@ export default function ServiceCallDetailScreen({ route }) {
                 </View>
               </TouchableOpacity>
 
-              {/* Labor */}
+              {/* Labor — proposed estimate before completion, actuals after */}
+              {!isCompleted ? (
+                <View style={styles.costGroup}>
+                  <Text style={styles.costGroupLabel}>Proposed Labor</Text>
+                  {proposedBreakdown.length > 0 ? (
+                    <>
+                      {proposedBreakdown.map((m) => (
+                        <View key={m.teamMemberId} style={styles.detailRow}>
+                          <Text style={styles.detailLabel}>{m.name}</Text>
+                          <Text style={[
+                            styles.detailValue,
+                            (m.hourlyRate === null || m.hourlyRate === undefined) && styles.valueUnset,
+                          ]}>
+                            {m.hourlyRate === null || m.hourlyRate === undefined
+                              ? 'No rate set'
+                              : `${money(m.hourlyRate)}/h`}
+                          </Text>
+                        </View>
+                      ))}
+                      <Text style={styles.costCaption}>
+                        {formatHours(costs?.proposedLaborHours)} × {isGroupProposal ? 'total crew rate' : 'rate'}
+                        {isGroupProposal ? ' — assumes each member on-site for the full time' : ''}
+                      </Text>
+                      <View style={[styles.detailRow, styles.laborSubtotalRow]}>
+                        <Text style={styles.laborSubtotalLabel}>Proposed Labor</Text>
+                        <Text style={styles.laborSubtotalValue}>{money(costs?.proposedLabor)}</Text>
+                      </View>
+                    </>
+                  ) : (
+                    <View style={styles.emptyRowFlush}>
+                      <Text style={styles.emptyText}>Assign a team member to estimate labor</Text>
+                    </View>
+                  )}
+                  {anyProposedUnrated && proposedBreakdown.length > 0 ? (
+                    <View style={styles.warnBanner}>
+                      <Text style={styles.warnBannerText}>
+                        A team member has no hourly rate set — the proposed labor shown is a
+                        floor. Set their rate to complete the estimate.
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              ) : (
               <View style={styles.costGroup}>
                 <Text style={styles.costGroupLabel}>Labor</Text>
                 {laborLines.length > 0 ? (
@@ -485,6 +535,7 @@ export default function ServiceCallDetailScreen({ route }) {
                   </View>
                 ) : null}
               </View>
+              )}
 
               {/* Materials */}
               <TouchableOpacity
@@ -512,25 +563,32 @@ export default function ServiceCallDetailScreen({ route }) {
                 </View>
               </TouchableOpacity>
 
-              {/* Total Cost */}
+              {/* Total Cost + Margin — expected before completion, actual after */}
               <View style={[styles.detailRow, styles.totalRow]}>
-                <Text style={styles.totalLabel}>Total Cost</Text>
-                <Text style={styles.totalValue}>{money(costs?.totalCost)}</Text>
+                <Text style={styles.totalLabel}>{isCompleted ? 'Total Cost' : 'Expected Total Cost'}</Text>
+                <Text style={styles.totalValue}>
+                  {money(isCompleted ? costs?.totalCost : costs?.expectedTotalCost)}
+                </Text>
               </View>
 
-              {/* Margin */}
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Margin</Text>
+                <Text style={styles.detailLabel}>{isCompleted ? 'Margin' : 'Expected Margin'}</Text>
                 {priceSet ? (
-                  <Text style={[
-                    styles.detailValue,
-                    Number(costs?.marginDollars) < 0 ? styles.marginNegative : styles.marginPositive,
-                  ]}>
-                    {money(costs?.marginDollars)}
-                    {costs?.marginPercent !== null && costs?.marginPercent !== undefined
-                      ? ` (${Number(costs.marginPercent).toFixed(1)}%)`
-                      : ''}
-                  </Text>
+                  (() => {
+                    const dollars = isCompleted ? costs?.marginDollars : costs?.expectedMarginDollars;
+                    const percent = isCompleted ? costs?.marginPercent : costs?.expectedMarginPercent;
+                    return (
+                      <Text style={[
+                        styles.detailValue,
+                        Number(dollars) < 0 ? styles.marginNegative : styles.marginPositive,
+                      ]}>
+                        {money(dollars)}
+                        {percent !== null && percent !== undefined
+                          ? ` (${Number(percent).toFixed(1)}%)`
+                          : ''}
+                      </Text>
+                    );
+                  })()
                 ) : (
                   <Text style={[styles.detailValue, styles.marginUnset]}>Price not set</Text>
                 )}
@@ -754,6 +812,7 @@ const styles = StyleSheet.create({
   costGroupLabel: {
     fontSize: 14, color: '#6b7280', marginBottom: 6,
   },
+  costCaption: { fontSize: 12, color: '#9ca3af', fontStyle: 'italic', marginTop: 8 },
   emptyRowFlush: { paddingVertical: 6 },
 
   laborRow: {

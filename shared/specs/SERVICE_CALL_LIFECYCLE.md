@@ -1,6 +1,6 @@
 # Service Call Lifecycle — Proposed → Confirmed → Actual — Spec
 
-**Status:** ✅ **BUILT (July 14, 2026)**. **No migration; no new endpoints.** Backend `getServiceCallDetail` enriched with `lifecycleState` + resolved `tasks[]` + `expectedHours`/`confirmedHours`/`expectedPrice`/`scopeIsAssumed`; `ServiceCallDetailScreen` renders the three states (header chip, muted proposed scope, expected↔confirmed hours, "Price (Expected)" qualifier); `CustomerDetailScreen` upcoming rows carry a lifecycle badge (`getCustomerDetails` derives proposed/confirmed). Fixes the latent "Task N" render bug (§1.1). **144/144 backend tests** (+8). RN sim verification is the user's.
+**Status:** ✅ **BUILT (July 14, 2026)** + **Proposed Job Costing / Expected Margin extension BUILT (July 15, 2026 — §9).** **No migration; no new endpoints.** Backend `getServiceCallDetail` enriched with `lifecycleState` + resolved `tasks[]` + `expectedHours`/`confirmedHours`/`expectedPrice`/`scopeIsAssumed`; `ServiceCallDetailScreen` renders the three states (header chip, muted proposed scope, expected↔confirmed hours, "Price (Expected)" qualifier); `CustomerDetailScreen` upcoming rows carry a lifecycle badge (`getCustomerDetails` derives proposed/confirmed). Fixes the latent "Task N" render bug (§1.1). **144/144 backend tests** (+8). RN sim verification is the user's.
 
 **Resolved-during-build note:** §5.2's "Job Costing (labor/margin) — render only in `completed`" conflicts with the same section's Price bullet (Price row shows an "Expected" qualifier *while proposed/confirmed*, so it must be visible pre-completion) and with "as today" (the section already renders always). Resolution: **kept Job Costing always-visible** (preserves early price/materials entry; labor/margin naturally show empty states until completion) and added the "Price (Expected)" qualifier while not completed. The route path is `GET /businesses/:businessId/**selection-cycles**/:selectionCycleId` (this spec calls it `service-calls` in §1.2/§4.3 — the live path was kept, not renamed).
 
@@ -124,6 +124,23 @@ A state chip in the header card reflecting `lifecycleState`:
 - **Completed (SCL7 fallback):** `status='completed'` with **no** submitted selection → `lifecycleState='completed'`, tasks = default menu, `scopeIsAssumed=true`.
 - **Partial confirmation:** a `draft` (not submitted) selection → still `proposed` (draft is not a confirmation).
 - **Ownership:** another business's Call → 404 (unchanged).
+
+---
+
+## 9. Proposed Job Costing / Expected Margin — ✅ BUILT (July 15, 2026)
+
+**Goal:** the proposed state already shows expected tasks/hours/price + assignment; this adds the **expected labor cost and margin** so the owner can see profitability *before* the job runs. Computed from the expected hours (`total_hours`) and the assigned member's/team's current hourly rate(s). Read/derive only — **no migration, no new endpoint** (enriches `getJobCosts`).
+
+### Resolved decisions
+- **PJC1 — Group labor = `hours × Σ(member rates)`.** `total_hours` is read as the **wall-clock duration the whole crew is on-site**, so a 3-person, 3h job proposes `3 × (rateA+rateB+rateC)`. Individual = `hours × rate`. The UI captions this ("assumes each member on-site for the full time"). *(Chosen over hours × avg rate, or per-member expected hours which would need a new field.)* This is a forecast of the per-member-independent actuals (`TEAM_LABOR_COSTING`), which only match if each member logs ~`total_hours`.
+- **PJC2 — Expected-margin rollup.** Show **Expected Total Cost** = `proposedLabor + materials + overhead` and **Expected Margin** = `expectedPrice − expectedTotalCost` (with %), while `proposed`/`confirmed`. At `completed` the section switches to the actuals-based Total Cost / Margin (unchanged).
+- **PJC3 — Hours basis follows the lifecycle.** `proposedLaborHours = confirmedHours ?? expectedHours` — the expected budget until the customer confirms, then their confirmed selection (which can be *lower*, dropping the estimate).
+- **PJC4 — Unrated member = $0 floor, flagged.** A group with any rate-less member still computes (that member contributes $0) and sets `expectedLaborIncomplete = true`; the UI shows the number as a floor + a "set their rate" warning. No assignment at all ⇒ `proposedLabor = null`, incomplete, and the expected cost is materials+overhead only. *(Owner always sees a floor, never a blank.)*
+- **PJC5 — Live rate, not snapshot.** The estimate uses the current member-card rate; actuals still snapshot at clock-in (TL2). The two can diverge — acceptable for a forecast.
+- **PJC6 — "Est" column fix.** `getJobCosts.estimatedHours` returned **0** with no submitted selection (keyed off `selections`); it now falls back to `expectedHours` so the labor table's estimate isn't blank pre-confirmation.
+
+### Surface
+`getJobCosts` adds: `expectedHours`, `confirmedHours`, `proposedLaborHours`, `proposedLabor`, `proposedLaborBreakdown[{teamMemberId,name,hourlyRate}]`, `expectedLaborIncomplete`, `expectedTotalCost`, `expectedMarginDollars`, `expectedMarginPercent`. `ServiceCallDetailScreen` renders a **Proposed Labor** group (per-member rate breakdown + assumption caption + floor warning) and **Expected Total Cost / Expected Margin** while not completed; the actual per-member labor table + actual Total/Margin take over at completion. Tests: `proposedJobCosting.test.js` (+7). **151/151 backend tests.**
 
 ---
 

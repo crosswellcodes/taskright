@@ -812,11 +812,25 @@ Body: `{ pricePerVisit }` — non-negative number or `null`. Sets `customer_cycl
     "overheadCostId": 6,
     "totalCost": 120,
     "marginDollars": 80,
-    "marginPercent": 40
+    "marginPercent": 40,
+
+    "expectedHours": 3,
+    "confirmedHours": 1.5,
+    "proposedLaborHours": 1.5,
+    "proposedLabor": 30,
+    "proposedLaborBreakdown": [
+      { "teamMemberId": 1, "name": "Bob", "hourlyRate": 20 }
+    ],
+    "expectedLaborIncomplete": false,
+    "expectedTotalCost": 110,
+    "expectedMarginDollars": 90,
+    "expectedMarginPercent": 45
   }
 }
 ```
-`estimatedHours` (Rule 7) = Σ `tasks.time_allotment_minutes` for the selected tasks ÷ 60, computed at query time. When `price` is null, `marginDollars`/`marginPercent` are `null` (Rule 3 — UI shows "Price not set"). `source` is `"auto"` (geofence-tracked) or `"manual"` (owner-corrected). `materialsCostId`/`overheadCostId` are the single v1 line's id (or `null` when none) so the per-job UI can drive a single editable field — POST when null, PATCH the existing line otherwise (added 2026-07-05 for the ServiceCallDetailScreen costing UI).
+`estimatedHours` (Rule 7) = Σ `tasks.time_allotment_minutes` for the selected tasks ÷ 60, computed at query time — now **falls back to `expectedHours`** when no selection is submitted (was `0`). When `price` is null, `marginDollars`/`marginPercent` are `null` (Rule 3 — UI shows "Price not set"). `source` is `"auto"` (geofence-tracked) or `"manual"` (owner-corrected). `materialsCostId`/`overheadCostId` are the single v1 line's id (or `null` when none) so the per-job UI can drive a single editable field — POST when null, PATCH the existing line otherwise (added 2026-07-05 for the ServiceCallDetailScreen costing UI).
+
+**Proposed / expected costing (added 2026-07-15, `SERVICE_CALL_LIFECYCLE.md` §9 — no new endpoint):** the *expected* labor cost + margin shown **before** the job runs. `proposedLabor` = `proposedLaborHours × Σ(assignee rates)` where `proposedLaborHours = confirmedHours ?? expectedHours` (PJC1/PJC3); a group sums every member's current card rate. `proposedLaborBreakdown` lists the assignee(s) + rate (null when unset). `expectedLaborIncomplete` is `true` when there's **no assignee, unknown hours, or any rate-less member** — the number is then a **floor**, never blank (PJC4). `expectedTotalCost` = `proposedLabor + materials + overhead`; `expectedMarginDollars/Percent` = vs `price` (null when no price). Rates are live (not snapshotted like actual labor — PJC5). The mobile screen renders these while the Call is `proposed`/`confirmed` and switches to the actuals-based `totalCost`/`margin*` at `completed`.
 
 #### Add Cost Line (manual)
 **POST** `/businesses/:businessId/jobs/:selectionCycleId/costs`
