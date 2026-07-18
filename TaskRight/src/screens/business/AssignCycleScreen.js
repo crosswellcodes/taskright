@@ -418,6 +418,19 @@ export default function AssignCycleScreen({ route, navigation }) {
                   />
                 </View>
                 <Text style={styles.startDateLabel}>Starting: {formatDisplayDate(startDate)}</Text>
+                {/* Parity with the date-based flow: review what's already scheduled on
+                    the chosen start date before committing (DOW_DAY_SNAPSHOT.md). */}
+                <TouchableOpacity
+                  style={styles.reviewDayBtn}
+                  onPress={() => {
+                    const forecastItem = forecast.find(f => f.serviceDate?.split('T')[0] === startDate) || null;
+                    navigation.navigate('ServiceDaySnapshot', { date: startDate, forecastItem });
+                  }}
+                >
+                  <Text style={styles.reviewDayBtnText}>
+                    Review {DAY_NAMES[selectedDay]} — see what's scheduled ›
+                  </Text>
+                </TouchableOpacity>
               </>
             )}
           </>
@@ -627,4 +640,9 @@ const styles = StyleSheet.create({
   inlineCalendarCard: { marginTop: 12, borderRadius: 14, borderWidth: 1, borderColor: '#e5e7eb', backgroundColor: '#fff' },
   inlineCalendarTitle: { fontSize: 12, color: '#6b7280', textAlign: 'center', paddingTop: 12, paddingHorizontal: 12, paddingBottom: 4, fontWeight: '500' },
   startDateLabel: { fontSize: 13, color: '#2563eb', fontWeight: '600', marginTop: 10, marginBottom: 4, textAlign: 'center' },
+  reviewDayBtn: {
+    marginTop: 10, paddingVertical: 12, borderRadius: 10,
+    borderWidth: 1.5, borderColor: '#bfdbfe', backgroundColor: '#eff6ff', alignItems: 'center',
+  },
+  reviewDayBtnText: { color: '#2563eb', fontSize: 14, fontWeight: '600' },
 });
