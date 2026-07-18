@@ -23,11 +23,14 @@ export default function ServiceDaySnapshotScreen({ route, navigation }) {
   const cycles     = forecastItem?.serviceCycles ?? [];
   const hasData    = forecastItem && total > 0;
 
-  // Navigate back to AssignCycle with the confirmed date as a param.
-  // This is the React Navigation "returning a result" pattern — avoids passing
-  // a non-serializable function as a navigation param.
+  // Return to the AssignCycle screen we came from with the confirmed date.
+  // React Navigation v7: `navigate` only reuses an existing screen when its
+  // params also match — since AssignCycle was opened with {customerId,…} and we
+  // pass {confirmedDate}, navigate would PUSH a fresh (blank) AssignCycle. Use
+  // `popTo` (matches by name only) + merge:true so we pop back to the original
+  // screen and keep its params, just adding confirmedDate.
   function handleConfirm() {
-    navigation.navigate('AssignCycle', { confirmedDate: date });
+    navigation.popTo('AssignCycle', { confirmedDate: date }, { merge: true });
   }
 
   return (

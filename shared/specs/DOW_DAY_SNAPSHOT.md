@@ -40,5 +40,15 @@ This is the **same** navigation the date-based modal already uses. `ServiceDaySn
 ## 4. Deferred — flavor 2 (weekday aggregate)
 "What does my {Weekday} generally look like" — filter `forecast` by `new Date(serviceDate).getUTCDay() === selectedDay`, sum hours/submitted/pending, union `serviceCycles` across the ~4 occurrences in the 30-day window, shown in a relabeled/aggregated snapshot. No backend change either. Revisit if owners ask for a recurring-load overview.
 
+## 4a. Post-build fix — "Confirm This Date" pushed a fresh screen (July 17, 2026)
+
+Testing the new flow surfaced a **pre-existing** bug (also affecting the date-based flow): `ServiceDaySnapshot`'s "Confirm This Date" called `navigation.navigate('AssignCycle', { confirmedDate })`. The app is on **React Navigation v7**, where `navigate` only reuses an existing screen when its params **also match** — the live `AssignCycle` was opened with `{customerId, customerName}`, so v7 **pushed a fresh (blank) AssignCycle** with only `{confirmedDate}` instead of returning to the origin. (This was written for v6's "navigate goes back by name" behavior and silently broke on the v7 upgrade.)
+
+**Fix:** use v7's `popTo`, which matches by **name only**, with `merge: true` to preserve the origin's params:
+```
+navigation.popTo('AssignCycle', { confirmedDate: date }, { merge: true });
+```
+Pops back to the original AssignCycle (customer context intact) and adds `confirmedDate`. Fixes **both** the day-of-week and date-based confirm paths.
+
 ## 5. Verification
 RN sim (business "Task Done Right LLC", biz 22, day_of_week): create a service → pick a weekday → tap **Review** → confirm the snapshot shows that date's calls/hours (or the empty state) → **Confirm This Date** returns to create with the date intact. Babel-check the changed screen.
