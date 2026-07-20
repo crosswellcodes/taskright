@@ -8,6 +8,7 @@ import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context'
 import { Calendar } from 'react-native-calendars';
 import { useAuth } from '../../context/AuthContext';
 import { getForecast } from '../../api/businessApi';
+import HoursCalendarDay from '../../components/HoursCalendarDay';
 
 // Return a colour for a service day based on submission rate
 function dayColor(item) {
@@ -61,7 +62,8 @@ export default function DashboardScreen({ navigation }) {
     return map;
   }, [forecast]);
 
-  // Build markedDates for react-native-calendars
+  // Build markedDates for react-native-calendars. dotColor carries the status
+  // colour so the custom day cell can tint that day's booked-hours figure.
   const markedDates = useMemo(() => {
     const marks = {};
     forecast.forEach(item => {
@@ -71,19 +73,52 @@ export default function DashboardScreen({ navigation }) {
         selected: true,
         selectedColor: dayColor(item),
         marked: true,
-        dotColor: '#fff',
+        dotColor: dayColor(item),
       };
     });
     return marks;
   }, [forecast]);
 
+  // Booked hours per date, for the hours-load indicator in each calendar day cell.
+  const hoursByDate = useMemo(() => {
+    const map = {};
+    forecast.forEach(item => {
+      const key = toDateKey(item.serviceDate);
+      if (key) map[key] = item.totalHours ?? 0;
+    });
+    return map;
+  }, [forecast]);
+
+  // Submission-status colour per service day, so each date's circle matches the
+  // legend (blue = pending, amber = mixed, green = all submitted).
+  const colorByDate = useMemo(() => {
+    const map = {};
+    forecast.forEach(item => {
+      const key = toDateKey(item.serviceDate);
+      if (key) map[key] = dayColor(item);
+    });
+    return map;
+  }, [forecast]);
+
   // Today's date string for the calendar's initial month
   const todayString = useMemo(() => toDateKey(new Date().toISOString()), []);
 
-  const handleDayPress = (day) => {
+  const handleDayPress = useCallback((day) => {
     const item = serviceDateMap[day.dateString];
     if (item) navigation.navigate('ForecastDay', { item });
-  };
+  }, [serviceDateMap, navigation]);
+
+  const renderDay = useCallback(
+    (props) => (
+      <HoursCalendarDay
+        {...props}
+        hoursByDate={hoursByDate}
+        colorByDate={colorByDate}
+        onDayPress={handleDayPress}
+      />
+    ),
+    [hoursByDate, colorByDate, handleDayPress]
+  );
 
   // ─── Shared loading / empty states ────────────────────────────────────────
 
@@ -140,8 +175,7 @@ export default function DashboardScreen({ navigation }) {
           <Calendar
             current={todayString}
             markedDates={markedDates}
-            markingType="dot"
-            onDayPress={handleDayPress}
+            dayComponent={renderDay}
             theme={{
               backgroundColor: '#f5f5f5',
               calendarBackground: '#fff',

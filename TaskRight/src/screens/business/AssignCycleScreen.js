@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert,
   ScrollView, ActivityIndicator, TextInput, Modal
@@ -7,6 +7,7 @@ import { Calendar } from 'react-native-calendars';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import AssigneePicker from '../../components/AssigneePicker';
+import HoursCalendarDay from '../../components/HoursCalendarDay';
 import {
   getServiceTemplates, getForecast, createServiceTemplate,
   createCustomerService, getCustomerService, updateCustomerService, deleteCustomerService,
@@ -149,6 +150,37 @@ export default function AssignCycleScreen({ route, navigation }) {
       }
     })();
   }, [user.businessId, customerId, serviceId, isEdit]);
+
+  // Booked hours per date (across all services) for the create-flow calendars.
+  const hoursByDate = useMemo(() => {
+    const map = {};
+    forecast.forEach(item => {
+      const key = item.serviceDate ? item.serviceDate.split('T')[0] : null;
+      if (key) map[key] = item.totalHours ?? 0;
+    });
+    return map;
+  }, [forecast]);
+
+  // Date-based first-service-date pick → review the day's snapshot before committing.
+  const handleFirstDatePick = useCallback((day) => {
+    setShowCalendar(false);
+    const forecastItem = forecast.find(f => f.serviceDate?.split('T')[0] === day.dateString) || null;
+    navigation.navigate('ServiceDaySnapshot', { date: day.dateString, forecastItem });
+  }, [forecast, navigation]);
+
+  // Day-of-week inline pick → just set the start date.
+  const handleDowDatePick = useCallback((day) => {
+    setStartDate(day.dateString);
+  }, []);
+
+  const renderFirstDateDay = useCallback(
+    (props) => <HoursCalendarDay {...props} hoursByDate={hoursByDate} onDayPress={handleFirstDatePick} />,
+    [hoursByDate, handleFirstDatePick]
+  );
+  const renderDowDay = useCallback(
+    (props) => <HoursCalendarDay {...props} hoursByDate={hoursByDate} onDayPress={handleDowDatePick} />,
+    [hoursByDate, handleDowDatePick]
+  );
 
   const openAddTask = () => {
     setEditingKey(null);
@@ -409,11 +441,10 @@ export default function AssignCycleScreen({ route, navigation }) {
                     current={startDate}
                     minDate={today}
                     markedDates={dowMarkedDates}
-                    markingType="dot"
+                    dayComponent={renderDowDay}
                     renderArrow={(direction) => (
                       <View style={styles.calArrow}><Text style={styles.calArrowText}>{direction === 'left' ? '‹' : '›'}</Text></View>
                     )}
-                    onDayPress={(day) => setStartDate(day.dateString)}
                     theme={{ todayTextColor: '#2563eb', selectedDayBackgroundColor: '#2563eb' }}
                   />
                 </View>
@@ -490,12 +521,7 @@ export default function AssignCycleScreen({ route, navigation }) {
             <Calendar
               minDate={today}
               markedDates={markedDates}
-              markingType="dot"
-              onDayPress={(day) => {
-                setShowCalendar(false);
-                const forecastItem = forecast.find(f => f.serviceDate?.split('T')[0] === day.dateString) || null;
-                navigation.navigate('ServiceDaySnapshot', { date: day.dateString, forecastItem });
-              }}
+              dayComponent={renderFirstDateDay}
               theme={{ todayTextColor: '#2563eb', selectedDayBackgroundColor: '#2563eb', arrowColor: '#2563eb' }}
             />
             <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowCalendar(false)}>
