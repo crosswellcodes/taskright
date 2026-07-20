@@ -21,8 +21,12 @@ export default function AddCustomerScreen({ navigation }) {
     setLoading(true);
     try {
       const fullPhone = '+1' + phoneNumber.replace(/\D/g, '');
-      await addCustomer(user.businessId, { name: name.trim(), phoneNumber: fullPhone });
-      navigation.goBack();
+      const { customer } = await addCustomer(user.businessId, { name: name.trim(), phoneNumber: fullPhone });
+      navigation.replace('CustomerPreferences', {
+        customerId: customer.id,
+        customerName: customer.name,
+        fromCreate: true,
+      });
     } catch (err) {
       if (err.code === 'DUPLICATE_CUSTOMER') {
         Alert.alert('Duplicate', 'A customer with this phone number already exists.');

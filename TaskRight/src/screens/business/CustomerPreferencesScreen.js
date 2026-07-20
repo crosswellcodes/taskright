@@ -12,7 +12,15 @@ import MapboxAddressInput from '../../components/MapboxAddressInput';
 export default function CustomerPreferencesScreen({ route, navigation }) {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
-  const { customerId, customerName } = route.params;
+  const { customerId, customerName, fromCreate } = route.params;
+
+  const leave = () => {
+    if (fromCreate) {
+      navigation.replace('CustomerDetail', { customerId, customerName });
+    } else {
+      navigation.goBack();
+    }
+  };
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -63,7 +71,7 @@ export default function CustomerPreferencesScreen({ route, navigation }) {
         address: address.trim() || null,
         notes: notes.trim() || null,
       });
-      navigation.goBack();
+      leave();
     } catch (err) {
       Alert.alert('Error', err.message || 'Failed to save');
     } finally {
@@ -149,7 +157,7 @@ export default function CustomerPreferencesScreen({ route, navigation }) {
           }
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.cancelBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.cancelBtn} onPress={leave}>
           <Text style={styles.cancelBtnText}>Cancel</Text>
         </TouchableOpacity>
       </ScrollView>
