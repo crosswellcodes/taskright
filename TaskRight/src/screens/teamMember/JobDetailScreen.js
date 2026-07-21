@@ -241,6 +241,7 @@ export default function JobDetailScreen({ route, navigation }) {
   const isCompleted = job?.status === 'completed';
   const hasTasks = job?.selectedTasks && job.selectedTasks.length > 0;
   const hasCoords = job?.customerLat != null && job?.customerLng != null;
+  const hasAddress = !!(job?.customerAddress || customerAddress);
   // Normally manual clock is for jobs with no coords / denied permission. But if
   // a teammate completed this job first (TL3) while this member is still clocked
   // in, keep Clock Out available so their hours still record as labor.
@@ -321,7 +322,11 @@ export default function JobDetailScreen({ route, navigation }) {
             {isCompleted ? (
               <Text style={styles.clockSubtext}>A teammate completed this job — clock out to log your hours</Text>
             ) : !hasCoords ? (
-              <Text style={styles.clockSubtext}>No address on file — using manual tracking</Text>
+              <Text style={styles.clockSubtext}>
+                {hasAddress
+                  ? 'Address not mapped yet — using manual tracking'
+                  : 'No address on file — using manual tracking'}
+              </Text>
             ) : locationPermission === false ? (
               <Text style={styles.clockSubtext}>Location access denied — using manual tracking</Text>
             ) : null}

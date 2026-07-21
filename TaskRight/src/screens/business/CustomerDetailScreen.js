@@ -159,6 +159,13 @@ export default function CustomerDetailScreen({ route, navigation }) {
             <Text style={styles.directionsBtnText}>Get Directions →</Text>
           </TouchableOpacity>
         ) : null}
+        {customer.geocodeStatus === 'failed' ? (
+          <Text style={styles.geocodeWarning}>
+            ⚠ We couldn't map this address for automatic clock-in
+            {customer.geocodeRelevance != null ? ' (closest match wasn’t confident)' : ''}
+            . Check the address in Details.
+          </Text>
+        ) : null}
       </View>
 
       {/* Profitability (COMPLETED cycles only) */}
@@ -433,6 +440,7 @@ const styles = StyleSheet.create({
   },
   directionsAddress: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginBottom: 4 },
   directionsBtnText: { fontSize: 13, color: '#fff', fontWeight: '700' },
+  geocodeWarning: { fontSize: 12, color: 'rgba(255,255,255,0.9)', marginTop: 8, lineHeight: 16 },
   section: { backgroundColor: '#fff', margin: 16, marginBottom: 0, borderRadius: 12, padding: 16 },
   sectionTitle: { fontSize: 13, fontWeight: '600', color: '#888', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#f3f4f6' },

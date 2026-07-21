@@ -4,36 +4,100 @@ const https = require('https');
 const notificationService = require('./notificationService');
 
 // ─── GEOCODING ───────────────────────────────────────────────────────────────
+// See shared/specs/GEOCODING_RELIABILITY.md. Coordinates drive team-member
+// auto-geofence clock-in; a blank or wrong pin silently degrades it to manual.
 
-function geocodeAddress(customerId, address) {
-  if (!address || !process.env.MAPBOX_ACCESS_TOKEN) return;
-  const encoded = encodeURIComponent(address);
-  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?access_token=${process.env.MAPBOX_ACCESS_TOKEN}&country=US&limit=1`;
-  https.get(url, (res) => {
-    let data = '';
-    res.on('data', chunk => { data += chunk; });
-    res.on('end', () => {
-      if (res.statusCode !== 200) {
-        // e.g. 401 expired token, 429 rate limit — body is HTML/error JSON, not
-        // a geocoding result. Log the status + a snippet so the cause is visible.
-        console.error(`Geocode HTTP ${res.statusCode} for customer ${customerId}:`, data.slice(0, 200));
-        return;
-      }
-      try {
-        const json = JSON.parse(data);
-        const feature = json.features && json.features[0];
-        if (!feature) return;
-        const [lng, lat] = feature.center;
-        knex('customers').where('id', customerId).update({
-          lat,
-          lng,
-          geocoded_at: knex.raw('CURRENT_TIMESTAMP'),
-        }).catch(e => console.error('Geocode DB update failed:', e.message));
-      } catch (e) {
-        console.error('Geocode parse failed:', e.message);
-      }
-    });
-  }).on('error', e => console.error('Geocode request failed:', e.message));
+const GEOCODE_MAX_ATTEMPTS = 3;      // hard cap — after this, stop retrying, flag for a human
+const GEOCODE_MIN_RELEVANCE = 0.8;   // below this, Mapbox's match isn't trustworthy
+const GEOCODE_RETRY_BACKOFF = '6 hours'; // min gap between attempts (Postgres interval literal)
+
+// Fetch Mapbox's single best candidate for an address. Resolves the raw feature
+// (or null). Never throws — network/HTTP/parse failures resolve null so the
+// caller records a clean attempt.
+function fetchGeocode(address) {
+  return new Promise((resolve) => {
+    const encoded = encodeURIComponent(address);
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?access_token=${process.env.MAPBOX_ACCESS_TOKEN}&country=US&limit=1`;
+    https.get(url, (res) => {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => {
+        if (res.statusCode !== 200) {
+          // e.g. 401 expired token, 429 rate limit — body is HTML/error JSON.
+          console.error(`Geocode HTTP ${res.statusCode}:`, data.slice(0, 200));
+          return resolve(null);
+        }
+        try {
+          const json = JSON.parse(data);
+          resolve((json.features && json.features[0]) || null);
+        } catch (e) {
+          console.error('Geocode parse failed:', e.message);
+          resolve(null);
+        }
+      });
+    }).on('error', e => { console.error('Geocode request failed:', e.message); resolve(null); });
+  });
+}
+
+// Attempt to geocode a customer's address, recording the attempt and honoring the
+// relevance gate. Awaitable (used by the retry job + tests) but callers on the
+// write path deliberately DON'T await it — geocoding stays off the UX latency path.
+// Returns { ok, reason?, relevance? } or { skipped: true }.
+async function geocodeCustomer(customerId, address) {
+  if (!address || !process.env.MAPBOX_ACCESS_TOKEN) return { skipped: true };
+
+  // Record the attempt up front so a hang/crash mid-call still counts toward the
+  // cap (prevents an unmappable address from retrying forever). G2.
+  await knex('customers').where('id', customerId).update({
+    geocode_attempts: knex.raw('geocode_attempts + 1'),
+    geocode_attempted_at: knex.raw('CURRENT_TIMESTAMP'),
+  });
+
+  const feature = await fetchGeocode(address);
+  if (!feature) return { ok: false, reason: 'no_match' }; // coords stay null
+
+  const relevance = feature.relevance == null ? 0 : feature.relevance;
+  if (relevance < GEOCODE_MIN_RELEVANCE) {
+    // G1: never store a low-confidence pin — record what we saw so the owner UI
+    // can explain why, but leave lat/lng null (member stays on safe manual).
+    await knex('customers').where('id', customerId)
+      .update({ geocode_relevance: relevance })
+      .catch(e => console.error('Geocode DB update failed:', e.message));
+    return { ok: false, reason: 'low_confidence', relevance };
+  }
+
+  const [lng, lat] = feature.center;
+  await knex('customers').where('id', customerId).update({
+    lat,
+    lng,
+    geocoded_at: knex.raw('CURRENT_TIMESTAMP'),
+    geocode_relevance: relevance,
+  }).catch(e => console.error('Geocode DB update failed:', e.message));
+  return { ok: true, relevance };
+}
+
+// Rows the retry sweep should attempt: has an address, no coords yet, under the
+// attempt cap, and either never tried or past the backoff window. Bounded query —
+// an unmappable address falls out once it hits GEOCODE_MAX_ATTEMPTS. Layer 2.
+function findCustomersNeedingGeocode(limit = 25) {
+  return knex('customers')
+    .whereNotNull('address')
+    .whereNull('lat')
+    .where('geocode_attempts', '<', GEOCODE_MAX_ATTEMPTS)
+    .andWhere((b) => {
+      b.whereNull('geocode_attempted_at')
+       .orWhereRaw(`geocode_attempted_at < NOW() - INTERVAL '${GEOCODE_RETRY_BACKOFF}'`);
+    })
+    .limit(limit)
+    .select('id', 'address');
+}
+
+// Derive a legible status for the owner UI from the tracking columns. G3/Layer 3.
+function deriveGeocodeStatus(customer) {
+  if (!customer.address) return 'none';
+  if (customer.lat != null) return 'ok';
+  if ((customer.geocode_attempts || 0) >= GEOCODE_MAX_ATTEMPTS) return 'failed';
+  return 'pending';
 }
 
 // ─── AUTH / BUSINESS ACCOUNT ────────────────────────────────────────────────
@@ -274,6 +338,11 @@ async function getCustomerDetails(customerId) {
   const customer = await knex('customers').where('id', customerId).first();
   if (!customer) return null;
 
+  // Geocode legibility (Layer 3): 'none'|'ok'|'pending'|'failed'. Drives the
+  // "couldn't map this address" note on CustomerDetailScreen.
+  customer.geocodeStatus = deriveGeocodeStatus(customer);
+  customer.geocodeRelevance = customer.geocode_relevance == null ? null : Number(customer.geocode_relevance);
+
   const services = await knex('customer_services as cs')
     .where('cs.customer_id', customerId)
     .select('cs.id', 'cs.name', 'cs.frequency', 'cs.total_hours',
@@ -351,15 +420,29 @@ async function getCustomerDetails(customerId) {
 async function updateCustomerDetails(customerId, data) {
   const updates = { updated_at: knex.raw('CURRENT_TIMESTAMP') };
   if (data.email !== undefined) updates.email = data.email || null;
-  if (data.address !== undefined) updates.address = data.address || null;
   if (data.notes !== undefined) updates.notes = data.notes || null;
   if (data.reviewRequestsOptedOut !== undefined) updates.review_requests_opted_out = !!data.reviewRequestsOptedOut;
+
+  // Address change resets all geocode tracking so a corrected address re-arms
+  // fully (fresh coords + fresh attempt budget). Whether set or cleared, the old
+  // pin and relevance are no longer valid. See GEOCODING_RELIABILITY.md §4.
+  const addressChanged = data.address !== undefined;
+  const newAddress = addressChanged ? (data.address || null) : undefined;
+  if (addressChanged) {
+    updates.address = newAddress;
+    updates.lat = null;
+    updates.lng = null;
+    updates.geocoded_at = null;
+    updates.geocode_relevance = null;
+    updates.geocode_attempts = 0;
+  }
+
   const updated = await knex('customers').where('id', customerId).update(updates).returning('*');
   const customer = updated[0];
 
-  // Re-geocode fire-and-forget whenever address changes
-  if (data.address !== undefined && data.address) {
-    geocodeAddress(customerId, data.address);
+  // Re-geocode fire-and-forget when an address is set (not when cleared).
+  if (newAddress) {
+    geocodeCustomer(customerId, newAddress).catch(e => console.error('Geocode failed:', e.message));
   }
 
   return customer;
@@ -2421,6 +2504,13 @@ async function submitReviewByToken(token, { rating, comment }) {
 }
 
 module.exports = {
+  // Geocoding
+  geocodeCustomer,
+  findCustomersNeedingGeocode,
+  deriveGeocodeStatus,
+  GEOCODE_MAX_ATTEMPTS,
+  GEOCODE_MIN_RELEVANCE,
+  GEOCODE_RETRY_BACKOFF,
   // Auth
   createBusiness,
   getBusinessById,

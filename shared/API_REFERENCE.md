@@ -522,6 +522,12 @@ Existing customer Services are unaffected (`template_id` is `ON DELETE SET NULL`
 #### Get Customer Details
 **GET** `/businesses/:businessId/customers/:customerId`
 
+Response `customer` includes geocoding legibility for the address → auto-geofence pipeline:
+- **`geocodeStatus`** — `none` (no address) · `ok` (coords resolved) · `pending` (address set, still within the retry budget) · `failed` (address couldn't be mapped after `GEOCODE_MAX_ATTEMPTS`; owner should check it). Drives the "couldn't map this address for automatic clock-in" note on `CustomerDetailScreen`.
+- **`geocodeRelevance`** — number `0–1` or `null`; the best Mapbox candidate's confidence. On a `failed` row a non-null value means a low-confidence match was rejected (not stored) rather than no match at all.
+
+See `shared/specs/GEOCODING_RELIABILITY.md`. Coordinates are stored only when relevance ≥ `GEOCODE_MIN_RELEVANCE` (0.8) — a confident-wrong pin is worse than manual tracking.
+
 #### Delete Customer
 **DELETE** `/businesses/:businessId/customers/:customerId`
 

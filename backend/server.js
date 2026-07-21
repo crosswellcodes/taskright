@@ -3,11 +3,13 @@ require('dotenv').config();
 const app = require('./src/app');
 const { startSelectionReminderJob } = require('./src/jobs/selection-reminders');
 const { startAutoRepeatJob } = require('./src/jobs/auto-repeat');
+const { startGeocodeRetryJob } = require('./src/jobs/geocode-retry');
 
 // Start cron jobs
 console.log('\n🕐 Starting scheduled jobs...');
 startSelectionReminderJob();
 startAutoRepeatJob();
+startGeocodeRetryJob();
 console.log('✓ All scheduled jobs started\n');
 
 // Start server
