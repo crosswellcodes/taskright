@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TextInput,
-  ActivityIndicator, Alert, TouchableOpacity, RefreshControl, Linking,
+  ActivityIndicator, Alert, TouchableOpacity, RefreshControl, Linking, AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -10,6 +10,18 @@ import { useAuth } from '../../context/AuthContext';
 import { getJobDetail, completeJob, postGeofenceEvent } from '../../api/teamMemberApi';
 
 const GEOFENCE_RADIUS_M = 100;
+
+// Plain-language copy for each of the six tracking modes surfaced by the single
+// always-present Time Tracking card (spec §3). No mode may render blank.
+const TRACKING_COPY = {
+  checking: 'Checking location…',
+  auto_inside: "At the job site — you're clocked in automatically",
+  auto_outside: "Outside the job site — you'll clock in automatically when you arrive",
+  manual_denied: 'Location is off — using manual tracking',
+  manual_unmapped: 'Address not mapped yet — using manual tracking',
+  manual_noaddress: 'No address on file — using manual tracking',
+  manual_completed: 'A teammate completed this job — clock out to log your hours',
+};
 
 function formatDate(dateStr) {
   if (!dateStr) return '';
@@ -51,10 +63,17 @@ export default function JobDetailScreen({ route, navigation }) {
   const [insideGeofence, setInsideGeofence] = useState(false);
   const [clockedIn, setClockedIn] = useState(false); // true after arrival posted
   const [clockLoading, setClockLoading] = useState(false);
+  const [elapsedLabel, setElapsedLabel] = useState(null); // "0:42" while clocked in
   const watchIdRef = useRef(null);
   const insideRef = useRef(false); // ref to avoid stale closure in watchPosition callback
   const clockedInRef = useRef(false);
   const lastPosRef = useRef(null); // last known {latitude, longitude} from the watcher
+  const arrivalRef = useRef(null); // moment the current clock-in started (for the elapsed timer)
+  const mountedRef = useRef(true); // guards async GPS callbacks from firing after unmount
+
+  const isCompleted = job?.status === 'completed';
+  const hasCoords = job?.customerLat != null && job?.customerLng != null;
+  const hasAddress = !!(job?.customerAddress || customerAddress);
 
   const fetchDetail = useCallback(async () => {
     try {
@@ -72,7 +91,24 @@ export default function JobDetailScreen({ route, navigation }) {
     useCallback(() => { fetchDetail(); }, [fetchDetail])
   );
 
-  // Start / stop geo-fence polling based on job state
+  // Track mount state so async GPS callbacks never setState after unmount.
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  // Re-arm per job (spec A1): whenever the job changes, drop permission back to
+  // "unknown" so the new job re-evaluates from scratch instead of inheriting a
+  // stale resolved state from the previous one.
+  useEffect(() => {
+    setLocationPermission(null);
+    setInsideGeofence(false);
+    insideRef.current = false;
+    clockedInRef.current = false;
+    setClockedIn(false);
+  }, [selectionCycleId]);
+
+  // Start / stop geo-fence polling based on job state.
   useEffect(() => {
     if (!job || job.status === 'completed') return;
     const jobLat = job.customerLat;
@@ -85,44 +121,128 @@ export default function JobDetailScreen({ route, navigation }) {
       return;
     }
 
-    Geolocation.requestAuthorization(
-      () => {
-        setLocationPermission(true);
-        startWatching(jobLat, jobLng);
-      },
-      () => {
-        setLocationPermission(false);
-      }
-    );
+    armGeofence(jobLat, jobLng);
 
     return () => stopWatchingAndCloseOut();
-  }, [job?.status, job?.customerLat, job?.customerLng]);
+  }, [selectionCycleId, job?.status, job?.customerLat, job?.customerLng]);
+
+  // When the app returns to the foreground after the member flipped location on
+  // in Settings, re-detect so a previously-denied job can re-arm automatically.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' || isCompleted) return;
+      if (locationPermission === false && hasCoords) {
+        setLocationPermission(null);
+        armGeofence(job.customerLat, job.customerLng);
+      }
+    });
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationPermission, isCompleted, job?.customerLat, job?.customerLng]);
+
+  // Leaving the screen while clocked in posts a synthetic departure (see
+  // stopWatchingAndCloseOut). Confirm it instead of vanishing silently (spec A3).
+  useEffect(() => {
+    const sub = navigation.addListener('beforeRemove', (e) => {
+      if (!clockedInRef.current || isCompleted) return;
+      e.preventDefault();
+      Alert.alert(
+        "You're still clocked in",
+        `Leaving will clock you out of ${job?.customerName ?? customerName}.`,
+        [
+          { text: 'Stay', style: 'cancel' },
+          {
+            text: 'Clock out & leave',
+            style: 'destructive',
+            onPress: () => navigation.dispatch(e.data.action),
+          },
+        ]
+      );
+    });
+    return sub;
+  }, [navigation, isCompleted, job?.customerName, customerName]);
+
+  // Elapsed "On the clock · 0:42" timer — derived from the arrival moment.
+  useEffect(() => {
+    if (!clockedIn) {
+      arrivalRef.current = null;
+      setElapsedLabel(null);
+      return;
+    }
+    if (arrivalRef.current == null) arrivalRef.current = Date.now();
+    const tick = () => {
+      const mins = Math.max(0, Math.floor((Date.now() - arrivalRef.current) / 60000));
+      setElapsedLabel(`${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, '0')}`);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [clockedIn]);
+
+  // Arm automatic tracking for a job with coordinates. requestAuthorization fires
+  // the OS prompt on first use, but on iOS its callbacks do NOT reliably fire once
+  // authorization is already determined (the reactivation bug on the 2nd job).
+  // getCurrentPosition's success/error path *does* fire on an already-authorized
+  // device, so it is the reliable resolver: it drives locationPermission to a
+  // concrete true/false and seeds the first distance check. A short timeout covers
+  // the case where neither requestAuthorization callback ever fires.
+  function armGeofence(jobLat, jobLng) {
+    let didResolve = false;
+    const resolve = () => {
+      if (didResolve || !mountedRef.current) return;
+      didResolve = true;
+      Geolocation.getCurrentPosition(
+        (pos) => {
+          if (!mountedRef.current) return;
+          setLocationPermission(true);
+          const { latitude, longitude } = pos.coords;
+          handlePosition(latitude, longitude, jobLat, jobLng);
+          startWatching(jobLat, jobLng);
+        },
+        () => {
+          if (!mountedRef.current) return;
+          setLocationPermission(false);
+        },
+        { timeout: 10000, enableHighAccuracy: true }
+      );
+    };
+    Geolocation.requestAuthorization(resolve, resolve);
+    setTimeout(resolve, 1200);
+  }
+
+  // Single source of truth for turning a GPS fix into geofence state + events.
+  // Shared by the getCurrentPosition seed and the watchPosition stream so arrival
+  // and departure transitions post exactly once.
+  function handlePosition(latitude, longitude, jobLat, jobLng) {
+    lastPosRef.current = { latitude, longitude };
+    const dist = distanceMetres(latitude, longitude, jobLat, jobLng);
+    const nowInside = dist <= GEOFENCE_RADIUS_M;
+
+    setInsideGeofence(nowInside);
+
+    if (nowInside && !insideRef.current) {
+      // Entered geofence — post arrival
+      insideRef.current = true;
+      clockedInRef.current = true;
+      setClockedIn(true);
+      postGeofenceEvent(user.teamMemberId, selectionCycleId, 'arrival', latitude, longitude, 'auto')
+        .catch(e => console.warn('Arrival event failed:', e.message));
+    } else if (!nowInside && insideRef.current) {
+      // Exited geofence — post departure
+      insideRef.current = false;
+      clockedInRef.current = false;
+      setClockedIn(false);
+      postGeofenceEvent(user.teamMemberId, selectionCycleId, 'departure', latitude, longitude, 'auto')
+        .catch(e => console.warn('Departure event failed:', e.message));
+    }
+  }
 
   function startWatching(jobLat, jobLng) {
     stopWatching();
     watchIdRef.current = Geolocation.watchPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
-        lastPosRef.current = { latitude, longitude };
-        const dist = distanceMetres(latitude, longitude, jobLat, jobLng);
-        const nowInside = dist <= GEOFENCE_RADIUS_M;
-
-        setInsideGeofence(nowInside);
-
-        if (nowInside && !insideRef.current) {
-          // Entered geofence — post arrival
-          insideRef.current = true;
-          clockedInRef.current = true;
-          setClockedIn(true);
-          postGeofenceEvent(user.teamMemberId, selectionCycleId, 'arrival', latitude, longitude, 'auto')
-            .catch(e => console.warn('Arrival event failed:', e.message));
-        } else if (!nowInside && insideRef.current) {
-          // Exited geofence — post departure
-          insideRef.current = false;
-          setClockedIn(false);
-          postGeofenceEvent(user.teamMemberId, selectionCycleId, 'departure', latitude, longitude, 'auto')
-            .catch(e => console.warn('Departure event failed:', e.message));
-        }
+        handlePosition(latitude, longitude, jobLat, jobLng);
       },
       (err) => console.warn('Location watch error:', err.message),
       { enableHighAccuracy: true, distanceFilter: 10, interval: 15000, fastestInterval: 10000 }
@@ -191,6 +311,20 @@ export default function JobDetailScreen({ route, navigation }) {
     );
   };
 
+  // "Enable location" (manual_denied). iOS only prompts once, so a hard-denied
+  // job can't be re-prompted in-app — send the member to Settings. On return the
+  // AppState 'active' listener re-arms automatically.
+  const handleEnableLocation = () => {
+    Alert.alert(
+      'Enable location',
+      'Turn on location access for TaskRight to clock in automatically when you reach the job site.',
+      [
+        { text: 'Not now', style: 'cancel' },
+        { text: 'Open Settings', onPress: () => Linking.openSettings().catch(() => {}) },
+      ]
+    );
+  };
+
   const toggleTask = (idx) => {
     setCheckedTasks(prev => {
       const next = new Set(prev);
@@ -238,16 +372,28 @@ export default function JobDetailScreen({ route, navigation }) {
     );
   };
 
-  const isCompleted = job?.status === 'completed';
   const hasTasks = job?.selectedTasks && job.selectedTasks.length > 0;
-  const hasCoords = job?.customerLat != null && job?.customerLng != null;
-  const hasAddress = !!(job?.customerAddress || customerAddress);
-  // Normally manual clock is for jobs with no coords / denied permission. But if
-  // a teammate completed this job first (TL3) while this member is still clocked
-  // in, keep Clock Out available so their hours still record as labor.
-  const showManualClock =
-    (!isCompleted && (!hasCoords || locationPermission === false)) ||
-    (isCompleted && clockedIn);
+
+  // Derive the single tracking mode driving the always-present Time Tracking card
+  // (spec §3). Every branch resolves to a rendered mode — no dead/blank state.
+  let trackingMode;
+  if (isCompleted) {
+    // Completed job: only surface the card if this member is still clocked in so
+    // they can clock out (TL3 — a teammate closed the job first).
+    trackingMode = 'manual_completed';
+  } else if (!hasCoords) {
+    trackingMode = hasAddress ? 'manual_unmapped' : 'manual_noaddress';
+  } else if (locationPermission === null) {
+    trackingMode = 'checking';
+  } else if (locationPermission === false) {
+    trackingMode = 'manual_denied';
+  } else {
+    trackingMode = insideGeofence ? 'auto_inside' : 'auto_outside';
+  }
+  const isManualMode = trackingMode.startsWith('manual');
+  // Card is always present for open jobs; for completed jobs only while still
+  // clocked in (so hours can still be logged).
+  const showTimeTracking = !isCompleted || clockedIn;
 
   if (loading) {
     return (
@@ -305,41 +451,49 @@ export default function JobDetailScreen({ route, navigation }) {
           </TouchableOpacity>
         ) : null}
 
-        {/* Auto geo-fence status indicator */}
-        {!isCompleted && hasCoords && locationPermission === true && (
-          <View style={[styles.geofenceCard, insideGeofence ? styles.geofenceInside : styles.geofenceOutside]}>
-            <View style={[styles.geofenceDot, insideGeofence ? styles.geofenceDotInside : styles.geofenceDotOutside]} />
-            <Text style={styles.geofenceText}>
-              {insideGeofence ? 'At job site — time tracking active' : 'Outside job site radius'}
-            </Text>
-          </View>
-        )}
-
-        {/* Manual clock-in / clock-out buttons */}
-        {showManualClock && (
+        {/* Unified, always-present Time Tracking card (spec §3) — one card covers
+            all six modes so tracking status is never a blank/dead state. */}
+        {showTimeTracking && (
           <View style={styles.clockCard}>
-            <Text style={styles.clockLabel}>CLOCK IN / OUT</Text>
-            {isCompleted ? (
-              <Text style={styles.clockSubtext}>A teammate completed this job — clock out to log your hours</Text>
-            ) : !hasCoords ? (
-              <Text style={styles.clockSubtext}>
-                {hasAddress
-                  ? 'Address not mapped yet — using manual tracking'
-                  : 'No address on file — using manual tracking'}
-              </Text>
-            ) : locationPermission === false ? (
-              <Text style={styles.clockSubtext}>Location access denied — using manual tracking</Text>
-            ) : null}
-            {clockLoading ? (
-              <ActivityIndicator color="#2563eb" style={{ marginTop: 12 }} />
-            ) : clockedIn ? (
-              <TouchableOpacity style={styles.clockOutBtn} onPress={() => handleManualClock('departure')}>
-                <Text style={styles.clockBtnText}>Clock Out</Text>
+            <Text style={styles.clockLabel}>TIME TRACKING</Text>
+
+            <View style={styles.trackingStatusRow}>
+              {trackingMode === 'checking' ? (
+                <ActivityIndicator size="small" color="#2563eb" style={styles.trackingSpinner} />
+              ) : (
+                <View style={[
+                  styles.geofenceDot,
+                  trackingMode === 'auto_inside' ? styles.geofenceDotInside : styles.geofenceDotOutside,
+                ]} />
+              )}
+              <Text style={styles.trackingText}>{TRACKING_COPY[trackingMode]}</Text>
+            </View>
+
+            {clockedIn && elapsedLabel != null && (
+              <Text style={styles.trackingElapsed}>On the clock · {elapsedLabel}</Text>
+            )}
+
+            {/* Manual re-enable path — always available when location is off. */}
+            {trackingMode === 'manual_denied' && (
+              <TouchableOpacity style={styles.enableBtn} onPress={handleEnableLocation}>
+                <Text style={styles.enableBtnText}>Enable location</Text>
               </TouchableOpacity>
-            ) : (
-              <TouchableOpacity style={styles.clockInBtn} onPress={() => handleManualClock('arrival')}>
-                <Text style={styles.clockBtnText}>Clock In</Text>
-              </TouchableOpacity>
+            )}
+
+            {/* Clock In / Out controls for every manual mode. Auto modes clock in
+                on their own, so they show status only. */}
+            {isManualMode && (
+              clockLoading ? (
+                <ActivityIndicator color="#2563eb" style={{ marginTop: 12 }} />
+              ) : clockedIn ? (
+                <TouchableOpacity style={styles.clockOutBtn} onPress={() => handleManualClock('departure')}>
+                  <Text style={styles.clockBtnText}>Clock Out</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={styles.clockInBtn} onPress={() => handleManualClock('arrival')}>
+                  <Text style={styles.clockBtnText}>Clock In</Text>
+                </TouchableOpacity>
+              )
             )}
           </View>
         )}
@@ -515,17 +669,10 @@ const styles = StyleSheet.create({
   directionsBtn: { backgroundColor: '#2563eb', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
   directionsBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
 
-  // Geo-fence status card
-  geofenceCard: {
-    borderRadius: 12, padding: 12, marginBottom: 12,
-    flexDirection: 'row', alignItems: 'center',
-  },
-  geofenceInside: { backgroundColor: '#ecfdf5' },
-  geofenceOutside: { backgroundColor: '#f3f4f6' },
+  // Geo-fence status dot (used in the Time Tracking card)
   geofenceDot: { width: 10, height: 10, borderRadius: 5, marginRight: 10 },
   geofenceDotInside: { backgroundColor: '#10b981' },
   geofenceDotOutside: { backgroundColor: '#9ca3af' },
-  geofenceText: { fontSize: 13, color: '#374151', fontWeight: '500' },
 
   // Manual clock card
   clockCard: {
@@ -535,6 +682,17 @@ const styles = StyleSheet.create({
   },
   clockLabel: { fontSize: 11, fontWeight: '700', color: '#888', letterSpacing: 1, marginBottom: 4 },
   clockSubtext: { fontSize: 12, color: '#9ca3af', marginBottom: 8 },
+
+  // Unified Time Tracking card
+  trackingStatusRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
+  trackingSpinner: { marginRight: 10 },
+  trackingText: { flex: 1, fontSize: 13, color: '#374151', fontWeight: '500', lineHeight: 18 },
+  trackingElapsed: { fontSize: 13, color: '#059669', fontWeight: '700', marginTop: 8 },
+  enableBtn: {
+    borderWidth: 1, borderColor: '#2563eb', borderRadius: 8,
+    paddingVertical: 10, alignItems: 'center', marginTop: 12,
+  },
+  enableBtnText: { color: '#2563eb', fontSize: 14, fontWeight: '700' },
   clockInBtn: {
     backgroundColor: '#2563eb', borderRadius: 8,
     paddingVertical: 12, alignItems: 'center', marginTop: 8,
