@@ -25,6 +25,8 @@ TaskRight_Project/
 
 ## Dev Environment — Three Terminals Required
 
+> **⚠️ Current state (July 20, 2026):** the **backend is stopped** — the live instance was shut down after verifying the geocode retry job, so its hourly sweep is not running. Postgres (`task_app_db`) is still up. Restart Terminal 3 (`cd backend && npm run dev`) to bring it back; on boot it logs `✓ Geocode Retry Job scheduled (runs hourly)` and resumes sweeping on the hour.
+
 ```bash
 # Terminal 1 — Metro bundler (must start FIRST)
 cd TaskRight && npm start
