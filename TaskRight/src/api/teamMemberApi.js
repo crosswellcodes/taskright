@@ -3,6 +3,10 @@ import { get, patch, post } from './client';
 export const getMyJobs = (teamMemberId) =>
   get(`/api/team-members/${teamMemberId}/jobs`);
 
+// Tier C — the member's currently-open clock-in (or null), for the cross-screen banner.
+export const getActiveClock = (teamMemberId) =>
+  get(`/api/team-members/${teamMemberId}/active-clock`);
+
 export const getJobDetail = (teamMemberId, selectionCycleId) =>
   get(`/api/team-members/${teamMemberId}/jobs/${selectionCycleId}`);
 

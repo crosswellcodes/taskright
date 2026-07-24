@@ -1511,7 +1511,38 @@ async function getJobsForTeamMember(teamMemberId) {
       'sel.status as selectionStatus',
       knex.raw('(sa.team_id IS NOT NULL) as "isTeamAssigned"'),
       't.name as teamName',
+      // GT-B1: expose a boolean the client can't misuse rather than raw coords.
+      // True when the customer has geocoded coordinates → auto geofence clock-in.
+      knex.raw('(c.lat IS NOT NULL AND c.lng IS NOT NULL) as "autoTrackable"'),
     );
+}
+
+// Tier C — the member's currently-open clock-in, if any. Derived purely from
+// geofence_events (GT-C1): find the latest event per cycle for this member, keep
+// only those whose latest event is an `arrival` (i.e. no later departure), and
+// return the most recent. Null when the member is not clocked into anything.
+// Read-only; no writes, no new table.
+async function getActiveClockForTeamMember(teamMemberId) {
+  const { rows } = await knex.raw(
+    `SELECT latest.selection_cycle_id AS "selectionCycleId",
+            latest.occurred_at        AS "arrivalAt",
+            c.id                      AS "customerId",
+            c.name                    AS "customerName"
+       FROM (
+         SELECT DISTINCT ON (ge.selection_cycle_id)
+                ge.selection_cycle_id, ge.event_type, ge.occurred_at
+           FROM geofence_events ge
+          WHERE ge.team_member_id = ?
+          ORDER BY ge.selection_cycle_id, ge.occurred_at DESC, ge.id DESC
+       ) latest
+       JOIN selection_cycles sc ON sc.id = latest.selection_cycle_id
+       JOIN customers c ON c.id = sc.customer_id
+      WHERE latest.event_type = 'arrival'
+      ORDER BY latest.occurred_at DESC
+      LIMIT 1`,
+    [teamMemberId]
+  );
+  return rows[0] || null;
 }
 
 async function getJobDetail(teamMemberId, selectionCycleId) {
@@ -2569,6 +2600,7 @@ module.exports = {
   getServiceCallDetail,
   // Team Member Jobs
   getJobsForTeamMember,
+  getActiveClockForTeamMember,
   getJobDetail,
   completeJobForTeamMember,
   recordGeofenceEvent,

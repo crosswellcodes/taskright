@@ -7,6 +7,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { getMyJobs } from '../../api/teamMemberApi';
+import useActiveClock from '../../hooks/useActiveClock';
+import ClockedInBanner from '../../components/ClockedInBanner';
 
 function formatDate(dateStr) {
   if (!dateStr) return '';
@@ -26,6 +28,22 @@ export default function MyJobsScreen({ navigation }) {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const { activeClock } = useActiveClock(user.teamMemberId);
+
+  // Deep-link the "you're clocked in" banner to its job. Prefer the full row from
+  // the jobs list (so JobDetail gets serviceDate/address for its first frame);
+  // fall back to what active-clock alone provides.
+  const openActiveJob = () => {
+    if (!activeClock) return;
+    const job = jobs.find(j => j.selectionCycleId === activeClock.selectionCycleId);
+    navigation.navigate('JobDetail', {
+      selectionCycleId: activeClock.selectionCycleId,
+      customerName: job?.customerName ?? activeClock.customerName,
+      serviceDate: job?.serviceDate ?? null,
+      serviceCycleName: job?.serviceCycleName ?? null,
+      customerAddress: job?.customerAddress ?? null,
+    });
+  };
 
   const fetchJobs = useCallback(async () => {
     try {
@@ -69,6 +87,13 @@ export default function MyJobsScreen({ navigation }) {
         {item.isTeamAssigned ? (
           <View style={styles.teamBadge}>
             <Text style={styles.teamBadgeText}>{item.teamName ? `Team · ${item.teamName}` : 'Team'}</Text>
+          </View>
+        ) : null}
+        {item.status === 'open' ? (
+          <View style={[styles.trackBadge, item.autoTrackable ? styles.trackBadgeAuto : styles.trackBadgeManual]}>
+            <Text style={[styles.trackBadgeText, item.autoTrackable ? styles.trackBadgeTextAuto : styles.trackBadgeTextManual]}>
+              {item.autoTrackable ? '◎ Auto clock-in' : 'Manual'}
+            </Text>
           </View>
         ) : null}
       </View>
@@ -116,6 +141,9 @@ export default function MyJobsScreen({ navigation }) {
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Cross-screen "you're clocked in" banner (Tier C) */}
+      <ClockedInBanner activeClock={activeClock} onPress={openActiveJob} />
 
       <FlatList
         data={[]}
@@ -194,6 +222,12 @@ const styles = StyleSheet.create({
   cycleName: { fontSize: 13, color: '#888', flexShrink: 1 },
   teamBadge: { backgroundColor: '#ede9fe', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, marginLeft: 8 },
   teamBadgeText: { fontSize: 11, fontWeight: '600', color: '#6d28d9' },
+  trackBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, marginLeft: 8 },
+  trackBadgeAuto: { backgroundColor: '#d1fae5' },
+  trackBadgeManual: { backgroundColor: '#f3f4f6' },
+  trackBadgeText: { fontSize: 11, fontWeight: '600' },
+  trackBadgeTextAuto: { color: '#047857' },
+  trackBadgeTextManual: { color: '#6b7280' },
   addressRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   addressText: { fontSize: 13, color: '#555', flex: 1, marginRight: 8 },
   directionsLink: { fontSize: 13, color: '#2563eb', fontWeight: '600', flexShrink: 0 },

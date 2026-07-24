@@ -617,6 +617,24 @@ Each entry includes `hourlyRate` (number or null) alongside `weeklyHours`, `grou
 
 **Team job resolution (2026-07-14, `TEAM_LABOR_COSTING.md` — no new endpoints):** the member-facing job views (`GET /api/team-members/:teamMemberId/jobs`, `/jobs/:selectionCycleId`, `PATCH .../complete`, `POST .../geofence`) now resolve a Call assigned to a **team** for every member of that team, not just individually-assigned members. `GET .../jobs` therefore includes group jobs and each row carries `isTeamAssigned` (bool) + `teamName` (nullable). Each group member records their own geofence → their own per-member labor line at their own rate, so a team-assigned Call's `laborLines`/profitability populate like an individual job's. Completion is first-to-complete-wins: a later member's `complete` returns `409 ALREADY_COMPLETED` (benign — the client treats it as "a teammate already completed this").
 
+**Clock-in transparency (2026-07-23, `GEOFENCE_TRANSPARENCY.md`):**
+- `GET /api/team-members/:teamMemberId/jobs` — each job row now also carries **`autoTrackable`** (bool): true when the customer has geocoded coordinates (auto geofence clock-in available), false → manual tracking. (GT-B1: a boolean the client can't misuse, not raw coords.)
+- **GET** `/api/team-members/:teamMemberId/active-clock` — the member's currently-open clock-in, if any, derived **read-only** from `geofence_events` (the latest event for a (member, cycle) is an `arrival` with no later `departure`). Auth: `requireTeamMember` (own id only). No writes, no migration.
+
+  **Response (200)**:
+  ```json
+  {
+    "success": true,
+    "activeClock": {
+      "selectionCycleId": 42,
+      "customerId": 7,
+      "customerName": "Alice Smith",
+      "arrivalAt": "2026-07-23T14:12:00.000Z"
+    }
+  }
+  ```
+  `activeClock` is `null` when the member is not clocked into anything. Powers the cross-screen "you're clocked in" banner.
+
 #### Delete Team Member
 **DELETE** `/businesses/:businessId/team-members/:memberId`
 

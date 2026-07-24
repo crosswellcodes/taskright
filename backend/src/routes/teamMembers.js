@@ -31,10 +31,41 @@ router.get('/:teamMemberId/jobs', requireTeamMember, async (req, res) => {
         serviceCycleName: j.serviceCycleName,
         selectedTasks: j.selectedTasks || [],
         selectionStatus: j.selectionStatus || null,
+        isTeamAssigned: !!j.isTeamAssigned,
+        teamName: j.teamName || null,
+        autoTrackable: !!j.autoTrackable,
       })),
     });
   } catch (error) {
     console.error('Get team member jobs error:', error);
+    return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
+  }
+});
+
+/**
+ * GET /api/team-members/:teamMemberId/active-clock
+ * The member's currently-open clock-in (if any), derived read-only from
+ * geofence_events: the latest event for a (member, cycle) being an `arrival`
+ * with no later `departure`. Returns { activeClock: {...} | null }. Powers the
+ * cross-screen "you're clocked in" banner (Tier C).
+ */
+router.get('/:teamMemberId/active-clock', requireTeamMember, async (req, res) => {
+  try {
+    const teamMemberId = parseInt(req.params.teamMemberId);
+    const active = await businessService.getActiveClockForTeamMember(teamMemberId);
+    return res.status(200).json({
+      success: true,
+      activeClock: active
+        ? {
+            selectionCycleId: active.selectionCycleId,
+            customerId: active.customerId,
+            customerName: active.customerName,
+            arrivalAt: active.arrivalAt,
+          }
+        : null,
+    });
+  } catch (error) {
+    console.error('Get active clock error:', error);
     return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
   }
 });
