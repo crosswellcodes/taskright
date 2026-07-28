@@ -1,81 +1,87 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, Alert
+  View, Text, TouchableOpacity, StyleSheet, ScrollView
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TaskPickerScreen({ route, navigation }) {
   const { cycle } = route.params;
   const insets = useSafeAreaInsets();
-  const maxMinutes = cycle.totalMinutesAvailable;
-  const [selected, setSelected] = useState([]);
 
-  const usedMinutes = useMemo(() => {
-    return selected.reduce((sum, id) => {
-      const task = cycle.availableTasks.find(t => t.id === id);
-      return sum + (task?.timeAllotmentMinutes || 0);
-    }, 0);
-  }, [selected, cycle.availableTasks]);
+  // Every task on the menu is included. The customer optionally reorders them
+  // to signal what matters most — leaving the default order is perfectly fine.
+  const [ordered, setOrdered] = useState(() => cycle.availableTasks || []);
 
-  const toggleTask = (task) => {
-    const alreadySelected = selected.includes(task.id);
-    if (!alreadySelected && usedMinutes + task.timeAllotmentMinutes > maxMinutes) {
-      Alert.alert('Time limit reached', `Adding this task would exceed your ${cycle.totalHours}-hour limit.`);
-      return;
-    }
-    setSelected(prev =>
-      alreadySelected ? prev.filter(id => id !== task.id) : [...prev, task.id]
-    );
+  const move = (index, dir) => {
+    setOrdered(prev => {
+      const target = index + dir;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
   };
 
-  const progressPercent = maxMinutes > 0 ? Math.min(usedMinutes / maxMinutes, 1) : 0;
-  const remaining = maxMinutes - usedMinutes;
+  if (ordered.length === 0) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.emptyText}>No tasks have been added to this service yet.</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      {/* Time bar */}
-      <View style={styles.timeBarContainer}>
-        <View style={styles.timeBarBg}>
-          <View style={[styles.timeBarFill, { width: `${progressPercent * 100}%` }]} />
-        </View>
-        <Text style={styles.timeText}>
-          {usedMinutes} / {maxMinutes} min used &nbsp;·&nbsp; {remaining} min remaining
+      <View style={styles.introCard}>
+        <Text style={styles.introTitle}>Rank what matters most</Text>
+        <Text style={styles.introBody}>
+          Every task below is part of your service. Use the arrows to put them in the
+          order that matters most to you — this is optional, so you can leave them as they are.
         </Text>
       </View>
 
       <ScrollView style={styles.list} contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}>
-        {cycle.availableTasks.map(task => {
-          const isSelected = selected.includes(task.id);
-          const wouldExceed = !isSelected && usedMinutes + task.timeAllotmentMinutes > maxMinutes;
+        {ordered.map((task, index) => {
+          const isFirst = index === 0;
+          const isLast = index === ordered.length - 1;
           return (
-            <TouchableOpacity
-              key={task.id}
-              style={[styles.taskCard, isSelected && styles.taskCardSelected, wouldExceed && styles.taskCardDisabled]}
-              onPress={() => toggleTask(task)}
-              disabled={wouldExceed && !isSelected}
-            >
-              <View style={styles.taskInfo}>
-                <Text style={[styles.taskName, isSelected && styles.taskNameSelected]}>{task.name}</Text>
-                <Text style={styles.taskTime}>{task.timeAllotmentMinutes} min</Text>
+            <View key={task.id} style={styles.taskCard}>
+              <View style={styles.rankBadge}>
+                <Text style={styles.rankBadgeText}>{index + 1}</Text>
               </View>
-              <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
-                {isSelected && <Text style={styles.checkmark}>✓</Text>}
+              <Text style={styles.taskName} numberOfLines={2}>{task.name}</Text>
+              <View style={styles.arrows}>
+                <TouchableOpacity
+                  style={[styles.arrowBtn, isFirst && styles.arrowBtnDisabled]}
+                  onPress={() => move(index, -1)}
+                  disabled={isFirst}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                >
+                  <Text style={[styles.arrowText, isFirst && styles.arrowTextDisabled]}>▲</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.arrowBtn, isLast && styles.arrowBtnDisabled]}
+                  onPress={() => move(index, 1)}
+                  disabled={isLast}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                >
+                  <Text style={[styles.arrowText, isLast && styles.arrowTextDisabled]}>▼</Text>
+                </TouchableOpacity>
               </View>
-            </TouchableOpacity>
+            </View>
           );
         })}
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
         <TouchableOpacity
-          style={[styles.continueBtn, selected.length === 0 && styles.continueBtnDisabled]}
-          onPress={() => navigation.navigate('Confirmation', { cycle, selectedTaskIds: selected })}
-          disabled={selected.length === 0}
+          style={styles.continueBtn}
+          onPress={() => navigation.navigate('Confirmation', {
+            cycle,
+            selectedTaskIds: ordered.map(t => t.id),
+          })}
         >
-          <Text style={styles.continueBtnText}>
-            Review Selection ({selected.length} task{selected.length !== 1 ? 's' : ''})
-          </Text>
+          <Text style={styles.continueBtnText}>Continue</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -84,28 +90,30 @@ export default function TaskPickerScreen({ route, navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
-  timeBarContainer: { backgroundColor: '#fff', padding: 16 },
-  timeBarBg: { height: 8, backgroundColor: '#e5e7eb', borderRadius: 4, marginBottom: 8, overflow: 'hidden' },
-  timeBarFill: { height: '100%', backgroundColor: '#2563eb', borderRadius: 4 },
-  timeText: { fontSize: 13, color: '#555' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, backgroundColor: '#f5f5f5' },
+  emptyText: { fontSize: 15, color: '#888', textAlign: 'center' },
+  introCard: { backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 16 },
+  introTitle: { fontSize: 16, fontWeight: '700', color: '#1a1a1a', marginBottom: 4 },
+  introBody: { fontSize: 13, color: '#6b7280', lineHeight: 19 },
   list: { flex: 1 },
   taskCard: {
     backgroundColor: '#fff', marginHorizontal: 16, marginTop: 10,
-    borderRadius: 12, padding: 16, flexDirection: 'row',
-    alignItems: 'center', borderWidth: 2, borderColor: 'transparent',
+    borderRadius: 12, padding: 16, flexDirection: 'row', alignItems: 'center',
   },
-  taskCardSelected: { borderColor: '#2563eb', backgroundColor: '#eff6ff' },
-  taskCardDisabled: { opacity: 0.4 },
-  taskInfo: { flex: 1 },
-  taskName: { fontSize: 16, color: '#1a1a1a', marginBottom: 4 },
-  taskNameSelected: { color: '#2563eb', fontWeight: '600' },
-  taskTime: { fontSize: 13, color: '#888' },
-  checkbox: {
-    width: 24, height: 24, borderRadius: 12, borderWidth: 2,
-    borderColor: '#ccc', justifyContent: 'center', alignItems: 'center',
+  rankBadge: {
+    width: 28, height: 28, borderRadius: 14, backgroundColor: '#eff6ff',
+    justifyContent: 'center', alignItems: 'center', marginRight: 14,
   },
-  checkboxSelected: { backgroundColor: '#2563eb', borderColor: '#2563eb' },
-  checkmark: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  rankBadgeText: { fontSize: 14, fontWeight: '700', color: '#2563eb' },
+  taskName: { flex: 1, fontSize: 16, color: '#1a1a1a', marginRight: 12 },
+  arrows: { flexDirection: 'row', alignItems: 'center' },
+  arrowBtn: {
+    width: 36, height: 36, borderRadius: 8, backgroundColor: '#f3f4f6',
+    justifyContent: 'center', alignItems: 'center', marginLeft: 8,
+  },
+  arrowBtnDisabled: { backgroundColor: '#fafafa' },
+  arrowText: { fontSize: 15, color: '#2563eb', fontWeight: '700' },
+  arrowTextDisabled: { color: '#d1d5db' },
   footer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: '#fff', padding: 16,
@@ -115,6 +123,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#2563eb', borderRadius: 10,
     paddingVertical: 14, alignItems: 'center',
   },
-  continueBtnDisabled: { backgroundColor: '#93c5fd' },
   continueBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

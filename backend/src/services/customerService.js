@@ -175,13 +175,9 @@ async function submitSelections(selectionCycleId, customerId, selectedTasks, sel
     throw error;
   }
 
-  const assignment = selectionCycle.customer_service_id
-    ? await knex('customer_services').where('id', selectionCycle.customer_service_id).first()
-    : null;
-
-  const maxMinutes = assignment ? Number(assignment.total_hours) * 60 : 0;
-
-  // Validate all selected tasks are available for this Service (its own menu)
+  // Validate all selected tasks are available for this Service (its own menu).
+  // (No time-budget cap: the customer prioritizes the full task list rather than
+  // fitting a subset into a fixed number of hours — see TaskPickerScreen.)
   const menuTasks = await knex('service_tasks')
     .where('customer_service_id', selectionCycle.customer_service_id);
   const availableTaskIds = menuTasks.map(t => t.id);
@@ -193,24 +189,6 @@ async function submitSelections(selectionCycleId, customerId, selectedTasks, sel
       error.statusCode = 400;
       throw error;
     }
-  }
-
-  // Calculate total time and validate against limit
-  const tasks = selectedTasks.length > 0
-    ? menuTasks.filter(t => selectedTasks.includes(t.id))
-    : [];
-  const totalMinutes = tasks.reduce((sum, t) => sum + t.time_allotment_minutes, 0);
-
-  if (totalMinutes > maxMinutes) {
-    const error = new Error(`Total time selected (${totalMinutes} mins) exceeds limit (${maxMinutes} mins)`);
-    error.code = 'TIME_EXCEEDED';
-    error.statusCode = 400;
-    error.details = {
-      availableMinutes: maxMinutes,
-      selectedMinutes: totalMinutes,
-      excessMinutes: totalMinutes - maxMinutes
-    };
-    throw error;
   }
 
   // Insert or update the selection record
@@ -383,7 +361,7 @@ async function getSelectionHistory(customerId) {
 
 // ─── FEEDBACK ─────────────────────────────────────────────────────────────────
 
-async function submitFeedback(customerId, selectionCycleId, text, photoFilenames) {
+async function submitFeedback(customerId, selectionCycleId, text, photoFilenames, rating = null) {
   const existing = await knex('feedbacks')
     .where('customer_id', customerId)
     .where('selection_cycle_id', selectionCycleId)
@@ -394,6 +372,7 @@ async function submitFeedback(customerId, selectionCycleId, text, photoFilenames
       .where('id', existing.id)
       .update({
         feedback_text: text || null,
+        rating: rating ?? null,
         photo_filenames: JSON.stringify(photoFilenames || []),
         updated_at: knex.raw('CURRENT_TIMESTAMP')
       })
@@ -406,6 +385,7 @@ async function submitFeedback(customerId, selectionCycleId, text, photoFilenames
       customer_id: customerId,
       selection_cycle_id: selectionCycleId,
       feedback_text: text || null,
+      rating: rating ?? null,
       photo_filenames: JSON.stringify(photoFilenames || []),
       created_at: knex.raw('CURRENT_TIMESTAMP'),
       updated_at: knex.raw('CURRENT_TIMESTAMP')

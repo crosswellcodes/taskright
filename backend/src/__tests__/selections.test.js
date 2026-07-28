@@ -104,11 +104,11 @@ describe('POST /api/customers/:customerId/selection-cycle/:selectionCycleId/subm
     expect(res.body.selection.message).toContain('Selection locked');
   });
 
-  it('returns 400 when selected time exceeds limit', async () => {
-    // task1 (60) + task2 (60) + hypothetical overage: add a 3rd task worth 70min
-    // To trigger TIME_EXCEEDED, create a task > 180min total
-    // 60 + 60 = 120min, within limit. We need a task that alone = 200min
-    // Add a 200-min task directly to the customer's Service menu (owned row).
+  it('accepts a selection whose task time exceeds the service hours (no time budget)', async () => {
+    // The customer prioritizes the full task list rather than fitting a subset
+    // into a fixed number of hours, so there is no longer a time-budget cap.
+    // A single 200-min task against a 3h (180-min) service used to be rejected
+    // with TIME_EXCEEDED; it now submits successfully.
     const cycleRow = await knex('customer_services').where('customer_id', customerId).first();
     const [bigTask] = await knex('service_tasks').insert({
       customer_service_id: cycleRow.id,
@@ -124,10 +124,10 @@ describe('POST /api/customers/:customerId/selection-cycle/:selectionCycleId/subm
       .set('Authorization', `Bearer ${custToken}`)
       .send({ selectedTasks: [bigTask.id], selectedTotalHours: 3 });
 
-    expect(res.status).toBe(400);
-    expect(res.body.code).toBe('TIME_EXCEEDED');
-    expect(res.body.availableMinutes).toBe(180);
-    expect(res.body.selectedMinutes).toBe(200);
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.selection.status).toBe('submitted');
+    expect(res.body.selection.selectedTasks).toContain(bigTask.id);
   });
 
   it('returns 409 when submitting twice', async () => {

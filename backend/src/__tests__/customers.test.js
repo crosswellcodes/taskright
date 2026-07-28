@@ -204,3 +204,85 @@ describe('POST /api/businesses/:businessId/customers/:customerId/services (templ
     expect(res.status).toBe(404);
   });
 });
+
+// ─── IN-APP FEEDBACK — STAR RATING ────────────────────────────────────────────
+
+describe('POST /api/customers/:customerId/feedback (rating)', () => {
+  async function setupCustomerCycle() {
+    const customer = await addCustomerToBusiness(businessId, token, { name: 'Rita', phoneNumber: '+13330004444' });
+    await assignCycleToCustomer(businessId, customer.id, cycle.id, token, 2);
+    const firstCycle = await knex('selection_cycles')
+      .where('customer_id', customer.id).orderBy('service_date', 'asc').first();
+    const login = await request(app)
+      .post('/api/auth/customers/login')
+      .send({ phoneNumber: '+13330004444' });
+    return { customer, firstCycle, custToken: login.body.token };
+  }
+
+  it('stores and returns an optional star rating', async () => {
+    const { customer, firstCycle, custToken } = await setupCustomerCycle();
+
+    const res = await request(app)
+      .post(`/api/customers/${customer.id}/feedback`)
+      .set('Authorization', `Bearer ${custToken}`)
+      .field('selectionCycleId', String(firstCycle.id))
+      .field('rating', '4')
+      .field('feedbackText', 'Great job');
+
+    expect(res.status).toBe(200);
+    expect(res.body.feedback.rating).toBe(4);
+    expect(res.body.feedback.feedbackText).toBe('Great job');
+
+    const get = await request(app)
+      .get(`/api/customers/${customer.id}/feedback/${firstCycle.id}`)
+      .set('Authorization', `Bearer ${custToken}`);
+    expect(get.body.feedback.rating).toBe(4);
+  });
+
+  it('allows feedback with no rating (rating optional → null)', async () => {
+    const { customer, firstCycle, custToken } = await setupCustomerCycle();
+
+    const res = await request(app)
+      .post(`/api/customers/${customer.id}/feedback`)
+      .set('Authorization', `Bearer ${custToken}`)
+      .field('selectionCycleId', String(firstCycle.id))
+      .field('feedbackText', 'No stars this time');
+
+    expect(res.status).toBe(200);
+    expect(res.body.feedback.rating).toBeNull();
+  });
+
+  it('updates the rating in place on re-submit', async () => {
+    const { customer, firstCycle, custToken } = await setupCustomerCycle();
+
+    await request(app)
+      .post(`/api/customers/${customer.id}/feedback`)
+      .set('Authorization', `Bearer ${custToken}`)
+      .field('selectionCycleId', String(firstCycle.id))
+      .field('rating', '2');
+
+    const res = await request(app)
+      .post(`/api/customers/${customer.id}/feedback`)
+      .set('Authorization', `Bearer ${custToken}`)
+      .field('selectionCycleId', String(firstCycle.id))
+      .field('rating', '5');
+
+    expect(res.body.feedback.rating).toBe(5);
+    const rows = await knex('feedbacks')
+      .where('customer_id', customer.id).where('selection_cycle_id', firstCycle.id);
+    expect(rows).toHaveLength(1);
+  });
+
+  it('rejects an out-of-range rating', async () => {
+    const { customer, firstCycle, custToken } = await setupCustomerCycle();
+
+    const res = await request(app)
+      .post(`/api/customers/${customer.id}/feedback`)
+      .set('Authorization', `Bearer ${custToken}`)
+      .field('selectionCycleId', String(firstCycle.id))
+      .field('rating', '7');
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('VALIDATION_ERROR');
+  });
+});

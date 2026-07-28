@@ -13,11 +13,16 @@ export default function ConfirmationScreen({ route, navigation }) {
   const { cycle, selectedTaskIds } = route.params;
   const [loading, setLoading] = useState(false);
 
+  // Preserve the customer's chosen priority order (map over the ids, don't filter the menu).
   const selectedTasks = useMemo(() =>
-    cycle.availableTasks.filter(t => selectedTaskIds.includes(t.id)),
+    selectedTaskIds
+      .map(id => cycle.availableTasks.find(t => t.id === id))
+      .filter(Boolean),
     [cycle, selectedTaskIds]
   );
 
+  // Total hours is still computed for the submit payload (feeds the business-side
+  // lifecycle/costing), but is no longer surfaced to the customer.
   const totalMinutes = selectedTasks.reduce((sum, t) => sum + t.timeAllotmentMinutes, 0);
   const totalHours = Math.ceil(totalMinutes / 60);
 
@@ -56,18 +61,16 @@ export default function ConfirmationScreen({ route, navigation }) {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Selected Tasks</Text>
-          {selectedTasks.map(task => (
+          <Text style={styles.sectionTitle}>Your Priorities</Text>
+          {selectedTasks.map((task, index) => (
             <View key={task.id} style={styles.taskRow}>
+              <View style={styles.rankBadge}>
+                <Text style={styles.rankBadgeText}>{index + 1}</Text>
+              </View>
               <Text style={styles.taskName}>{task.name}</Text>
-              <Text style={styles.taskTime}>{task.timeAllotmentMinutes} min</Text>
             </View>
           ))}
-        </View>
-
-        <View style={styles.totalRow}>
-          <Text style={styles.totalLabel}>Total Time</Text>
-          <Text style={styles.totalValue}>{totalMinutes} min ({totalHours}h)</Text>
+          <Text style={styles.priorityHint}>Listed in the order you chose — top matters most.</Text>
         </View>
       </ScrollView>
 
@@ -91,16 +94,14 @@ const styles = StyleSheet.create({
   section: { backgroundColor: '#fff', margin: 16, marginBottom: 0, borderRadius: 12, padding: 16 },
   sectionTitle: { fontSize: 13, fontWeight: '600', color: '#888', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
   dateText: { fontSize: 17, color: '#1a1a1a', fontWeight: '600' },
-  taskRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
-  taskName: { fontSize: 15, color: '#333' },
-  taskTime: { fontSize: 14, color: '#888' },
-  totalRow: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    margin: 16, backgroundColor: '#eff6ff',
-    borderRadius: 12, padding: 16,
+  taskRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+  rankBadge: {
+    width: 26, height: 26, borderRadius: 13, backgroundColor: '#eff6ff',
+    justifyContent: 'center', alignItems: 'center', marginRight: 12,
   },
-  totalLabel: { fontSize: 15, fontWeight: '600', color: '#1e40af' },
-  totalValue: { fontSize: 15, fontWeight: '600', color: '#1e40af' },
+  rankBadgeText: { fontSize: 13, fontWeight: '700', color: '#2563eb' },
+  taskName: { flex: 1, fontSize: 15, color: '#333' },
+  priorityHint: { fontSize: 12, color: '#9ca3af', marginTop: 12 },
   footer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: '#fff', padding: 16, flexDirection: 'row', gap: 12,

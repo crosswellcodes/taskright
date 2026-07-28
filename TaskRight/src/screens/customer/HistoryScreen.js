@@ -91,26 +91,25 @@ export default function HistoryScreen() {
         <View style={styles.summaryRow}>
           <Text style={styles.summaryText}>
             {hasTasksSelected
-              ? `${item.selectedTaskNames.length} task${item.selectedTaskNames.length !== 1 ? 's' : ''} selected`
+              ? `${item.selectedTaskNames.length} task${item.selectedTaskNames.length !== 1 ? 's' : ''}`
               : 'No tasks selected'}
           </Text>
-          {item.selectedTotalHours != null && (
-            <Text style={styles.summaryHours}>{item.selectedTotalHours} hr{item.selectedTotalHours !== 1 ? 's' : ''}</Text>
-          )}
         </View>
 
         {/* Expand chevron */}
         {hasTasksSelected && (
-          <Text style={styles.chevron}>{isExpanded ? '▲ Hide tasks' : '▼ Show tasks'}</Text>
+          <Text style={styles.chevron}>{isExpanded ? '▲ Hide priorities' : '▼ Show priorities'}</Text>
         )}
 
-        {/* Expanded task list */}
+        {/* Expanded task list — in the customer's chosen priority order */}
         {isExpanded && hasTasksSelected && (
           <View style={styles.taskList}>
             {item.selectedTaskNames.map((task, idx) => (
               <View key={idx} style={styles.taskRow}>
+                <View style={styles.rankBadge}>
+                  <Text style={styles.rankBadgeText}>{idx + 1}</Text>
+                </View>
                 <Text style={styles.taskName}>{task.name}</Text>
-                <Text style={styles.taskTime}>{task.minutes} min</Text>
               </View>
             ))}
           </View>
@@ -172,7 +171,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
   summaryText: { fontSize: 14, color: '#6b7280' },
-  summaryHours: { fontSize: 14, color: '#6b7280', fontWeight: '500' },
 
   chevron: { fontSize: 12, color: '#2563eb', marginTop: 8, fontWeight: '500' },
 
@@ -180,9 +178,12 @@ const styles = StyleSheet.create({
     marginTop: 12, borderTopWidth: 1, borderTopColor: '#f3f4f6', paddingTop: 10,
   },
   taskRow: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', paddingVertical: 5,
+    flexDirection: 'row', alignItems: 'center', paddingVertical: 6,
   },
-  taskName: { fontSize: 14, color: '#374151', flex: 1, marginRight: 12 },
-  taskTime: { fontSize: 13, color: '#9ca3af' },
+  rankBadge: {
+    width: 22, height: 22, borderRadius: 11, backgroundColor: '#eff6ff',
+    justifyContent: 'center', alignItems: 'center', marginRight: 10,
+  },
+  rankBadgeText: { fontSize: 12, fontWeight: '700', color: '#2563eb' },
+  taskName: { fontSize: 14, color: '#374151', flex: 1 },
 });

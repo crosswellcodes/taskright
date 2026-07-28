@@ -9,11 +9,13 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import { submitFeedback, getFeedbackForCycle } from '../../api/customerApi';
 
 const MAX_PHOTOS = 5;
+const RATING_LABELS = ['Poor', 'Fair', 'Good', 'Very good', 'Excellent'];
 
 export default function FeedbackScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { customerId, selectionCycleId, serviceDate } = route.params;
 
+  const [rating, setRating] = useState(0); // 0 = unrated (optional)
   const [feedbackText, setFeedbackText] = useState('');
   const [photos, setPhotos] = useState([]); // { uri, type, name } — new picks
   const [existingPhotos, setExistingPhotos] = useState([]); // filenames from server
@@ -30,6 +32,7 @@ export default function FeedbackScreen({ route, navigation }) {
     try {
       const data = await getFeedbackForCycle(customerId, selectionCycleId);
       if (data.feedback) {
+        setRating(data.feedback.rating || 0);
         setFeedbackText(data.feedback.feedbackText || '');
         setExistingPhotos(data.feedback.photoFilenames || []);
       }
@@ -79,6 +82,9 @@ export default function FeedbackScreen({ route, navigation }) {
     try {
       const formData = new FormData();
       formData.append('selectionCycleId', String(selectionCycleId));
+      if (rating > 0) {
+        formData.append('rating', String(rating));
+      }
       if (feedbackText.trim()) {
         formData.append('feedbackText', feedbackText.trim());
       }
@@ -122,6 +128,28 @@ export default function FeedbackScreen({ route, navigation }) {
         <View style={styles.headerCard}>
           <Text style={styles.headerTitle}>Leave Feedback</Text>
           <Text style={styles.headerDate}>{formattedDate}</Text>
+        </View>
+
+        {/* Star rating */}
+        <View style={styles.section}>
+          <Text style={styles.label}>Rate your service (optional)</Text>
+          <View style={styles.starsRow}>
+            {[1, 2, 3, 4, 5].map(n => (
+              <TouchableOpacity
+                key={n}
+                onPress={() => setRating(prev => (prev === n ? 0 : n))}
+                hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                accessibilityLabel={`${n} star${n !== 1 ? 's' : ''}`}
+              >
+                <Text style={[styles.star, n <= rating ? styles.starOn : styles.starOff]}>★</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {rating > 0 ? (
+            <Text style={styles.ratingLabel}>{RATING_LABELS[rating - 1]}</Text>
+          ) : (
+            <Text style={styles.ratingHint}>Tap a star to rate — or skip it.</Text>
+          )}
         </View>
 
         {/* Feedback text */}
@@ -218,6 +246,12 @@ const styles = StyleSheet.create({
     padding: 16, marginBottom: 16,
   },
   label: { fontSize: 13, fontWeight: '600', color: '#555', marginBottom: 10 },
+  starsRow: { flexDirection: 'row', gap: 8 },
+  star: { fontSize: 38, lineHeight: 44 },
+  starOn: { color: '#f59e0b' },
+  starOff: { color: '#d1d5db' },
+  ratingLabel: { fontSize: 14, color: '#b45309', fontWeight: '600', marginTop: 8 },
+  ratingHint: { fontSize: 12, color: '#9ca3af', marginTop: 8 },
   textArea: {
     borderWidth: 1, borderColor: '#ddd', borderRadius: 10,
     paddingHorizontal: 14, paddingVertical: 12,

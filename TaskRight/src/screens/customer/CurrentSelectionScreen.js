@@ -133,11 +133,12 @@ export default function CurrentSelectionScreen({ navigation }) {
   const hasSubmitted = !!(cycle && cycle.previousSelection);
   const cycleIsOpen = !!(cycle && cycle.status === 'open');
 
-  // Submitted task names for the submitted banner
+  // Submitted tasks in the customer's chosen priority order (map over the stored
+  // id array, don't filter the menu — filtering would lose the ranking).
   const submittedTasks = hasSubmitted
-    ? (cycle.availableTasks || []).filter(t =>
-        (cycle.previousSelection.selectedTasks || []).includes(t.id)
-      )
+    ? (cycle.previousSelection.selectedTasks || [])
+        .map(id => (cycle.availableTasks || []).find(t => t.id === id))
+        .filter(Boolean)
     : [];
 
   return (
@@ -170,7 +171,6 @@ export default function CurrentSelectionScreen({ navigation }) {
               {cycle.businessName ? (
                 <Text style={styles.businessName}>{cycle.businessName}</Text>
               ) : null}
-              <Text style={styles.hoursText}>{cycle.totalHours} hours available</Text>
               <Text style={styles.cardRef}>Ref #{cycle.id}</Text>
               <Text style={styles.cardHint}>
                 {hasSubmitted ? 'Tap to review your selections →' : 'Tap to view and select tasks →'}
@@ -226,13 +226,12 @@ export default function CurrentSelectionScreen({ navigation }) {
                 submittedTasks.length === 0 ? (
                   <Text style={styles.modalEmpty}>No tasks selected.</Text>
                 ) : (
-                  submittedTasks.map(task => (
+                  submittedTasks.map((task, index) => (
                     <View key={task.id} style={[styles.modalTaskRow, styles.modalTaskRowSelected]}>
-                      <View style={styles.modalTaskCheckmark}>
-                        <Text style={styles.modalTaskCheckmarkText}>✓</Text>
+                      <View style={styles.modalRankBadge}>
+                        <Text style={styles.modalRankBadgeText}>{index + 1}</Text>
                       </View>
                       <Text style={[styles.modalTaskName, styles.modalTaskNameSelected]}>{task.name}</Text>
-                      <Text style={styles.modalTaskTime}>{task.timeAllotmentMinutes} min</Text>
                     </View>
                   ))
                 )
@@ -243,7 +242,6 @@ export default function CurrentSelectionScreen({ navigation }) {
                   (cycle.availableTasks || []).map(task => (
                     <View key={task.id} style={styles.modalTaskRow}>
                       <Text style={styles.modalTaskName}>{task.name}</Text>
-                      <Text style={styles.modalTaskTime}>{task.timeAllotmentMinutes} min</Text>
                     </View>
                   ))
                 )
@@ -252,12 +250,12 @@ export default function CurrentSelectionScreen({ navigation }) {
             <View style={styles.modalFooter}>
               {hasSubmitted ? (
                 <Text style={styles.modalFooterText}>
-                  {submittedTasks.length} task{submittedTasks.length !== 1 ? 's' : ''} selected · {cycle.previousSelection.selectedTotalHours} hr{cycle.previousSelection.selectedTotalHours !== 1 ? 's' : ''}
+                  {submittedTasks.length} task{submittedTasks.length !== 1 ? 's' : ''}, in your priority order
                 </Text>
               ) : (cycle.availableTasks || []).length > 0 ? (
                 <>
                   <Text style={styles.modalFooterText}>
-                    {cycle.availableTasks.length} task{cycle.availableTasks.length !== 1 ? 's' : ''} · {cycle.totalHours} hrs available
+                    {cycle.availableTasks.length} task{cycle.availableTasks.length !== 1 ? 's' : ''}
                   </Text>
                   <TouchableOpacity
                     style={styles.modalSelectBtn}
@@ -319,7 +317,9 @@ export default function CurrentSelectionScreen({ navigation }) {
                       ) : null}
                     </View>
                     <View style={styles.upcomingBottomRow}>
-                      <Text style={styles.upcomingHours}>{svc.totalHours} hrs available</Text>
+                      <Text style={styles.upcomingHours}>
+                        {(svc.availableTasks?.length || 0)} task{(svc.availableTasks?.length || 0) !== 1 ? 's' : ''}
+                      </Text>
                       {svc.selectionSubmitted ? (
                         <View style={styles.submittedBadge}>
                           <Text style={styles.submittedBadgeText}>✓ Tasks Selected</Text>
@@ -330,11 +330,6 @@ export default function CurrentSelectionScreen({ navigation }) {
                         </View>
                       )}
                     </View>
-                    {!svc.selectionSubmitted && svc.availableTasks?.length > 0 ? (
-                      <Text style={styles.upcomingTaskCount}>
-                        {svc.availableTasks.length} task{svc.availableTasks.length !== 1 ? 's' : ''} available
-                      </Text>
-                    ) : null}
                     <Text style={styles.upcomingRef}>Ref #{svc.id}</Text>
                   </View>
                 </TouchableOpacity>
@@ -415,7 +410,9 @@ export default function CurrentSelectionScreen({ navigation }) {
                     </Text>
                   </View>
                 </View>
-                <Text style={styles.calDetailHours}>{svc.totalHours} hrs available · Ref #{svc.id}</Text>
+                <Text style={styles.calDetailHours}>
+                  {(svc.availableTasks?.length || 0)} task{(svc.availableTasks?.length || 0) !== 1 ? 's' : ''} · Ref #{svc.id}
+                </Text>
                 {!svc.selectionSubmitted && (
                   <TouchableOpacity
                     style={styles.calDetailBtn}
@@ -462,7 +459,6 @@ const styles = StyleSheet.create({
   },
   cardStatusBadgeText: { color: '#86efac', fontSize: 11, fontWeight: '700' },
   dateText: { color: '#fff', fontSize: 20, fontWeight: '700', marginBottom: 4 },
-  hoursText: { color: 'rgba(255,255,255,0.85)', fontSize: 15 },
   businessName: { color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: '600', marginBottom: 4 },
   cardRef: { color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 4 },
   cardHint: { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 10 },
@@ -477,11 +473,10 @@ const styles = StyleSheet.create({
   modalEmpty: { fontSize: 15, color: '#888', textAlign: 'center', marginTop: 40 },
   modalTaskRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
   modalTaskRowSelected: { backgroundColor: '#f0fdf4', borderRadius: 8, paddingHorizontal: 8, marginBottom: 2, borderBottomWidth: 0 },
-  modalTaskCheckmark: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#16a34a', justifyContent: 'center', alignItems: 'center', marginRight: 10 },
-  modalTaskCheckmarkText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  modalRankBadge: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#dcfce7', justifyContent: 'center', alignItems: 'center', marginRight: 10 },
+  modalRankBadgeText: { color: '#15803d', fontSize: 12, fontWeight: '700' },
   modalTaskName: { fontSize: 15, color: '#1a1a1a', flex: 1, marginRight: 12 },
   modalTaskNameSelected: { color: '#15803d', fontWeight: '600' },
-  modalTaskTime: { fontSize: 14, color: '#888', fontWeight: '500' },
   modalFooter: {
     borderTopWidth: 1, borderTopColor: '#eee',
     paddingVertical: 14, paddingHorizontal: 20, alignItems: 'center',
@@ -617,6 +612,5 @@ const styles = StyleSheet.create({
     paddingVertical: 3, paddingHorizontal: 8,
   },
   pendingBadgeText: { color: '#92400e', fontSize: 12, fontWeight: '600' },
-  upcomingTaskCount: { fontSize: 12, color: '#9ca3af', marginTop: 4 },
   upcomingRef: { fontSize: 11, color: '#c4c9d4', marginTop: 3 },
 });

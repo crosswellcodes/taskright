@@ -114,14 +114,6 @@ router.post('/:customerId/selection-cycle/:selectionCycleId/submit', requireCust
         ...(error.details || {})
       });
     }
-    if (error.code === 'TIME_EXCEEDED') {
-      return res.status(400).json({
-        success: false,
-        error: error.message,
-        code: 'TIME_EXCEEDED',
-        ...(error.details || {})
-      });
-    }
     if (error.code === 'INVALID_TASK') {
       return res.status(400).json({ success: false, error: error.message, code: 'INVALID_TASK' });
     }
@@ -192,8 +184,22 @@ router.post('/:customerId/feedback', requireCustomer, (req, res) => {
       const parsedCycleId = selectionCycleId ? parseInt(selectionCycleId) : null;
       const photoFilenames = (req.files || []).map(f => f.filename);
 
+      // Optional 1–5 star rating (multipart field arrives as a string)
+      let rating = null;
+      const ratingRaw = req.body.rating;
+      if (ratingRaw != null && ratingRaw !== '') {
+        rating = parseInt(ratingRaw, 10);
+        if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+          return res.status(400).json({
+            success: false,
+            error: 'rating must be an integer from 1 to 5',
+            code: 'VALIDATION_ERROR'
+          });
+        }
+      }
+
       const feedback = await customerService.submitFeedback(
-        customerId, parsedCycleId, feedbackText || null, photoFilenames
+        customerId, parsedCycleId, feedbackText || null, photoFilenames, rating
       );
 
       // Fire-and-forget: notify business owner of new feedback
@@ -217,6 +223,7 @@ router.post('/:customerId/feedback', requireCustomer, (req, res) => {
         feedback: {
           id: feedback.id,
           feedbackText: feedback.feedback_text,
+          rating: feedback.rating,
           photoFilenames: feedback.photo_filenames,
           createdAt: feedback.created_at
         }
@@ -244,6 +251,7 @@ router.get('/:customerId/feedback/:selectionCycleId', requireCustomer, async (re
       feedback: feedback ? {
         id: feedback.id,
         feedbackText: feedback.feedback_text,
+        rating: feedback.rating,
         photoFilenames: feedback.photo_filenames,
         createdAt: feedback.created_at
       } : null
