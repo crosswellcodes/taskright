@@ -130,7 +130,7 @@ function unwrap(res, label) {
           useDefaultTemplate: true, brandId, usecase: 'CUSTOMER_CARE',
           phoneNumbers: [], directLending: false, ageGated: false,
           sample1: 'Hi [Name], your [Business] service is scheduled for [Date]. Reply C to confirm, T to review tasks, D to request a date change, or N to leave a note.',
-          referenceId: 'smoke-test',
+          // campaign create rejects referenceId (verified live) — omit it.
         };
         const data = unwrap(await sdk.campaigns.createCampaign({ campaignData }), 'createCampaign');
         console.log(`  ✓ campaignId=${data.campaignId}, status=${data.status}`);

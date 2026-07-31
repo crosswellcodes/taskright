@@ -469,7 +469,9 @@ class SignalHouseProvider extends SmsProvider {
       ageGated: false,
       sample1: 'Hi [Name], your [Business] service is scheduled for [Date]. Reply C to confirm, T to review tasks, D to request a date change, or N to leave a note for your team.',
       sample2: 'Your [Business] service was completed today — thank you! Reply to share quick feedback.',
-      referenceId: String(business.id),
+      // NOTE: campaign create does NOT accept referenceId (verified live — SignalHouse
+      // rejects it as an unrecognized key; unlike brand create, which does). Campaign
+      // events correlate via subgroupId in handleWebhookEvent.
     };
     const res = await this._client().campaigns.createCampaign({ campaignData });
     if (!res || !res.success) {
