@@ -402,25 +402,33 @@ class SignalHouseProvider extends SmsProvider {
     try {
       switch (event) {
         case 'BRAND_CREATION_SUCCESSFUL': {
+          // Store the real brandId. Do NOT create the campaign yet — campaign create
+          // requires the brand to be VERIFIED (confirmed live: a brand at
+          // PENDING_APPROVAL is rejected). We wait for BRAND_IDENTITY_STATUS_UPDATED.
           if (payload.brandId) {
             await knex('businesses').where('id', business.id)
               .update({ sms_brand_id: payload.brandId, updated_at: knex.raw('CURRENT_TIMESTAMP') });
           }
-          console.log(`✓ Brand created for business ${business.id} (${payload.brandId || 'no id'})`);
-          // Now that we have a brandId + a purchased number, create the campaign.
-          const fresh = await knex('businesses').where('id', business.id).first();
-          if (fresh.sms_brand_id && fresh.sms_phone_number) {
-            await this._createCampaign(fresh);
-          }
+          console.log(`✓ Brand created for business ${business.id} (${payload.brandId || 'no id'}) — awaiting identity verification`);
           break;
         }
         case 'BRAND_CREATION_FAILED':
           await this._setA2p(business.id, 'failed');
           console.warn(`✗ Brand creation failed for business ${business.id}`);
           break;
-        case 'BRAND_IDENTITY_STATUS_UPDATED':
-          console.log(`ℹ️  Brand identity for business ${business.id}: ${payload.status || 'unknown'}`);
+        case 'BRAND_IDENTITY_STATUS_UPDATED': {
+          const status = String(payload.status || '').toUpperCase();
+          console.log(`ℹ️  Brand identity for business ${business.id}: ${status || 'unknown'}`);
+          // Brand is now verified → create the campaign (needs a brandId + a number).
+          // Idempotent: skip if a campaign already exists.
+          if (status === 'VERIFIED' || status === 'VETTED_VERIFIED') {
+            const fresh = await knex('businesses').where('id', business.id).first();
+            if (fresh.sms_brand_id && fresh.sms_phone_number && !fresh.sms_campaign_id) {
+              await this._createCampaign(fresh);
+            }
+          }
           break;
+        }
         case 'CAMPAIGN_APPROVED_BY_SIGNAL_HOUSE':
           if (payload.campaignId) {
             await knex('businesses').where('id', business.id)

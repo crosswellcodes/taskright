@@ -15,9 +15,12 @@
  *
  * What it never does: purchase a number, send a message, or (by default) create the
  * real Global webhook. Flags:
- *   --keep       leave the test subgroup/brand in place (default: delete them)
- *   --no-brand   skip the mock brand + campaign steps
- *   --webhook    also create the Global inbound webhook (needs a real public API_BASE_URL)
+ *   --keep         leave the test subgroup/brand/number in place (default: delete them)
+ *   --no-brand     skip the mock brand + campaign steps
+ *   --buy-number   PAID (~$1): purchase a real number so the campaign step can validate
+ *                  createCampaign end-to-end (campaign requires >=1 phoneNumber). The
+ *                  number is released again during cleanup unless --keep.
+ *   --webhook      also create the Global inbound webhook (needs a real public API_BASE_URL)
  *
  * Run from the backend dir:  node scripts/signalhouse-smoke.js
  */
@@ -27,6 +30,7 @@ const args = new Set(process.argv.slice(2));
 const KEEP = args.has('--keep');
 const DO_BRAND = !args.has('--no-brand');
 const DO_WEBHOOK = args.has('--webhook');
+const BUY_NUMBER = args.has('--buy-number'); // PAID (~$1) — purchases a real number for the campaign step
 
 const API_BASE_URL = process.env.API_BASE_URL || 'https://api.taskright.io';
 const results = [];
@@ -93,6 +97,32 @@ function unwrap(res, label) {
     if (!subgroupId) console.log('  ⚠️  no data.subgroupId — provisionBusiness reads that path; confirm');
   });
 
+  // ── 3b. Purchase a number (PAID ~$1) — needed to validate campaign create ────
+  let purchasedNumber = null;
+  if (BUY_NUMBER && subgroupId) {
+    await step('purchasePhoneNumber (PAID ~$1)', async () => {
+      const search = unwrap(await sdk.numbers.getAvailablePhoneNumbers({ smsEnabled: true, mmsEnabled: true, limit: 1 }), 'getAvailablePhoneNumbers');
+      const candidate = search.numbers && search.numbers[0] && search.numbers[0].number;
+      if (!candidate) throw new Error('no available number to purchase');
+      const wire = String(candidate).replace(/\D/g, '');
+      unwrap(await sdk.numbers.purchasePhoneNumber({ phoneNumbers: [wire], subgroupId }), 'purchasePhoneNumber');
+      console.log(`  ✓ purchase queued: ${wire}`);
+      for (let i = 0; i < 12; i++) {
+        const list = unwrap(await sdk.numbers.getPhoneNumbers({ subgroupId }), 'getPhoneNumbers');
+        const arr = Array.isArray(list) ? list : (list.numbers || list.records || []);
+        const found = arr.find((n) => n && String(n.phoneNumber || n.number || '').replace(/\D/g, '') === wire);
+        if (found) {
+          purchasedNumber = wire;
+          console.log(`  ✓ number provisioned on subgroup (status ${found.status || '?'})`);
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 5000));
+      }
+      purchasedNumber = wire; // not yet listed — still try the campaign with it
+      console.log('  ⚠️  number not listed on subgroup after poll — will still attempt campaign');
+    });
+  }
+
   // ── 4/5/6. Mock brand → status → campaign ───────────────────────────────────
   let brandId = null;
   if (DO_BRAND && subgroupId) {
@@ -128,7 +158,7 @@ function unwrap(res, label) {
       await step('createCampaign (mock brand)', async () => {
         const campaignData = {
           useDefaultTemplate: true, brandId, usecase: 'CUSTOMER_CARE',
-          phoneNumbers: [], directLending: false, ageGated: false,
+          phoneNumbers: purchasedNumber ? [purchasedNumber] : [], directLending: false, ageGated: false,
           sample1: 'Hi [Name], your [Business] service is scheduled for [Date]. Reply C to confirm, T to review tasks, D to request a date change, or N to leave a note.',
           // campaign create rejects referenceId (verified live) — omit it.
         };
@@ -154,14 +184,35 @@ function unwrap(res, label) {
     });
   }
 
-  // ── Cleanup ─────────────────────────────────────────────────────────────────
-  if (subgroupId && !KEEP) {
-    await step('cleanup: deleteSubgroup', async () => {
-      unwrap(await sdk.subgroups.deleteSubgroup({ id: subgroupId }), 'deleteSubgroup');
-      console.log(`  ✓ deleted test subgroup ${subgroupId}`);
-    });
+  // ── Cleanup (number → brand → subgroup; subgroup delete is async) ────────────
+  if (!KEEP) {
+    if (purchasedNumber) {
+      await step('cleanup: deletePhoneNumbers', async () => {
+        unwrap(await sdk.numbers.deletePhoneNumbers({ phoneNumbers: [purchasedNumber] }), 'deletePhoneNumbers');
+        console.log(`  ✓ released number ${purchasedNumber}`);
+      });
+    }
+    if (brandId) {
+      await step('cleanup: deleteBrand', async () => {
+        unwrap(await sdk.brands.deleteBrand({ brandId }), 'deleteBrand');
+        console.log(`  ✓ deleted brand ${brandId}`);
+      });
+    }
+    if (subgroupId) {
+      await step('cleanup: deleteSubgroup (poll — async after brand delete)', async () => {
+        let last;
+        for (let i = 0; i < 10; i++) {
+          const s = await sdk.subgroups.deleteSubgroup({ id: subgroupId });
+          if (s.success) { console.log(`  ✓ deleted subgroup ${subgroupId}`); return; }
+          last = s.error || s.status;
+          await new Promise((r) => setTimeout(r, 3000));
+        }
+        throw new Error(`deleteSubgroup did not succeed: ${JSON.stringify(last)}`);
+      });
+    }
   } else if (subgroupId) {
-    console.log(`\n(kept test subgroup ${subgroupId} — --keep)`);
+    console.log(`\n(kept — --keep: subgroup ${subgroupId}` +
+      `${brandId ? ', brand ' + brandId : ''}${purchasedNumber ? ', number ' + purchasedNumber : ''})`);
   }
 
   // ── Summary ─────────────────────────────────────────────────────────────────

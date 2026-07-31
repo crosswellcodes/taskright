@@ -135,10 +135,25 @@ describe('P4: SignalHouse provisioning + A2P', () => {
       return business;
     }
 
-    test('BRAND_CREATION_SUCCESSFUL stores brandId + creates the campaign', async () => {
+    test('BRAND_CREATION_SUCCESSFUL stores brandId but does NOT create the campaign yet', async () => {
+      // Campaign create requires a VERIFIED brand (confirmed live) — so brand-created
+      // only stores the id; the campaign waits for BRAND_IDENTITY_STATUS_UPDATED.
       const business = await provisionedBusiness();
       const client = fakeClient();
       const req = { body: { event: 'BRAND_CREATION_SUCCESSFUL', metaData: { Brand: { referenceId: String(business.id), brandId: 'BXYZ' } } } };
+      await new SignalHouseProvider({ client }).handleWebhookEvent(req);
+
+      expect(client.calls.createCampaign).toHaveLength(0);
+      const row = await knex('businesses').where('id', business.id).first();
+      expect(row.sms_brand_id).toBe('BXYZ');
+      expect(row.sms_campaign_id).toBeNull();
+    });
+
+    test('BRAND_IDENTITY_STATUS_UPDATED (VERIFIED) creates the campaign', async () => {
+      const business = await provisionedBusiness();
+      await knex('businesses').where('id', business.id).update({ sms_brand_id: 'BXYZ' });
+      const client = fakeClient();
+      const req = { body: { event: 'BRAND_IDENTITY_STATUS_UPDATED', metaData: { Brand: { referenceId: String(business.id), status: 'VERIFIED' } } } };
       await new SignalHouseProvider({ client }).handleWebhookEvent(req);
 
       expect(client.calls.createCampaign[0].campaignData.brandId).toBe('BXYZ');
@@ -146,7 +161,6 @@ describe('P4: SignalHouse provisioning + A2P', () => {
       expect(client.calls.createCampaign[0].campaignData.phoneNumbers).toEqual(['15557778888']);
 
       const row = await knex('businesses').where('id', business.id).first();
-      expect(row.sms_brand_id).toBe('BXYZ');
       expect(row.sms_campaign_id).toBe('C0000001');
     });
 
