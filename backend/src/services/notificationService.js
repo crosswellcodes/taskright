@@ -1,46 +1,31 @@
-const twilio = require('twilio');
 const knex = require('../db');
-
-const PARENT_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
-const PARENT_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
-
-function parentClient() {
-  return twilio(PARENT_ACCOUNT_SID, PARENT_AUTH_TOKEN);
-}
+const { getProvider } = require('./sms');
 
 /**
- * Send an SMS on behalf of a business via their dedicated Messaging Service.
+ * Send an SMS on behalf of a business, via the configured SMS provider.
  *
- * In dev mode (business not yet provisioned), logs to console instead of
- * calling Twilio — so the rest of the app works without live credentials.
+ * In dev mode (business not yet provisioned), the provider logs to console
+ * instead of calling out — so the rest of the app works without live credentials.
  *
- * Every successful send is logged to the messages table for communication history.
+ * Every real send is logged to the messages table for communication history.
+ * (Dev-mode sends are not logged — behavior preserved from the Twilio original.)
  *
- * @param {Object} business  - Full business DB row (needs id, twilio_subaccount_sid,
- *                             twilio_messaging_service_sid, twilio_phone_number)
+ * @param {Object} business  - Full business DB row (needs id, sms_subgroup_id,
+ *                             sms_phone_number, and provider-specific send state)
  * @param {String} toPhone   - Recipient E.164 phone number
  * @param {String} message   - SMS body
- * @returns {Promise<Object|null>} Twilio response object, or null in dev mode
+ * @returns {Promise<Object|null>} Provider response object, or null in dev mode
  */
 async function sendSMS(business, toPhone, message) {
-  if (!toPhone || !message) {
-    throw new Error('toPhone and message are required');
+  const result = await getProvider('send').send(business, toPhone, message);
+
+  // Only a genuinely-sent message is recorded in the thread history. dev-mode sends
+  // log nothing (preserves original behavior); blocked/failed sends are already
+  // logged by the provider and must not appear in the thread as if delivered.
+  // (TwilioProvider only ever returns 'sent' or 'dev' — behavior unchanged there.)
+  if (result.status !== 'sent') {
+    return result.raw;
   }
-
-  // Dev mode — business not provisioned yet (fresh signup or test environment)
-  if (!business.twilio_subaccount_sid || !business.twilio_messaging_service_sid) {
-    console.log(`📱 [DEV SMS] To ${toPhone}: ${message}`);
-    return null;
-  }
-
-  const client = parentClient();
-  const response = await client.messages.create({
-    messagingServiceSid: business.twilio_messaging_service_sid,
-    to: toPhone,
-    body: message
-  });
-
-  console.log(`✓ SMS sent to ${toPhone} via business ${business.id} (SID: ${response.sid})`);
 
   // Best-effort outbound message log — don't let a logging failure block the caller
   try {
@@ -55,15 +40,15 @@ async function sendSMS(business, toPhone, message) {
       customer_id: customer ? customer.id : null,
       direction: 'outbound',
       body: message,
-      twilio_message_sid: response.sid,
+      sms_message_id: result.id,
       to_phone: toPhone,
-      from_phone: business.twilio_phone_number || null,
+      from_phone: business.sms_phone_number || null,
     });
   } catch (logErr) {
     console.error('Outbound message log failed:', logErr.message);
   }
 
-  return response;
+  return result.raw;
 }
 
 /**

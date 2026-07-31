@@ -1,11 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const twilio = require('twilio');
 const { generateToken } = require('../utils/jwt');
 const { validateBusinessSignup, validateCustomerSignup } = require('../utils/validators');
 const businessService = require('../services/businessService');
 const customerService = require('../services/customerService');
-const { provisionBusiness } = require('../services/twilioProvisioningService');
+const { getProvider } = require('../services/sms');
 
 // Normalize a US phone number to E.164 format
 function normalizePhone(phone) {
@@ -15,14 +14,9 @@ function normalizePhone(phone) {
   return phone;
 }
 
-function verifyClient() {
-  return twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
-    .verify.v2.services(process.env.TWILIO_VERIFY_SERVICE_SID);
-}
-
 /**
  * POST /api/auth/verify/send
- * Send a 6-digit OTP to the given phone number via Twilio Verify.
+ * Send a 6-digit OTP to the given phone number via the configured SMS provider.
  * Used by the web signup flow before account creation.
  */
 router.post('/verify/send', async (req, res) => {
@@ -33,7 +27,7 @@ router.post('/verify/send', async (req, res) => {
   }
 
   try {
-    await verifyClient().verifications.create({ to: normalizePhone(phoneNumber), channel: 'sms' });
+    await getProvider('otp').sendOtp(normalizePhone(phoneNumber));
     return res.json({ success: true });
   } catch (error) {
     // Twilio rate-limit error code 20429
@@ -77,16 +71,8 @@ router.post('/businesses/signup', async (req, res) => {
 
     // Web signup: verify OTP before creating the account
     if (otpCode) {
-      try {
-        const check = await verifyClient().verificationChecks.create({
-          to: normalizePhone(phoneNumber),
-          code: otpCode,
-        });
-        if (check.status !== 'approved') {
-          return res.status(400).json({ success: false, error: 'Invalid or expired verification code', code: 'INVALID_OTP' });
-        }
-      } catch (error) {
-        // Twilio throws when code is wrong/expired rather than returning status
+      const ok = await getProvider('otp').verifyOtp(normalizePhone(phoneNumber), otpCode);
+      if (!ok) {
         return res.status(400).json({ success: false, error: 'Invalid or expired verification code', code: 'INVALID_OTP' });
       }
     }
@@ -94,9 +80,9 @@ router.post('/businesses/signup', async (req, res) => {
     // Create business
     const business = await businessService.createBusiness(name, phoneNumber, schedulingFormat || 'date_based', resolvedEntityType);
 
-    // Fire-and-forget Twilio provisioning — signup response is instant,
+    // Fire-and-forget provisioning — signup response is instant,
     // provisioning completes in the background (status tracked in DB)
-    provisionBusiness(business.id).catch(err =>
+    getProvider('provision').provisionBusiness(business.id).catch(err =>
       console.error('provisionBusiness unhandled error:', err.message)
     );
 
@@ -237,15 +223,8 @@ router.post('/customers/signup', async (req, res) => {
 
     // Web signup: verify OTP before creating the account
     if (otpCode) {
-      try {
-        const check = await verifyClient().verificationChecks.create({
-          to: normalizePhone(phoneNumber),
-          code: otpCode,
-        });
-        if (check.status !== 'approved') {
-          return res.status(400).json({ success: false, error: 'Invalid or expired verification code', code: 'INVALID_OTP' });
-        }
-      } catch {
+      const ok = await getProvider('otp').verifyOtp(normalizePhone(phoneNumber), otpCode);
+      if (!ok) {
         return res.status(400).json({ success: false, error: 'Invalid or expired verification code', code: 'INVALID_OTP' });
       }
     }

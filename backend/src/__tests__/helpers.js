@@ -7,6 +7,7 @@ const knex = require('../db');
 async function truncateAllTables() {
   await knex.raw(`
     TRUNCATE TABLE
+      otp_codes,
       messages,
       review_tokens,
       geofence_events,

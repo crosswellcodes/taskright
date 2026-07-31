@@ -1,10 +1,10 @@
 const express = require('express');
-const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const router = express.Router();
 const knex = require('../db');
 const { sendSMS } = require('../services/notificationService');
+const { getProvider } = require('../services/sms');
 const {
   confirmCustomerSelection,
   generateSelectionToken,
@@ -15,36 +15,6 @@ const MEDIA_DIR = path.join(__dirname, '../../uploads/messages');
 fs.mkdirSync(MEDIA_DIR, { recursive: true });
 
 const WEBSITE_URL = process.env.WEBSITE_URL || 'https://taskrightpro.com';
-
-/**
- * Downloads a Twilio media URL to disk using Basic auth.
- * Follows redirects (Twilio may redirect to CDN).
- */
-function downloadMedia(url, dest) {
-  return new Promise((resolve, reject) => {
-    const auth = Buffer.from(
-      `${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`
-    ).toString('base64');
-
-    const makeRequest = (targetUrl, sendAuth = true) => {
-      const reqOptions = sendAuth ? { headers: { Authorization: `Basic ${auth}` } } : {};
-      https.get(targetUrl, reqOptions, (res) => {
-        if ([301, 302, 307, 308].includes(res.statusCode)) {
-          return makeRequest(res.headers.location, false);
-        }
-        if (res.statusCode !== 200) {
-          return reject(new Error(`Media download failed: HTTP ${res.statusCode}`));
-        }
-        const file = fs.createWriteStream(dest);
-        res.pipe(file);
-        file.on('finish', () => file.close(resolve));
-        file.on('error', (err) => { fs.unlink(dest, () => {}); reject(err); });
-      }).on('error', reject);
-    };
-
-    makeRequest(url);
-  });
-}
 
 /**
  * Handle C/T/D/N keyword replies from known customers.
@@ -151,47 +121,65 @@ async function handleKeyword(business, customer, fromPhone, body) {
 /**
  * POST /api/webhooks/inbound-sms
  *
- * Twilio posts here when a customer replies to a business's dedicated number.
- * Returns 200 with empty TwiML immediately; processes async after response.
+ * The SMS provider posts here when a customer replies to a business's dedicated
+ * number. Returns 200 with empty TwiML immediately; processes async after response.
  */
 router.post('/inbound-sms', async (req, res) => {
+  const provider = getProvider('inbound');
+
+  // Provider-configured inbound authentication (Twilio: always accepts).
+  if (!provider.verifyInboundSignature(req)) {
+    return res.status(401).send('Unauthorized');
+  }
+
   res.set('Content-Type', 'text/xml');
   res.send('<Response/>');
 
   setImmediate(async () => {
     try {
-      const {
-        To: toPhone,
-        From: fromPhone,
-        Body: body,
-        MessageSid: twilioMessageSid,
-        NumMedia: numMediaStr,
-      } = req.body;
+      // SignalHouse delivers non-message provisioning/status events (brand/campaign/
+      // number/ops) to the same Global webhook. Dispatch those to the event handler;
+      // Twilio has no such events and no handleWebhookEvent (feature-detected).
+      const eventType = req.body && req.body.event;
+      if (eventType && eventType !== 'MESSAGE_RECEIVED' && typeof provider.handleWebhookEvent === 'function') {
+        await provider.handleWebhookEvent(req);
+        return;
+      }
 
-      const numMedia = parseInt(numMediaStr) || 0;
+      const { toPhone, fromPhone, body, messageId, subgroupId, media } = provider.parseInbound(req);
+      const numMedia = media.length;
 
       if (!toPhone || !fromPhone || (!body && numMedia === 0)) {
         console.warn('Inbound SMS webhook missing required fields:', req.body);
         return;
       }
 
-      // Deduplicate — Twilio may retry if our earlier response was slow
-      if (twilioMessageSid) {
+      // Deduplicate — the provider may retry if our earlier response was slow
+      if (messageId) {
         const existing = await knex('messages')
-          .where('twilio_message_sid', twilioMessageSid)
+          .where('sms_message_id', messageId)
           .first();
         if (existing) {
-          console.log(`Duplicate inbound SID ${twilioMessageSid} — skipping`);
+          console.log(`Duplicate inbound SID ${messageId} — skipping`);
           return;
         }
       }
 
-      const business = await knex('businesses')
-        .where('twilio_phone_number', toPhone)
-        .first();
+      // Route to the business by subgroup (SignalHouse) first, falling back to the
+      // receiving number (Twilio carries no subgroupId, so this is its only path).
+      let business = null;
+      if (subgroupId) {
+        business = await knex('businesses').where('sms_subgroup_id', subgroupId).first();
+      }
+      if (!business && toPhone) {
+        business = await knex('businesses').where('sms_phone_number', toPhone).first();
+      }
 
       if (!business) {
-        console.warn(`Inbound SMS to unknown Twilio number ${toPhone} — no matching business`);
+        console.warn(
+          `Inbound SMS with no matching business (to ${toPhone}` +
+          (subgroupId ? `, subgroup ${subgroupId}` : '') + ')'
+        );
         return;
       }
 
@@ -205,17 +193,16 @@ router.post('/inbound-sms', async (req, res) => {
       if (numMedia > 0) {
         const paths = [];
         for (let i = 0; i < numMedia; i++) {
-          const mediaUrl = req.body[`MediaUrl${i}`];
-          const contentType = req.body[`MediaContentType${i}`] || 'image/jpeg';
-          const ext = contentType.split('/')[1]?.split(';')[0]?.replace('+', '') || 'jpg';
-          const filename = `${twilioMessageSid}_${i}.${ext}`;
+          const m = media[i];
+          const ext = m.contentType.split('/')[1]?.split(';')[0]?.replace('+', '') || 'jpg';
+          const filename = `${messageId}_${i}.${ext}`;
           const dest = path.join(MEDIA_DIR, filename);
           try {
-            await downloadMedia(mediaUrl, dest);
+            await provider.fetchInboundMedia(m, dest);
             paths.push(`/uploads/messages/${filename}`);
             console.log(`📎 Media downloaded: ${filename}`);
           } catch (err) {
-            console.error(`❌ Media download failed (${i}) for SID ${twilioMessageSid}:`, err.message, '| URL:', mediaUrl);
+            console.error(`❌ Media download failed (${i}) for SID ${messageId}:`, err.message, '| URL:', m.url);
           }
         }
         if (paths.length > 0) mediaUrls = JSON.stringify(paths);
@@ -226,7 +213,7 @@ router.post('/inbound-sms', async (req, res) => {
         customer_id: customer ? customer.id : null,
         direction: 'inbound',
         body: (body || '').trim(),
-        twilio_message_sid: twilioMessageSid || null,
+        sms_message_id: messageId || null,
         to_phone: toPhone,
         from_phone: fromPhone,
         media_urls: mediaUrls,

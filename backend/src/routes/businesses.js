@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const twilio = require('twilio');
 const knex = require('../db');
 const { authenticate, requireBusiness } = require('../middleware/auth');
 const businessService = require('../services/businessService');
 const notificationService = require('../services/notificationService');
+const { getProvider } = require('../services/sms');
 
 // All business routes require authentication + ownership check
 router.use(authenticate);
@@ -1103,7 +1103,7 @@ router.get('/:businessId/customers/:customerId/messages', requireBusiness, async
       body: m.body,
       fromPhone: m.from_phone,
       toPhone: m.to_phone,
-      twilioMessageSid: m.twilio_message_sid,
+      smsMessageId: m.sms_message_id,
       createdAt: m.created_at,
       mediaUrls: m.media_urls || null,
     }));
@@ -1146,28 +1146,18 @@ router.post('/:businessId/customers/:customerId/messages', requireBusiness, asyn
     }
 
     const messageBody = body.trim();
-    let twilioSid = null;
 
-    if (req.business.twilio_messaging_service_sid) {
-      const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-      const response = await client.messages.create({
-        messagingServiceSid: req.business.twilio_messaging_service_sid,
-        to: customer.phone_number,
-        body: messageBody,
-      });
-      twilioSid = response.sid;
-    } else {
-      console.log(`📱 [DEV SMS] To ${customer.phone_number}: ${messageBody}`);
-    }
+    const result = await getProvider('send').send(req.business, customer.phone_number, messageBody);
+    const twilioSid = result.id;
 
     const [inserted] = await knex('messages').insert({
       business_id: req.business.id,
       customer_id: customer.id,
       direction: 'outbound',
       body: messageBody,
-      twilio_message_sid: twilioSid,
+      sms_message_id: twilioSid,
       to_phone: customer.phone_number,
-      from_phone: req.business.twilio_phone_number || null,
+      from_phone: req.business.sms_phone_number || null,
     }).returning('*');
 
     return res.status(201).json({
@@ -1178,7 +1168,7 @@ router.post('/:businessId/customers/:customerId/messages', requireBusiness, asyn
         body: inserted.body,
         fromPhone: inserted.from_phone,
         toPhone: inserted.to_phone,
-        twilioMessageSid: inserted.twilio_message_sid,
+        smsMessageId: inserted.sms_message_id,
         createdAt: inserted.created_at,
       },
     });
@@ -1189,8 +1179,6 @@ router.post('/:businessId/customers/:customerId/messages', requireBusiness, asyn
 });
 
 // ─── A2P KYC ─────────────────────────────────────────────────────────────────
-
-const { registerA2P } = require('../services/twilioProvisioningService');
 
 /**
  * PATCH /api/businesses/:businessId/kyc
@@ -1256,8 +1244,8 @@ router.patch('/:businessId/kyc', requireBusiness, async (req, res) => {
       updated_at: knex.raw('CURRENT_TIMESTAMP'),
     });
 
-    // Fire-and-forget Trust Hub chain. EIN lives in this closure only.
-    registerA2P(business.id, ein?.trim() || null).catch(err =>
+    // Fire-and-forget A2P registration. EIN lives in this closure only.
+    getProvider('provision').registerA2P(business.id, ein?.trim() || null).catch(err =>
       console.error('registerA2P unhandled error:', err.message)
     );
 

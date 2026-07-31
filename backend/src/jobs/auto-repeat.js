@@ -27,9 +27,9 @@ function startAutoRepeatJob() {
           'selection_cycles.service_date',
           'businesses.id as business_id',
           'businesses.name as business_name',
-          'businesses.twilio_subaccount_sid',
+          'businesses.sms_subgroup_id',
           'businesses.twilio_messaging_service_sid',
-          'businesses.twilio_phone_number'
+          'businesses.sms_phone_number'
         );
 
       if (upcomingServices.length === 0) {
@@ -71,9 +71,9 @@ function startAutoRepeatJob() {
           // Construct the business object expected by sendSMS
           const business = {
             id: service.business_id,
-            twilio_subaccount_sid: service.twilio_subaccount_sid,
+            sms_subgroup_id: service.sms_subgroup_id,
             twilio_messaging_service_sid: service.twilio_messaging_service_sid,
-            twilio_phone_number: service.twilio_phone_number,
+            sms_phone_number: service.sms_phone_number,
           };
 
           const serviceDate = service.service_date instanceof Date
