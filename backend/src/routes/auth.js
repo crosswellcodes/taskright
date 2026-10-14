@@ -125,11 +125,13 @@ router.post('/businesses/signup', async (req, res) => {
 
 /**
  * POST /api/auth/businesses/login
- * Login with phone number
+ * Login with phone number.
+ * Web flow: include otpCode to verify phone possession before issuing a token.
+ * Mobile flow: omit otpCode — verification is skipped (existing behaviour unchanged).
  */
 router.post('/businesses/login', async (req, res) => {
   try {
-    const { phoneNumber } = req.body;
+    const { phoneNumber, otpCode } = req.body;
 
     if (!phoneNumber) {
       return res.status(400).json({
@@ -147,6 +149,13 @@ router.post('/businesses/login', async (req, res) => {
         error: 'Business not found',
         code: 'BUSINESS_NOT_FOUND'
       });
+    }
+
+    if (otpCode) {
+      const ok = await getProvider('otp').verifyOtp(normalizePhone(phoneNumber), otpCode);
+      if (!ok) {
+        return res.status(400).json({ success: false, error: 'Invalid or expired verification code', code: 'INVALID_OTP' });
+      }
     }
 
     const { token, expiresIn } = generateToken({

@@ -110,9 +110,12 @@ Used by the web signup flow to verify a phone number before account creation. Po
 **Request Body**:
 ```json
 {
-  "phoneNumber": "+14155551234"
+  "phoneNumber": "+14155551234",
+  "otpCode": "123456"
 }
 ```
+
+`otpCode` is optional. When present (web portal login — see `WEB_PORTAL.md` M0), it's verified via `getProvider('otp')` before a token is issued. When absent (mobile app flow), verification is skipped — existing behaviour unchanged.
 
 **Response (200)**:
 ```json
@@ -130,6 +133,96 @@ Used by the web signup flow to verify a phone number before account creation. Po
 
 **Error Responses**:
 - `400` — `VALIDATION_ERROR` — Phone not provided
+- `400` — `INVALID_OTP` — OTP code wrong or expired (web flow only)
+- `404` — `BUSINESS_NOT_FOUND`
+- `500` — `INTERNAL_ERROR`
+
+---
+
+### Get Own Business Profile
+**GET** `/businesses/:businessId`
+
+Self business profile. Used by the web portal dashboard shell (header) and Account module — see `WEB_PORTAL.md` M0. Requires `requireBusiness` (the token's `businessId` must match `:businessId`).
+
+**Response (200)**:
+```json
+{
+  "success": true,
+  "business": {
+    "id": 1,
+    "name": "ABC Cleaning Co.",
+    "phoneNumber": "+14155551234",
+    "schedulingFormat": "date_based",
+    "joinCode": "ABC123",
+    "entityType": "sole_prop",
+    "contactFirstName": null,
+    "contactLastName": null,
+    "contactEmail": null,
+    "businessStreet": null,
+    "businessCity": null,
+    "businessState": null,
+    "businessZip": null,
+    "smsProvisioningStatus": "pending",
+    "a2pRegistrationStatus": "pending",
+    "createdAt": "2026-03-16T12:00:00Z"
+  }
+}
+```
+
+**Error Responses**:
+- `401` — `MISSING_TOKEN` / `INVALID_TOKEN`
+- `403` — `FORBIDDEN` — Token's business doesn't match `:businessId`
+- `404` — `BUSINESS_NOT_FOUND`
+- `500` — `INTERNAL_ERROR`
+
+---
+
+### Get Home Summary
+**GET** `/businesses/:businessId/home-summary`
+
+Web portal Home/Today aggregate (`WEB_PORTAL.md` M1) — Action Center, today, a 7-day week strip, lean month-to-date revenue, recent reviews, and the on-the-clock board, composed in one call instead of N client-side requests.
+
+**Response (200)**:
+```json
+{
+  "success": true,
+  "summary": {
+    "actionCenter": {
+      "awaitingConfirmation": [
+        { "selectionCycleId": 12, "customerId": 3, "customerName": "Jane Doe", "serviceDate": "2026-10-14", "submissionDeadline": "2026-10-13" }
+      ],
+      "pastDeadline": [
+        { "selectionCycleId": 9, "customerId": 2, "customerName": "John Doe", "serviceDate": "2026-10-10", "submissionDeadline": "2026-10-08" }
+      ],
+      "unassignedUpcoming": [
+        { "selectionCycleId": 12, "customerId": 3, "customerName": "Jane Doe", "serviceDate": "2026-10-14" }
+      ]
+    },
+    "today": {
+      "serviceDate": "2026-10-12",
+      "items": [
+        { "selectionCycleId": 10, "customerId": 4, "customerName": "Ann Smith", "serviceDate": "2026-10-12", "submitted": true, "assigned": true }
+      ]
+    },
+    "weekStrip": [
+      { "date": "2026-10-12", "count": 2 }
+    ],
+    "revenue": { "monthToDate": 1250.00 },
+    "recentReviews": [
+      { "id": 5, "rating": 5, "feedbackText": "Great job!", "customerName": "Ann Smith", "createdAt": "2026-10-11T14:00:00Z" }
+    ],
+    "activeClocks": [
+      { "teamMemberId": 7, "teamMemberName": "Ann", "selectionCycleId": 10, "customerId": 4, "customerName": "Ann Smith", "arrivalAt": "2026-10-12T14:05:00Z" }
+    ]
+  }
+}
+```
+
+`awaitingConfirmation` = open, unsubmitted cycles whose deadline (if any) hasn't passed. `pastDeadline` = open, unsubmitted cycles whose deadline has passed. `unassignedUpcoming` = open cycles due within 7 days with no `service_assignments` row. `today`/`weekStrip` cover the next 7 days starting today. `revenue.monthToDate` sums `price` over cycles completed this calendar month (lean — not a full margin rollup; that lands with Money/M6). "Unread messages" and "failed SMS" Action Center items from the design spec are **not yet implemented** — no read-marker or delivery-status column exists yet (tracked for the Messages module).
+
+**Error Responses**:
+- `401` — `MISSING_TOKEN` / `INVALID_TOKEN`
+- `403` — `FORBIDDEN`
 - `404` — `BUSINESS_NOT_FOUND`
 - `500` — `INTERNAL_ERROR`
 
@@ -684,17 +777,13 @@ Each entry includes `hourlyRate` (number or null) alongside `weeklyHours`, `grou
 }
 ```
 
+Upserts the Call's single `service_assignments` row (last-write-wins). If both ids are sent, `teamMemberId` wins.
+
+**Ownership (hardened Oct 13, 2026, WEB_PORTAL M2):** the Call must belong to the business (`404 NOT_FOUND` otherwise), and so must the assignee (`404 NOT_FOUND` for a member/group of another business; `400 VALIDATION_ERROR` if neither id is sent). Before this, any authenticated business could overwrite another business's assignment by Call id.
+
 **Response (200)**:
 ```json
-{
-  "success": true,
-  "assignment": {
-    "id": 99,
-    "selectionCycleId": 10,
-    "teamMemberId": 1,
-    "teamId": null
-  }
-}
+{ "success": true, "message": "Assignment saved" }
 ```
 
 #### Delete Assignment
@@ -704,25 +793,36 @@ Each entry includes `hourlyRate` (number or null) alongside `weeklyHours`, `grou
 
 ### Selections & Feedback (Business View)
 
-#### Get All Selections
-**GET** `/businesses/:businessId/selections`
+#### Get Forecast (Service Calls by Day)
+**GET** `/businesses/:businessId/selections[?from=YYYY-MM-DD&to=YYYY-MM-DD]`
+
+Calls grouped by `serviceDate`, then by Service. **Default window:** today → today+30 (the mobile Dashboard/Forecast contract). **Optional range** (added Oct 13, 2026 for the web portal's month calendar): `from` + `to`, both required together, inclusive, any dates past or future. Returns `400 VALIDATION_ERROR` for a partial range, a bad format, `from > to`, or a span over **62 days**.
 
 **Response (200)**:
 ```json
 {
   "success": true,
-  "selections": [
-    {
-      "customerId": 5,
-      "customerName": "Sarah Johnson",
-      "cycleId": 10,
-      "selectedTasks": [1, 2],
-      "selectedTotalHours": 1.5,
-      "submittedAt": "2026-03-16T14:30:00Z"
-    }
-  ]
+  "summary": {
+    "totalCustomers": 9,
+    "upcomingServices": [
+      {
+        "serviceDate": "2026-10-14T05:00:00.000Z",
+        "customerSelectionsStatus": { "submitted": 1, "pending": 1 },
+        "totalHours": 4,
+        "serviceCycles": [
+          {
+            "id": 12,
+            "name": "Weekly Clean",
+            "pendingCustomers":   [{ "id": 5, "name": "Sarah", "selectionCycleId": 99,  "lifecycleState": "proposed" }],
+            "submittedCustomers": [{ "id": 6, "name": "Tom",   "selectionCycleId": 100, "lifecycleState": "confirmed" }]
+          }
+        ]
+      }
+    ]
+  }
 }
 ```
+`serviceDate` is an ISO timestamp, so split on `'T'`. `lifecycleState` (additive, Oct 13, 2026) follows the same SCL4 rule as `GET .../selection-cycles/:id`: `completed` > `confirmed` (submitted selection) > `proposed`. A completed Call with no submission stays in `pendingCustomers` but reads `completed`.
 
 #### Mark Service Complete
 **POST** `/businesses/:businessId/customers/:customerId/mark-service-complete`

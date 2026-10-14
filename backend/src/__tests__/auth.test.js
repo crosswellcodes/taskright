@@ -1,5 +1,6 @@
 const request = require('supertest');
 const { app, knex, truncateAllTables } = require('./helpers');
+const SignalHouseProvider = require('../services/sms/SignalHouseProvider');
 
 beforeEach(async () => { await truncateAllTables(); });
 afterAll(async () => { await knex.destroy(); });
@@ -76,6 +77,49 @@ describe('POST /api/auth/businesses/login', () => {
 
     expect(res.status).toBe(404);
     expect(res.body.success).toBe(false);
+  });
+
+  describe('with otpCode (web login)', () => {
+    const OLD_ENV = { ...process.env };
+
+    afterEach(() => {
+      if (OLD_ENV.SMS_PROVIDER_OTP === undefined) delete process.env.SMS_PROVIDER_OTP;
+      else process.env.SMS_PROVIDER_OTP = OLD_ENV.SMS_PROVIDER_OTP;
+    });
+
+    it('verifies the code and logs in', async () => {
+      process.env.SMS_PROVIDER_OTP = 'signalhouse';
+      await request(app)
+        .post('/api/auth/businesses/signup')
+        .send({ name: 'CleanCo', phoneNumber: '+15550001111' });
+
+      await new SignalHouseProvider({ otpGenerator: () => '123456' }).sendOtp('+15550001111');
+
+      const res = await request(app)
+        .post('/api/auth/businesses/login')
+        .send({ phoneNumber: '+15550001111', otpCode: '123456' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.token).toBeDefined();
+    });
+
+    it('rejects a wrong code', async () => {
+      process.env.SMS_PROVIDER_OTP = 'signalhouse';
+      await request(app)
+        .post('/api/auth/businesses/signup')
+        .send({ name: 'CleanCo', phoneNumber: '+15550001111' });
+
+      await new SignalHouseProvider({ otpGenerator: () => '123456' }).sendOtp('+15550001111');
+
+      const res = await request(app)
+        .post('/api/auth/businesses/login')
+        .send({ phoneNumber: '+15550001111', otpCode: '000000' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.code).toBe('INVALID_OTP');
+    });
   });
 
   it('returns 400 when phone number is missing', async () => {

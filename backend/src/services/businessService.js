@@ -946,11 +946,13 @@ async function updateFeedbackBusinessNotes(feedbackId, businessId, notes) {
 
 // ─── FORECAST ────────────────────────────────────────────────────────────────
 
-async function getBusinessForecast(businessId) {
+// range: optional { from, to } (YYYY-MM-DD, validated by the route). Omitted →
+// the original today..today+30 window (mobile contract unchanged).
+async function getBusinessForecast(businessId, range = {}) {
   const today = new Date();
   const thirtyDaysLater = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
-  const todayStr = today.toISOString().split('T')[0];
-  const thirtyDaysStr = thirtyDaysLater.toISOString().split('T')[0];
+  const todayStr = range.from || today.toISOString().split('T')[0];
+  const thirtyDaysStr = range.to || thirtyDaysLater.toISOString().split('T')[0];
 
   const customers = await knex('customers').where('business_id', businessId);
   const customerIds = customers.map(c => c.id);
@@ -1002,6 +1004,11 @@ async function getBusinessForecast(businessId) {
 
       const submittedCustomerIds = new Set(submissions.map(s => s.customer_id));
 
+      // SCL4: completed > confirmed (submitted) > proposed — same rule as
+      // getServiceCallDetail, so calendar and detail never disagree.
+      const lifecycleOf = (sc, isSubmitted) =>
+        sc && sc.status === 'completed' ? 'completed' : (isSubmitted ? 'confirmed' : 'proposed');
+
       const submitted = submissions.length;
       const pending = cycleGroup.selectionCycles.length - submitted;
 
@@ -1015,14 +1022,14 @@ async function getBusinessForecast(businessId) {
         .filter(c => cycleCustomerIds.includes(c.id) && !submittedCustomerIds.has(c.id))
         .map(c => {
           const sc = cycleGroup.selectionCycles.find(s => s.customer_id === c.id);
-          return { id: c.id, name: c.name, selectionCycleId: sc ? sc.id : null };
+          return { id: c.id, name: c.name, selectionCycleId: sc ? sc.id : null, lifecycleState: lifecycleOf(sc, false) };
         });
 
       const submittedCustomers = customers
         .filter(c => cycleCustomerIds.includes(c.id) && submittedCustomerIds.has(c.id))
         .map(c => {
           const sc = cycleGroup.selectionCycles.find(s => s.customer_id === c.id);
-          return { id: c.id, name: c.name, selectionCycleId: sc ? sc.id : null };
+          return { id: c.id, name: c.name, selectionCycleId: sc ? sc.id : null, lifecycleState: lifecycleOf(sc, true) };
         });
 
       serviceCycles.push({
@@ -2397,6 +2404,150 @@ async function getCustomerProfitability(businessId, customerId) {
   };
 }
 
+// ─── HOME SUMMARY (web portal M1 — Home/Today) ──────────────────────────────
+// One aggregate call instead of composing N endpoints client-side (WEB_PORTAL.md
+// §4.1). Go-live cut: Action Center (awaiting confirmation / past-deadline /
+// unassigned-upcoming — all derivable from existing tables), today, a 7-day
+// week strip, a lean MTD revenue number, recent reviews, and an on-the-clock
+// board. "Unread messages" / "failed SMS" Action Center items are deferred —
+// there's no read-marker or delivery-status column yet (see Messages module).
+
+async function getActiveClocksForBusiness(businessId) {
+  const { rows } = await knex.raw(
+    `SELECT DISTINCT ON (latest.team_member_id)
+            latest.team_member_id   AS "teamMemberId",
+            tm.name                 AS "teamMemberName",
+            latest.selection_cycle_id AS "selectionCycleId",
+            latest.occurred_at        AS "arrivalAt",
+            c.id                      AS "customerId",
+            c.name                    AS "customerName"
+       FROM (
+         SELECT DISTINCT ON (ge.team_member_id, ge.selection_cycle_id)
+                ge.team_member_id, ge.selection_cycle_id, ge.event_type, ge.occurred_at
+           FROM geofence_events ge
+           JOIN team_members tm2 ON tm2.id = ge.team_member_id
+          WHERE tm2.business_id = ?
+          ORDER BY ge.team_member_id, ge.selection_cycle_id, ge.occurred_at DESC, ge.id DESC
+       ) latest
+       JOIN team_members tm ON tm.id = latest.team_member_id
+       JOIN selection_cycles sc ON sc.id = latest.selection_cycle_id
+       JOIN customers c ON c.id = sc.customer_id
+      WHERE latest.event_type = 'arrival'
+      ORDER BY latest.team_member_id, latest.occurred_at DESC`,
+    [businessId]
+  );
+  return rows;
+}
+
+async function getHomeSummary(businessId) {
+  const business = await knex('businesses').where('id', businessId).first();
+  if (!business) {
+    throw Object.assign(new Error('Business not found'), { code: 'NOT_FOUND', statusCode: 404 });
+  }
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const weekEndStr = new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const monthStartStr = new Date().toISOString().slice(0, 7) + '-01';
+
+  const customers = await knex('customers').where('business_id', businessId).select('id', 'name');
+  const customerName = (id) => (customers.find((c) => c.id === id) || {}).name || null;
+  const customerIds = customers.map((c) => c.id);
+
+  const empty = {
+    actionCenter: { awaitingConfirmation: [], pastDeadline: [], unassignedUpcoming: [] },
+    today: { serviceDate: todayStr, items: [] },
+    weekStrip: Array.from({ length: 7 }, (_, i) => ({
+      date: new Date(Date.now() + i * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      count: 0,
+    })),
+    revenue: { monthToDate: 0 },
+    recentReviews: [],
+    activeClocks: [],
+  };
+  if (customerIds.length === 0) return empty;
+
+  const openCycles = await knex('selection_cycles')
+    .whereIn('customer_id', customerIds)
+    .where('status', 'open')
+    .select('id', 'customer_id', 'service_date', 'submission_deadline');
+
+  const cycleIds = openCycles.map((c) => c.id);
+  const submittedSet = new Set(
+    cycleIds.length
+      ? (await knex('selections').whereIn('selection_cycle_id', cycleIds).where('status', 'submitted').select('selection_cycle_id'))
+          .map((r) => r.selection_cycle_id)
+      : []
+  );
+  const assignedSet = new Set(
+    cycleIds.length
+      ? (await knex('service_assignments').whereIn('selection_cycle_id', cycleIds).select('selection_cycle_id'))
+          .map((r) => r.selection_cycle_id)
+      : []
+  );
+
+  const awaitingConfirmation = [];
+  const pastDeadline = [];
+  const unassignedUpcoming = [];
+  const todayItems = [];
+  const weekCounts = {};
+
+  for (const c of openCycles) {
+    const dateStr = new Date(c.service_date).toISOString().split('T')[0];
+    const deadlineStr = c.submission_deadline ? new Date(c.submission_deadline).toISOString().split('T')[0] : null;
+    const isSubmitted = submittedSet.has(c.id);
+    const isAssigned = assignedSet.has(c.id);
+    const base = { selectionCycleId: c.id, customerId: c.customer_id, customerName: customerName(c.customer_id), serviceDate: dateStr };
+
+    if (!isSubmitted) {
+      if (deadlineStr && deadlineStr < todayStr) pastDeadline.push({ ...base, submissionDeadline: deadlineStr });
+      else awaitingConfirmation.push({ ...base, submissionDeadline: deadlineStr });
+    }
+
+    if (!isAssigned && dateStr >= todayStr && dateStr <= weekEndStr) unassignedUpcoming.push(base);
+
+    if (dateStr === todayStr) todayItems.push({ ...base, submitted: isSubmitted, assigned: isAssigned });
+
+    if (dateStr >= todayStr && dateStr <= weekEndStr) weekCounts[dateStr] = (weekCounts[dateStr] || 0) + 1;
+  }
+
+  const weekStrip = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(Date.now() + i * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    return { date: d, count: weekCounts[d] || 0 };
+  });
+
+  const completedThisMonth = await knex('selection_cycles')
+    .whereIn('customer_id', customerIds)
+    .where('status', 'completed')
+    .where('service_date', '>=', monthStartStr)
+    .select('price');
+  const monthToDate = round2(completedThisMonth.reduce((sum, r) => sum + (r.price != null ? Number(r.price) : 0), 0));
+
+  const reviewRows = await knex('feedbacks')
+    .join('selection_cycles', 'feedbacks.selection_cycle_id', 'selection_cycles.id')
+    .join('customers', 'selection_cycles.customer_id', 'customers.id')
+    .where('customers.business_id', businessId)
+    .orderBy('feedbacks.created_at', 'desc')
+    .limit(5)
+    .select('feedbacks.id', 'feedbacks.rating', 'feedbacks.feedback_text', 'feedbacks.created_at', 'customers.name as customer_name');
+
+  const activeClocks = await getActiveClocksForBusiness(businessId);
+
+  return {
+    actionCenter: { awaitingConfirmation, pastDeadline, unassignedUpcoming },
+    today: { serviceDate: todayStr, items: todayItems },
+    weekStrip,
+    revenue: { monthToDate },
+    recentReviews: reviewRows.map((r) => ({
+      id: r.id,
+      rating: r.rating,
+      feedbackText: r.feedback_text,
+      customerName: r.customer_name,
+      createdAt: r.created_at,
+    })),
+    activeClocks,
+  };
+}
+
 // ─── REVIEW REQUESTS ─────────────────────────────────────────────────────────
 
 const WEBSITE_URL = process.env.WEBSITE_URL || 'https://taskrightpro.com';
@@ -2613,6 +2764,8 @@ module.exports = {
   deleteJobCost,
   getJobCosts,
   getCustomerProfitability,
+  // Home Summary (web portal M1)
+  getHomeSummary,
   // SMS keyword helpers
   confirmCustomerSelection,
   generateSelectionToken,

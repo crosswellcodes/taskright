@@ -1,6 +1,6 @@
 # TaskRight Business Web Portal — Design Spec
 
-**Status:** DESIGN — awaiting review. No code yet.
+**Status:** 🟡 M0 + M1 BUILT (Oct 12, 2026); M2 BUILT (Oct 13, 2026), awaiting review before M3. M3–M7 not started.
 **Author:** Session of Oct 12, 2026.
 **Read with:** `HANDOFF.md` (current state), `shared/API_REFERENCE.md` (endpoints), `shared/DESIGN_SYSTEM.md` (tokens/components), `shared/specs/EARLY_ACCESS_PAYMENT`/Stripe notes (billing — folded in here as Module 7).
 
@@ -112,9 +112,16 @@ Pipeline kanban, map route optimization, team utilization analytics, job-history
 ## 7. Build milestones
 Customer-value first; transaction last. Each milestone: implement → `npm run build` green (website) + backend tests green for any new endpoints → review → next.
 
-- **M0 — Foundation:** web login + session + `/dashboard` shell + nav + API client + `GET /:id` profile.
-- **M1 — Home / Today:** Action Center + today + week strip + lean revenue; Home-summary aggregate endpoint.
-- **M2 — Schedule:** forecast calendar + service-call detail + reschedule + assign.
+- **M0 — Foundation:** ✅ **BUILT (Oct 12, 2026).** Web login (phone → OTP → httpOnly cookie via a Next.js BFF) + protected `/dashboard/*` + shell (left nav, 7 modules, responsive; top bar with business name + logout) + a generic `/api/businesses/*` proxy route + a shared `apiClient.ts` (mirrors RN `client.js`) + `GET /api/businesses/:id` backend endpoint. Six non-Home modules are inviting "coming soon" stubs per §9.2 (not dead links). Backend: `POST /businesses/login` extended with optional `otpCode` verification (backward-compatible — mobile unaffected). **222/222 backend tests** (+5: login-with-OTP, self-profile). Website `npm run build` clean. Files: `backend/src/routes/auth.js` (login), `backend/src/routes/businesses.js` (`GET /:businessId`), `TaskRight-Website/src/{proxy.ts, lib/session.ts, lib/apiClient.ts, lib/navigation.ts, app/api/auth/*, app/api/businesses/[...path]/route.ts, app/dashboard/login/page.tsx, app/dashboard/(shell)/*, components/dashboard/*}`. Not yet built: silent 401→re-login (cookie is cleared by the proxy/login-route on a bad token, but the shell layout just redirects — no retry), Account/Billing real data (still a stub, per "M0 is auth + shell + profile endpoint only").
+- **M1 — Home / Today:** ✅ **BUILT (Oct 12, 2026).** `GET /api/businesses/:id/home-summary` composes Action Center (awaiting confirmation / past-deadline / unassigned-upcoming, all derived from existing tables — no new schema), today, a 7-day week strip, lean MTD revenue (sum of `price` over cycles completed this month — not a full margin rollup, that's M6), recent reviews (last 5 `feedbacks`), and an on-the-clock board (business-wide, adapted from the per-team-member `active-clock` query). Home page is a Server Component fetching the aggregate directly. **Not built:** "unread messages" / "failed SMS" Action Center items — no read-marker or delivery-status column exists yet; deferred to M4 (Messages) where that schema work belongs. **225/225 backend tests** (+3). Website `npm run build` clean; verified live against the dev DB.
+- **M2 — Schedule:** ✅ **BUILT (Oct 13, 2026).**
+  - **Forecast window decision:** `GET /:id/selections` was hardcoded to today → +30, future only, so it couldn't drive a navigable month calendar (no past months, no early-month days, nothing past day 30). It now takes an **additive optional `?from=&to=`** (both together, inclusive, 62-day cap to bound its per-day query loop; omitted → the original window, so mobile is unchanged).
+  - **Per-entry `lifecycleState`** (same SCL4 rule as call detail) so past completed Calls don't render as "pending".
+  - **Assignment hardening:** `PUT /:id/assignments/:scid` previously checked neither the Call's nor the assignee's ownership (the upsert is keyed on `selection_cycle_id` alone), which was a cross-tenant write. It now 404s on a foreign Call or assignee, reusing `assertAssigneeOwnedByBusiness`.
+  - **Frontend:** `/dashboard/schedule` (Server Component) has a 6-week month grid (requests exactly its 42-day range, with prev/today/next and lifecycle dots), a **day snapshot** panel via `?day=` (calls + assignee from the existing `GET /assignments?serviceDate=`, plus a calls/hours/unassigned summary), and an inviting empty state. `/dashboard/schedule/calls/[id]` (Server Component) shows a lifecycle stepper, scope (proposed tasks muted, `scopeIsAssumed` note), expected/confirmed hours, expected price, and completion. Its client `CallActions` handles assign/unassign (member or group) and reschedule (hidden once completed; the copy says the customer is texted), then `router.refresh()`.
+  - **New shared files:** `lib/serverApi.ts` (Server Component backend reads) and `lib/schedule.ts` (types + UTC date helpers).
+  - **232/232 backend tests** (+7 in `forecast.test.js`). Website `npm run build` clean. The ranged forecast was verified read-only against the live dev DB.
+  - **Fast-follow (not built):** pipeline kanban, drag-to-reschedule.
 - **M3 — Customers:** list + detail + CRUD + map (lat/lng feed).
 - **M4 — Messages:** unified inbox feed + thread + send/media.
 - **M5 — Team:** members + groups + assignments + live clock board.

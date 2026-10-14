@@ -9,6 +9,67 @@ const { getProvider } = require('../services/sms');
 // All business routes require authentication + ownership check
 router.use(authenticate);
 
+// ─── BUSINESS PROFILE ────────────────────────────────────────────────────────
+
+/**
+ * GET /api/businesses/:businessId
+ * Self business profile — the authenticated business's own row.
+ * Used by the web portal shell (header) and Account module.
+ */
+router.get('/:businessId', requireBusiness, async (req, res) => {
+  try {
+    const businessId = parseInt(req.params.businessId);
+    const business = await businessService.getBusinessById(businessId);
+    if (!business) {
+      return res.status(404).json({ success: false, error: 'Business not found', code: 'BUSINESS_NOT_FOUND' });
+    }
+    return res.status(200).json({
+      success: true,
+      business: {
+        id: business.id,
+        name: business.name,
+        phoneNumber: business.phone_number,
+        schedulingFormat: business.scheduling_format,
+        joinCode: business.join_code,
+        entityType: business.entity_type,
+        contactFirstName: business.contact_first_name,
+        contactLastName: business.contact_last_name,
+        contactEmail: business.contact_email,
+        businessStreet: business.business_street,
+        businessCity: business.business_city,
+        businessState: business.business_state,
+        businessZip: business.business_zip,
+        smsProvisioningStatus: business.sms_provisioning_status,
+        a2pRegistrationStatus: business.a2p_registration_status,
+        createdAt: business.created_at
+      }
+    });
+  } catch (err) {
+    console.error('Get business profile error:', err);
+    return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
+  }
+});
+
+/**
+ * GET /api/businesses/:businessId/home-summary
+ * Web portal Home/Today aggregate (WEB_PORTAL.md M1) — Action Center, today,
+ * a 7-day week strip, lean MTD revenue, recent reviews, and the on-the-clock
+ * board, composed in one call.
+ */
+router.get('/:businessId/home-summary', requireBusiness, async (req, res) => {
+  try {
+    const businessId = parseInt(req.params.businessId);
+    const summary = await businessService.getHomeSummary(businessId);
+    return res.status(200).json({ success: true, summary });
+  } catch (err) {
+    if (err.code === 'NOT_FOUND') {
+      return res.status(404).json({ success: false, error: err.message, code: 'BUSINESS_NOT_FOUND' });
+    }
+    console.error('Get home summary error:', err);
+    return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
+  }
+});
+
 // ─── SERVICE TEMPLATES (reusable library) ────────────────────────────────────
 // Tasks are owned per-template (template_tasks) — no global /tasks routes anymore.
 // Task shape at the boundary: { id?, name, timeAllotmentMinutes }.
@@ -499,7 +560,27 @@ router.get('/:businessId/selections', requireBusiness, async (req, res) => {
       return res.status(404).json({ success: false, error: 'Business not found', code: 'BUSINESS_NOT_FOUND' });
     }
 
-    const summary = await businessService.getBusinessForecast(businessId);
+    // Optional ?from=&to= (YYYY-MM-DD) for the portal's month calendar. Both or
+    // neither; omitted → the original today..+30 window. Span capped at 62 days
+    // to bound the per-day/per-service query loop.
+    const { from, to } = req.query;
+    let range = {};
+    if (from !== undefined || to !== undefined) {
+      const isDate = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(`${s}T00:00:00Z`));
+      if (!isDate(from) || !isDate(to)) {
+        return res.status(400).json({ success: false, error: 'from and to are both required in YYYY-MM-DD format', code: 'VALIDATION_ERROR' });
+      }
+      const spanDays = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000;
+      if (spanDays < 0) {
+        return res.status(400).json({ success: false, error: 'from must be on or before to', code: 'VALIDATION_ERROR' });
+      }
+      if (spanDays > 62) {
+        return res.status(400).json({ success: false, error: 'Date range may not exceed 62 days', code: 'VALIDATION_ERROR' });
+      }
+      range = { from, to };
+    }
+
+    const summary = await businessService.getBusinessForecast(businessId, range);
 
     return res.status(200).json({ success: true, summary });
   } catch (error) {
@@ -911,9 +992,23 @@ router.put('/:businessId/assignments/:selectionCycleId', requireBusiness, async 
     const assignee = teamMemberId
       ? { teamMemberId: parseInt(teamMemberId) }
       : { teamId: parseInt(teamId) };
-    await businessService.upsertServiceAssignment(businessId, selectionCycleId, assignee);
+    // Both the Call and the assignee must belong to this business (closes a
+    // cross-tenant write — the upsert itself is keyed on selection_cycle_id only).
+    const call = await knex('selection_cycles as sc')
+      .join('customers as c', 'sc.customer_id', 'c.id')
+      .where('sc.id', selectionCycleId)
+      .where('c.business_id', businessId)
+      .first('sc.id');
+    if (!call) {
+      return res.status(404).json({ success: false, error: 'Service call not found', code: 'NOT_FOUND' });
+    }
+    const ownedAssignee = await businessService.assertAssigneeOwnedByBusiness(businessId, assignee);
+    await businessService.upsertServiceAssignment(businessId, selectionCycleId, ownedAssignee);
     return res.status(200).json({ success: true, message: 'Assignment saved' });
   } catch (error) {
+    if (error.code === 'VALIDATION_ERROR' || error.code === 'NOT_FOUND') {
+      return res.status(error.statusCode).json({ success: false, error: error.message, code: error.code });
+    }
     console.error('Upsert assignment error:', error);
     return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
   }

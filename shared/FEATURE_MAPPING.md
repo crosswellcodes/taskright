@@ -11,7 +11,7 @@ This document maps TaskRight's features across platforms and indicates where eac
 | Feature | Mobile App | Website | Priority | Notes |
 |---------|-----------|---------|----------|-------|
 | **Business Signup** | ✅ Complete | 🔄 Recommended | P0 | Website landing page CTA → link to app store OR web flow |
-| **Business Login** | ✅ Complete | 🔄 Recommended | P0 | Web login for potential admin dashboard |
+| **Business Login** | ✅ Complete | ✅ Complete (Oct 12, 2026) | P0 | Phone+OTP → httpOnly-cookie JWT via the web portal's Next.js BFF. See `WEB_PORTAL.md` M0. |
 | **Customer Signup** | ✅ Complete | ✅ Recommended | P0 | Main web CTA — drive traffic to app signup |
 | **Customer Login** | ✅ Complete | ⚠️ Optional | P1 | May not need on web; customers primarily use app |
 | **Phone Verification** | ✅ Complete | 🔄 Consider | P1 | Use same JWT auth backend for consistency |
@@ -42,7 +42,7 @@ This document maps TaskRight's features across platforms and indicates where eac
 | **Manage Team Members** | ✅ Add, edit, delete staff | 🔄 Consider | P1 | Web dashboard ideal for team roster |
 | **Create Team Groups** | ✅ Group staff for assignments | 🔄 Consider | P1 | Easier on web with drag-drop UX |
 | **Assign Customers to Cycles** | ✅ Select customers + cycle | 🔄 Consider | P1 | Web would be more scalable |
-| **Assign Staff to Cycle** | ✅ Pick individual or group | 🔄 Consider | P1 | Visual assignment better on web |
+| **Assign Staff to Cycle** | ✅ Pick individual or group | ✅ Complete (Oct 13, 2026) | P1 | Web portal Schedule: per-call assign/unassign + reschedule on `/dashboard/schedule/calls/[id]`, plus a month calendar and day snapshot. See `WEB_PORTAL.md` M2. |
 | **View Customer Selections** | ✅ See submitted tasks per customer | ✅ Showcase | P1 | Key business insight to highlight |
 | **View Feedback** | ✅ Customer ratings + comments | ✅ Showcase | P1 | Social proof — show on marketing |
 | **Mark Service Complete** | ✅ Confirm completion in app | 🔄 Consider | P1 | Could move to web for easier bulk operations |
@@ -111,18 +111,12 @@ These can be added once core MVP is validated:
 
 ---
 
-### Phase 3: Admin Dashboard (Future)
-**Goal**: Reduce friction for business owners entering data
+### Phase 3: Business Web Portal — superseded by `shared/specs/WEB_PORTAL.md`
+**Status**: M0 (foundation — login + dashboard shell) ✅ built Oct 12, 2026. M1–M7 not started.
 
-**Features**:
-- Task management (CRUD with web forms)
-- Team member roster (add, edit, bulk import)
-- Service cycle creation (calendar UX)
-- Assignment dashboard (drag-drop staff ↔ services)
-- Selection view (see what customers picked)
-- Feedback aggregation (ratings, trends)
+The vague "Admin Dashboard" sketched below is now the concrete 7-module build in `WEB_PORTAL.md`, in fixed order: **Home/Today → Schedule → Customers → Messages → Team → Money → Account & Billing** (customer-value first, billing last). Covers everything listed here (task/team/service-cycle management, assignment, selection view, feedback aggregation) plus web-native standouts a phone can't do well — a desktop SMS inbox, a customer/team map, a profitability dashboard, a live clock board.
 
-**Backend Integration**: Full API_REFERENCE.md
+**Backend Integration**: Full API_REFERENCE.md + a handful of new aggregate endpoints (see `WEB_PORTAL.md` §5).
 
 ---
 
