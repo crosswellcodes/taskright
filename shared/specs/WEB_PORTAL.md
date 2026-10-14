@@ -1,6 +1,6 @@
 # TaskRight Business Web Portal — Design Spec
 
-**Status:** 🟡 M0 + M1 BUILT (Oct 12, 2026); M2 BUILT (Oct 13, 2026), awaiting review before M3. M3–M7 not started.
+**Status:** 🟡 M0 + M1 BUILT (Oct 12, 2026); M2 + M3 BUILT (Oct 13, 2026), awaiting review before M4. M4–M7 not started.
 **Author:** Session of Oct 12, 2026.
 **Read with:** `HANDOFF.md` (current state), `shared/API_REFERENCE.md` (endpoints), `shared/DESIGN_SYSTEM.md` (tokens/components), `shared/specs/EARLY_ACCESS_PAYMENT`/Stripe notes (billing — folded in here as Module 7).
 
@@ -122,7 +122,14 @@ Customer-value first; transaction last. Each milestone: implement → `npm run b
   - **New shared files:** `lib/serverApi.ts` (Server Component backend reads) and `lib/schedule.ts` (types + UTC date helpers).
   - **232/232 backend tests** (+7 in `forecast.test.js`). Website `npm run build` clean. The ranged forecast was verified read-only against the live dev DB.
   - **Fast-follow (not built):** pipeline kanban, drag-to-reschedule.
-- **M3 — Customers:** list + detail + CRUD + map (lat/lng feed).
+- **M3 — Customers:** ✅ **BUILT (Oct 13, 2026).**
+  - **Map decision (user, Oct 13):** an **interactive Mapbox GL map** (`mapbox-gl`, pinned exactly to `3.31.0` because lockfiles are gitignored repo-wide). The token comes from `NEXT_PUBLIC_MAPBOX_TOKEN` (the same public `pk.` token as the app) and is never committed, since the repo is public. The map is loaded client-only via `next/dynamic` (mapbox-gl touches `window` on import). Pins are blue, and customers with a Call today are orange (today's Calls come from the M2 ranged forecast with `from=to=today`, so no new endpoint). Popups link to the customer. Without a token, or with no geocoded customers, it shows an inviting placeholder.
+  - **Builder decision (user, Oct 13):** the **full web service builder**. Create from scratch or a template (copy-on-instantiate, so template task ids are dropped). A date-based first date, or a day-of-week pick using the app's next-occurrence rule. Optional person/group assignee, using the S16 validate-first fan-out. Definition-only edit with tasks diff-upserted by id (existing ids preserved). Delete surfaces `409 HAS_HISTORY`. Create copy warns that the customer gets the welcome SMS.
+  - **Backend (additive):** `GET /:id/customers` gains `address`, numeric `lat`/`lng` and `geocodeStatus` (the map feed, §5 item 6). The `GET /:id/customers/:cid` route now returns `geocodeStatus`, `geocodeRelevance` and `lat`/`lng`. That's a **latent-bug fix**: `getCustomerDetails` always computed them, but the route mapping dropped them, so the mobile "couldn't map this address" note never rendered.
+  - **Frontend:** `/dashboard/customers` (list with search over name/phone/address, a "Today" badge, a List/Map toggle via `?view=map`, and an inline Add-customer form that normalizes the phone the same way as the app's `normalizePhone`). `/dashboard/customers/[id]`: services, upcoming calls (linking to the M2 call page), a profitability card, a contact card (edit email/address/notes, review-request opt-out switch, geocode note), a single-pin map, a Message shortcut (to `/dashboard/messages`, an M4 stub for now), and a two-step delete whose warning spells out the cascade. `/dashboard/customers/[id]/services/new` and `/[serviceId]` hold the builder.
+  - **New files:** `lib/customers.ts` and `components/dashboard/customers/{CustomersView,CustomerMap,CustomerMapLazy,ContactCard,DeleteButton,ServiceForm}.tsx`.
+  - **Not built:** editing a customer's **name/phone** (the PATCH endpoint only accepts email/address/notes/opt-out, which is app parity). Route/territory optimization stays fast-follow.
+  - **235/235 backend tests** (+3, `customerMap.test.js`). Website `npm run build` clean. The list and detail fields were verified read-only against the live dev DB.
 - **M4 — Messages:** unified inbox feed + thread + send/media.
 - **M5 — Team:** members + groups + assignments + live clock board.
 - **M6 — Money:** profitability rollup + per-call costs + margins.

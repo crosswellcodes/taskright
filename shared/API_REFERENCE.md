@@ -605,15 +605,21 @@ Existing customer Services are unaffected (`template_id` is `ON DELETE SET NULL`
 **Request Body**:
 ```json
 {
+  "name": "Sarah Johnson",
   "phoneNumber": "+14155559876"
 }
 ```
+Both are required (`phoneNumber` in E.164). `409 DUPLICATE_CUSTOMER` if the phone already exists for this business. Returns `201 { success, customer: { id, businessId, name, phoneNumber, createdAt } }`.
 
 #### Get All Customers
 **GET** `/businesses/:businessId/customers`
 
+→ `{ success, customers: [{ id, name, phoneNumber, assignedCycles: [{ id, name, frequency, totalHours }], address, lat, lng, geocodeStatus }], total }`. `address`, `lat`/`lng` (numbers or `null`) and `geocodeStatus` were added Oct 13, 2026 for the web portal's customer map (WEB_PORTAL M3). They're additive, and only `ok` rows have coordinates.
+
 #### Get Customer Details
 **GET** `/businesses/:businessId/customers/:customerId`
+
+Response `customer` also carries `lat`/`lng` (numbers or `null`). **Fix (Oct 13, 2026):** `getCustomerDetails` always computed `geocodeStatus`/`geocodeRelevance`, but the route's field mapping dropped them, so the mobile "couldn't map this address" note never rendered. They're returned now.
 
 Response `customer` includes geocoding legibility for the address → auto-geofence pipeline:
 - **`geocodeStatus`** — `none` (no address) · `ok` (coords resolved) · `pending` (address set, still within the retry budget) · `failed` (address couldn't be mapped after `GEOCODE_MAX_ATTEMPTS`; owner should check it). Drives the "couldn't map this address for automatic clock-in" note on `CustomerDetailScreen`.

@@ -318,6 +318,7 @@ async function getCustomersByBusiness(businessId) {
     .orderBy('created_at', 'asc');
 
   for (const customer of customers) {
+    customer.geocodeStatus = deriveGeocodeStatus(customer); // portal map (M3)
     // A customer's Services are now self-describing (definition lives on the row).
     const services = await knex('customer_services as cs')
       .where('cs.customer_id', customer.id)

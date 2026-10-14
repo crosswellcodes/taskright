@@ -41,7 +41,7 @@ This document maps TaskRight's features across platforms and indicates where eac
 | **Define Tasks** | ✅ Create, edit, delete tasks | 🔄 Consider | P1 | Web form more comfortable for task mgmt |
 | **Manage Team Members** | ✅ Add, edit, delete staff | 🔄 Consider | P1 | Web dashboard ideal for team roster |
 | **Create Team Groups** | ✅ Group staff for assignments | 🔄 Consider | P1 | Easier on web with drag-drop UX |
-| **Assign Customers to Cycles** | ✅ Select customers + cycle | 🔄 Consider | P1 | Web would be more scalable |
+| **Assign Customers to Cycles** | ✅ Select customers + cycle | ✅ Complete (Oct 13, 2026) | P1 | Web portal Customers: full service builder (template or scratch, tasks, optional assignee) + customer list/search/map/detail. See `WEB_PORTAL.md` M3. |
 | **Assign Staff to Cycle** | ✅ Pick individual or group | ✅ Complete (Oct 13, 2026) | P1 | Web portal Schedule: per-call assign/unassign + reschedule on `/dashboard/schedule/calls/[id]`, plus a month calendar and day snapshot. See `WEB_PORTAL.md` M2. |
 | **View Customer Selections** | ✅ See submitted tasks per customer | ✅ Showcase | P1 | Key business insight to highlight |
 | **View Feedback** | ✅ Customer ratings + comments | ✅ Showcase | P1 | Social proof — show on marketing |

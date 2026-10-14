@@ -308,7 +308,12 @@ router.get('/:businessId/customers', requireBusiness, async (req, res) => {
         id: c.id,
         name: c.name,
         phoneNumber: c.phone_number,
-        assignedCycles: c.assignedCycles
+        assignedCycles: c.assignedCycles,
+        // Web portal customer map (WEB_PORTAL M3) — additive.
+        address: c.address || null,
+        lat: c.lat == null ? null : Number(c.lat),
+        lng: c.lng == null ? null : Number(c.lng),
+        geocodeStatus: c.geocodeStatus,
       })),
       total: customers.length
     });
@@ -346,7 +351,13 @@ router.get('/:businessId/customers/:customerId', requireBusiness, async (req, re
         lastSelection: customer.lastSelection,
         // Review Requests (Component 3): surface the opt-out flag so the detail
         // screen can render + toggle it (PATCH .../customers/:id below).
-        reviewRequestsOptedOut: customer.review_requests_opted_out
+        reviewRequestsOptedOut: customer.review_requests_opted_out,
+        // Computed by getCustomerDetails but previously dropped here, so the
+        // mobile "couldn't map this address" note never rendered. + pin coords.
+        geocodeStatus: customer.geocodeStatus,
+        geocodeRelevance: customer.geocodeRelevance,
+        lat: customer.lat == null ? null : Number(customer.lat),
+        lng: customer.lng == null ? null : Number(customer.lng),
       }
     });
   } catch (error) {
