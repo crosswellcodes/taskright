@@ -1169,6 +1169,43 @@ router.delete('/:businessId/groups/:groupId', requireBusiness, async (req, res) 
 // ─── MESSAGES (communication history) ────────────────────────────────────────
 
 /**
+ * GET /api/businesses/:businessId/messages/inbox
+ * Unified inbox (web portal M4): one thread per customer with its latest
+ * message + unread inbound count, newest first. → { threads, totalUnread }
+ */
+router.get('/:businessId/messages/inbox', requireBusiness, async (req, res) => {
+  try {
+    const businessId = parseInt(req.params.businessId);
+    const inbox = await businessService.getMessageInbox(businessId);
+    return res.status(200).json({ success: true, ...inbox });
+  } catch (error) {
+    console.error('Get message inbox error:', error);
+    return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
+  }
+});
+
+/**
+ * POST /api/businesses/:businessId/customers/:customerId/messages/read
+ * Mark the customer's unread inbound messages read. Explicit write (never a
+ * side effect of GET). → { markedRead }
+ */
+router.post('/:businessId/customers/:customerId/messages/read', requireBusiness, async (req, res) => {
+  try {
+    const businessId = parseInt(req.params.businessId);
+    const customerId = parseInt(req.params.customerId);
+    const customer = await knex('customers').where({ id: customerId, business_id: businessId }).first();
+    if (!customer) {
+      return res.status(404).json({ success: false, error: 'Customer not found', code: 'CUSTOMER_NOT_FOUND' });
+    }
+    const markedRead = await businessService.markThreadRead(businessId, customerId);
+    return res.status(200).json({ success: true, markedRead });
+  } catch (error) {
+    console.error('Mark thread read error:', error);
+    return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
+  }
+});
+
+/**
  * GET /api/businesses/:businessId/customers/:customerId/messages
  * Paginated SMS thread between business and customer.
  * Query params: limit (default 50), before (message id, for cursor pagination)
@@ -1237,6 +1274,7 @@ router.get('/:businessId/customers/:customerId/messages', requireBusiness, async
  */
 router.post('/:businessId/customers/:customerId/messages', requireBusiness, async (req, res) => {
   try {
+    const businessId = parseInt(req.params.businessId);
     const customerId = parseInt(req.params.customerId);
     const { body } = req.body;
 
@@ -1244,8 +1282,11 @@ router.post('/:businessId/customers/:customerId/messages', requireBusiness, asyn
       return res.status(400).json({ success: false, error: 'Message body is required', code: 'VALIDATION_ERROR' });
     }
 
+    // requireBusiness only checks ownership; it never loads the business row, so
+    // this route used to crash (TypeError → 500) on every send. Load it here.
+    const business = await knex('businesses').where('id', businessId).first();
     const customer = await knex('customers')
-      .where({ id: customerId, business_id: req.business.id })
+      .where({ id: customerId, business_id: businessId })
       .first();
     if (!customer) {
       return res.status(404).json({ success: false, error: 'Customer not found', code: 'CUSTOMER_NOT_FOUND' });
@@ -1253,17 +1294,29 @@ router.post('/:businessId/customers/:customerId/messages', requireBusiness, asyn
 
     const messageBody = body.trim();
 
-    const result = await getProvider('send').send(req.business, customer.phone_number, messageBody);
+    // Surface provider failures (e.g. an invalid recipient number) as a 502 with
+    // the provider's reason, instead of a generic 500. Nothing is logged on failure.
+    let result;
+    try {
+      result = await getProvider('send').send(business, customer.phone_number, messageBody);
+    } catch (sendErr) {
+      console.error('Send message provider error:', sendErr.message);
+      return res.status(502).json({
+        success: false,
+        error: `Message not sent: ${sendErr.message || 'the SMS provider rejected it'}`,
+        code: 'SMS_SEND_FAILED',
+      });
+    }
     const twilioSid = result.id;
 
     const [inserted] = await knex('messages').insert({
-      business_id: req.business.id,
+      business_id: businessId,
       customer_id: customer.id,
       direction: 'outbound',
       body: messageBody,
       sms_message_id: twilioSid,
       to_phone: customer.phone_number,
-      from_phone: req.business.sms_phone_number || null,
+      from_phone: business.sms_phone_number || null,
     }).returning('*');
 
     return res.status(201).json({
@@ -1276,6 +1329,7 @@ router.post('/:businessId/customers/:customerId/messages', requireBusiness, asyn
         toPhone: inserted.to_phone,
         smsMessageId: inserted.sms_message_id,
         createdAt: inserted.created_at,
+        mediaUrls: null, // same shape as GET thread messages
       },
     });
   } catch (err) {

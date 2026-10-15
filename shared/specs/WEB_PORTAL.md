@@ -1,6 +1,6 @@
 # TaskRight Business Web Portal — Design Spec
 
-**Status:** 🟡 M0 + M1 BUILT (Oct 12, 2026); M2 + M3 BUILT (Oct 13, 2026), awaiting review before M4. M4–M7 not started.
+**Status:** 🟡 M0 + M1 BUILT (Oct 12, 2026); M2 + M3 BUILT (Oct 13, 2026); M4 BUILT (Oct 14, 2026), awaiting review before M5. M5–M7 not started.
 **Author:** Session of Oct 12, 2026.
 **Read with:** `HANDOFF.md` (current state), `shared/API_REFERENCE.md` (endpoints), `shared/DESIGN_SYSTEM.md` (tokens/components), `shared/specs/EARLY_ACCESS_PAYMENT`/Stripe notes (billing — folded in here as Module 7).
 
@@ -130,7 +130,17 @@ Customer-value first; transaction last. Each milestone: implement → `npm run b
   - **New files:** `lib/customers.ts` and `components/dashboard/customers/{CustomersView,CustomerMap,CustomerMapLazy,ContactCard,DeleteButton,ServiceForm}.tsx`.
   - **Not built:** editing a customer's **name/phone** (the PATCH endpoint only accepts email/address/notes/opt-out, which is app parity). Route/territory optimization stays fast-follow.
   - **235/235 backend tests** (+3, `customerMap.test.js`). Website `npm run build` clean. The list and detail fields were verified read-only against the live dev DB.
-- **M4 — Messages:** unified inbox feed + thread + send/media.
+- **M4 — Messages:** ✅ **BUILT (Oct 14, 2026).**
+  - **Unread decision (user, Oct 14):** per-message **`messages.read_at`** (**migration 028**, both DBs). Unread = inbound with `read_at` NULL. Existing inbound history was backfilled as read. There's a partial index on unread inbound. Reads are marked by an explicit `POST .../messages/read`, never as a GET side effect.
+  - **Backend:** `GET /:id/messages/inbox` (one thread per customer via `DISTINCT ON`, with latest message, `hasMedia` and `unreadCount`, newest first, plus `totalUnread`). `POST /:id/customers/:cid/messages/read` (ownership-checked, idempotent). Home-summary `actionCenter.unreadMessages` (the M1-deferred item; "failed SMS" stays deferred because there's no delivery-status column).
+  - **Latent-bug fix:** `POST .../messages` (manual SMS) read `req.business`, which **no middleware sets**, so every send crashed with a generic 500 (the earlier "fake number" diagnosis was wrong for current code). It now loads the business, and provider failures return **`502 SMS_SEND_FAILED`** with the provider's reason, logging nothing. The mobile thread screen benefits too (it alerts `err.message`). **Same bug still in `PATCH /:id/kyc`** (M7/Account scope; not touched).
+  - **Frontend:** `/dashboard/messages` is a two-pane console (it stacks on mobile; the thread view has a back link).
+    - `InboxList`: threads, bold + count badge when unread, search over name/phone/body, and a "New message" picker for any customer.
+    - `ThreadPanel`: bubbles, MMS images, "load earlier" cursor paging, mark-read on view, 20s `router.refresh()` polling while the tab is visible, and Enter to send / Shift+Enter for a new line.
+    - MMS media loads through a new **session-checked same-origin proxy** `app/api/media/messages/[file]/route.ts` (strict filename regex; the backend's `/uploads` stays unauthenticated, a pre-existing exposure noted for hardening).
+    - Home's Action Center gains an "Unread messages" group linking to each thread. Customer detail's Message button (M3) now lands on a live thread.
+  - **Deferred:** inbound texts from unknown numbers (`customer_id` NULL) aren't in the inbox. Mobile doesn't call mark-read yet. Templates/canned replies are fast-follow.
+  - **245/245 backend tests** (+10, `messagesInbox.test.js`; the message routes had no prior coverage). Website `npm run build` clean. Inbox verified read-only against the live dev DB.
 - **M5 — Team:** members + groups + assignments + live clock board.
 - **M6 — Money:** profitability rollup + per-call costs + margins.
 - **M7 — Account & Billing (FINAL):** profile + provisioning status + Stripe (Customer/Checkout/Portal/webhook) + billing columns.

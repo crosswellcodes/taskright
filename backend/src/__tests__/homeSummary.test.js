@@ -29,7 +29,7 @@ describe('GET /api/businesses/:businessId/home-summary', () => {
       .set('Authorization', `Bearer ${token}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.summary.actionCenter).toEqual({ awaitingConfirmation: [], pastDeadline: [], unassignedUpcoming: [] });
+    expect(res.body.summary.actionCenter).toEqual({ awaitingConfirmation: [], pastDeadline: [], unassignedUpcoming: [], unreadMessages: [] });
     expect(res.body.summary.weekStrip).toHaveLength(7);
     expect(res.body.summary.revenue.monthToDate).toBe(0);
     expect(res.body.summary.recentReviews).toEqual([]);

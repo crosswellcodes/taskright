@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
 
@@ -37,11 +38,19 @@ type Review = {
   createdAt: string;
 };
 
+type UnreadThread = {
+  customerId: number;
+  customerName: string | null;
+  unreadCount: number;
+  lastMessageAt: string;
+};
+
 type HomeSummary = {
   actionCenter: {
     awaitingConfirmation: ActionItem[];
     pastDeadline: ActionItem[];
     unassignedUpcoming: ActionItem[];
+    unreadMessages: UnreadThread[];
   };
   today: { serviceDate: string; items: TodayItem[] };
   weekStrip: { date: string; count: number }[];
@@ -102,7 +111,8 @@ export default async function HomePage() {
   const { summary }: { summary: HomeSummary } = await res.json();
 
   const { actionCenter, today, weekStrip, revenue, recentReviews, activeClocks } = summary;
-  const actionCount = actionCenter.awaitingConfirmation.length + actionCenter.pastDeadline.length + actionCenter.unassignedUpcoming.length;
+  const unreadMessages = actionCenter.unreadMessages ?? [];
+  const actionCount = actionCenter.awaitingConfirmation.length + actionCenter.pastDeadline.length + actionCenter.unassignedUpcoming.length + unreadMessages.length;
 
   return (
     <div className="space-y-6">
@@ -116,6 +126,24 @@ export default async function HomePage() {
           <EmptyNote text="Nothing needs your attention right now." />
         ) : (
           <div className="space-y-5">
+            {unreadMessages.length > 0 && (
+              <div>
+                <p className="text-brand text-xs font-semibold uppercase tracking-wide mb-1">Unread messages</p>
+                {unreadMessages.map((t) => (
+                  <Link
+                    key={t.customerId}
+                    href={`/dashboard/messages?customer=${t.customerId}`}
+                    className="flex items-center justify-between py-2.5 border-b border-border last:border-0 hover:bg-bg -mx-2 px-2 rounded-lg"
+                  >
+                    <div>
+                      <p className="text-text text-sm font-medium">{t.customerName || `Customer #${t.customerId}`}</p>
+                      <p className="text-text-muted text-xs">last at {formatTime(t.lastMessageAt)}, {formatDay(t.lastMessageAt.split('T')[0])}</p>
+                    </div>
+                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-brand text-white">{t.unreadCount} new</span>
+                  </Link>
+                ))}
+              </div>
+            )}
             {actionCenter.pastDeadline.length > 0 && (
               <div>
                 <p className="text-red-600 text-xs font-semibold uppercase tracking-wide mb-1">Past deadline</p>

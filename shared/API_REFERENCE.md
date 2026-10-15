@@ -196,6 +196,9 @@ Web portal Home/Today aggregate (`WEB_PORTAL.md` M1) — Action Center, today, a
       ],
       "unassignedUpcoming": [
         { "selectionCycleId": 12, "customerId": 3, "customerName": "Jane Doe", "serviceDate": "2026-10-14" }
+      ],
+      "unreadMessages": [
+        { "customerId": 2, "customerName": "John Doe", "unreadCount": 2, "lastMessageAt": "2026-10-14T15:02:11.000Z" }
       ]
     },
     "today": {
@@ -218,7 +221,7 @@ Web portal Home/Today aggregate (`WEB_PORTAL.md` M1) — Action Center, today, a
 }
 ```
 
-`awaitingConfirmation` = open, unsubmitted cycles whose deadline (if any) hasn't passed. `pastDeadline` = open, unsubmitted cycles whose deadline has passed. `unassignedUpcoming` = open cycles due within 7 days with no `service_assignments` row. `today`/`weekStrip` cover the next 7 days starting today. `revenue.monthToDate` sums `price` over cycles completed this calendar month (lean — not a full margin rollup; that lands with Money/M6). "Unread messages" and "failed SMS" Action Center items from the design spec are **not yet implemented** — no read-marker or delivery-status column exists yet (tracked for the Messages module).
+`awaitingConfirmation` = open, unsubmitted cycles whose deadline (if any) hasn't passed. `pastDeadline` = open, unsubmitted cycles whose deadline has passed. `unassignedUpcoming` = open cycles due within 7 days with no `service_assignments` row. `today`/`weekStrip` cover the next 7 days starting today. `revenue.monthToDate` sums `price` over cycles completed this calendar month (lean — not a full margin rollup; that lands with Money/M6). `unreadMessages` (added Oct 14, 2026, M4) = customers with unread inbound messages (`messages.read_at` NULL), newest first. The "failed SMS" item is **not yet implemented**, because no delivery-status column exists.
 
 **Error Responses**:
 - `401` — `MISSING_TOKEN` / `INVALID_TOKEN`
@@ -1052,6 +1055,37 @@ Keyword matching is case-insensitive, whitespace-trimmed. The stateful `note_pen
 
 ## Communication Endpoints
 
+### Unified Inbox (web portal M4)
+**GET** `/businesses/:businessId/messages/inbox`
+
+**Authentication**: Required (Business)
+
+One thread per customer that has any message, with its latest message and unread count, newest first. Unread means an **inbound** message with `read_at` NULL (migration 028, Oct 14, 2026; existing inbound history was backfilled as read). Inbound texts from unknown numbers (`customer_id` NULL) aren't included yet.
+
+**Response (200)**:
+```json
+{
+  "success": true,
+  "threads": [
+    {
+      "customerId": 5,
+      "customerName": "Sarah Johnson",
+      "phoneNumber": "+14155559876",
+      "unreadCount": 2,
+      "lastMessage": { "id": 88, "direction": "inbound", "body": "See you then!", "hasMedia": false, "createdAt": "2026-10-14T15:02:11.000Z" }
+    }
+  ],
+  "totalUnread": 2
+}
+```
+
+### Mark Thread Read (web portal M4)
+**POST** `/businesses/:businessId/customers/:customerId/messages/read`
+
+**Authentication**: Required (Business)
+
+Sets `read_at` on the customer's unread inbound messages. It's idempotent and an explicit write (the GET thread endpoint never marks anything read). → `{ success, markedRead }`. `404 CUSTOMER_NOT_FOUND` for another business's customer. The mobile app doesn't call it yet, so reading a thread on the phone doesn't clear web unread badges.
+
 ### Get Customer Message Thread
 **GET** `/businesses/:businessId/customers/:customerId/messages`
 
@@ -1074,8 +1108,9 @@ Keyword matching is case-insensitive, whitespace-trimmed. The stateful `note_pen
       "body": "Welcome to ABC Cleaning Co.! Your first service is scheduled for 2026-05-21.",
       "fromPhone": "+14155550100",
       "toPhone": "+14155559876",
-      "twilioMessageSid": "SM123abc",
-      "createdAt": "2026-05-14T10:00:00.000Z"
+      "smsMessageId": "SM123abc",
+      "createdAt": "2026-05-14T10:00:00.000Z",
+      "mediaUrls": null
     },
     {
       "id": 2,
@@ -1083,7 +1118,7 @@ Keyword matching is case-insensitive, whitespace-trimmed. The stateful `note_pen
       "body": "Can I reschedule?",
       "fromPhone": "+14155559876",
       "toPhone": "+14155550100",
-      "twilioMessageSid": "SM456def",
+      "smsMessageId": "SM456def",
       "createdAt": "2026-05-14T10:05:00.000Z",
       "mediaUrls": null
     },
@@ -1093,7 +1128,7 @@ Keyword matching is case-insensitive, whitespace-trimmed. The stateful `note_pen
       "body": "",
       "fromPhone": "+14155559876",
       "toPhone": "+14155550100",
-      "twilioMessageSid": "MM789ghi",
+      "smsMessageId": "MM789ghi",
       "createdAt": "2026-05-14T10:10:00.000Z",
       "mediaUrls": ["/uploads/messages/MM789ghi_0.jpeg"]
     }
@@ -1137,18 +1172,22 @@ Messages are returned oldest-first (ready for chat thread display). To page back
     "body": "Hi Sarah, just a heads up we're running 15 minutes late today.",
     "fromPhone": "+14155550100",
     "toPhone": "+14155559876",
-    "twilioMessageSid": "SMabc123",
-    "createdAt": "2026-05-14T15:30:00.000Z"
+    "smsMessageId": "SMabc123",
+    "createdAt": "2026-05-14T15:30:00.000Z",
+    "mediaUrls": null
   }
 }
 ```
 
-**Behavior**: Sends SMS via the business's dedicated Twilio Messaging Service and logs the message to the `messages` table. In dev mode (no Twilio credentials), logs to console and inserts with `twilioMessageSid: null`. Returns the inserted message row so the mobile UI can append it to the thread without refetching.
+**Behavior**: Sends the SMS through the business's provider (`getProvider('send')`) and logs it to the `messages` table. In dev mode (no provider credentials), it logs to the console and inserts with `smsMessageId: null`. Returns the inserted message row so the UI can append it without refetching.
+
+**Fixed Oct 14, 2026:** this route read `req.business`, which no middleware sets, so **every send crashed** with a generic 500. It now loads the business row itself.
 
 **Error Responses**:
 - `400` — `VALIDATION_ERROR` — Body is empty
 - `401` — Unauthorized
 - `404` — `CUSTOMER_NOT_FOUND`
+- `502` — `SMS_SEND_FAILED` — the provider rejected the send (e.g. Twilio 21211 invalid recipient). `error` carries the provider's reason; nothing is logged.
 - `500` — `INTERNAL_ERROR`
 
 ---

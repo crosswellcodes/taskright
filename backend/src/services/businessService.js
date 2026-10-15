@@ -2410,8 +2410,8 @@ async function getCustomerProfitability(businessId, customerId) {
 // §4.1). Go-live cut: Action Center (awaiting confirmation / past-deadline /
 // unassigned-upcoming — all derivable from existing tables), today, a 7-day
 // week strip, a lean MTD revenue number, recent reviews, and an on-the-clock
-// board. "Unread messages" / "failed SMS" Action Center items are deferred —
-// there's no read-marker or delivery-status column yet (see Messages module).
+// board. M4 added "unread messages" (messages.read_at, migration 028). "Failed
+// SMS" is still deferred — there's no delivery-status column yet.
 
 async function getActiveClocksForBusiness(businessId) {
   const { rows } = await knex.raw(
@@ -2455,7 +2455,7 @@ async function getHomeSummary(businessId) {
   const customerIds = customers.map((c) => c.id);
 
   const empty = {
-    actionCenter: { awaitingConfirmation: [], pastDeadline: [], unassignedUpcoming: [] },
+    actionCenter: { awaitingConfirmation: [], pastDeadline: [], unassignedUpcoming: [], unreadMessages: [] },
     today: { serviceDate: todayStr, items: [] },
     weekStrip: Array.from({ length: 7 }, (_, i) => ({
       date: new Date(Date.now() + i * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -2533,8 +2533,14 @@ async function getHomeSummary(businessId) {
 
   const activeClocks = await getActiveClocksForBusiness(businessId);
 
+  // M4: unread inbound threads (deferred from M1 until messages.read_at existed).
+  const unreadByCustomer = await getUnreadCountsByCustomer(businessId);
+  const unreadMessages = Object.entries(unreadByCustomer)
+    .map(([id, u]) => ({ customerId: Number(id), customerName: customerName(Number(id)), unreadCount: u.count, lastMessageAt: u.lastAt }))
+    .sort((a, b) => new Date(b.lastMessageAt) - new Date(a.lastMessageAt));
+
   return {
-    actionCenter: { awaitingConfirmation, pastDeadline, unassignedUpcoming },
+    actionCenter: { awaitingConfirmation, pastDeadline, unassignedUpcoming, unreadMessages },
     today: { serviceDate: todayStr, items: todayItems },
     weekStrip,
     revenue: { monthToDate },
@@ -2547,6 +2553,67 @@ async function getHomeSummary(businessId) {
     })),
     activeClocks,
   };
+}
+
+// ─── MESSAGES INBOX (web portal M4) ──────────────────────────────────────────
+// An inbound message with read_at NULL is unread (migration 028). Threads are
+// per customer; inbound texts from unknown numbers (customer_id NULL) are not
+// part of the inbox yet (WEB_PORTAL.md M4, deferred).
+
+// { [customerId]: { count, lastAt } } over unread inbound messages.
+async function getUnreadCountsByCustomer(businessId) {
+  const rows = await knex('messages')
+    .where({ business_id: businessId, direction: 'inbound' })
+    .whereNull('read_at')
+    .whereNotNull('customer_id')
+    .groupBy('customer_id')
+    .select('customer_id')
+    .count('* as count')
+    .max('created_at as last_at');
+  const out = {};
+  for (const r of rows) out[r.customer_id] = { count: Number(r.count), lastAt: r.last_at };
+  return out;
+}
+
+// One row per customer thread: the latest message + unread count, newest first.
+async function getMessageInbox(businessId) {
+  const { rows } = await knex.raw(
+    `SELECT DISTINCT ON (m.customer_id)
+            m.customer_id AS "customerId", c.name AS "customerName", c.phone_number AS "phoneNumber",
+            m.id, m.direction, m.body, m.media_urls, m.created_at
+       FROM messages m
+       JOIN customers c ON c.id = m.customer_id
+      WHERE m.business_id = ? AND c.business_id = ?
+      ORDER BY m.customer_id, m.id DESC`,
+    [businessId, businessId]
+  );
+  const unread = await getUnreadCountsByCustomer(businessId);
+
+  const threads = rows
+    .map(r => ({
+      customerId: r.customerId,
+      customerName: r.customerName,
+      phoneNumber: r.phoneNumber,
+      unreadCount: unread[r.customerId] ? unread[r.customerId].count : 0,
+      lastMessage: {
+        id: r.id,
+        direction: r.direction,
+        body: r.body,
+        hasMedia: Array.isArray(r.media_urls) && r.media_urls.length > 0,
+        createdAt: r.created_at,
+      },
+    }))
+    .sort((a, b) => b.lastMessage.id - a.lastMessage.id);
+
+  return { threads, totalUnread: threads.reduce((sum, t) => sum + t.unreadCount, 0) };
+}
+
+// Mark a customer's unread inbound messages read. Returns how many changed.
+async function markThreadRead(businessId, customerId) {
+  return knex('messages')
+    .where({ business_id: businessId, customer_id: customerId, direction: 'inbound' })
+    .whereNull('read_at')
+    .update({ read_at: knex.fn.now() });
 }
 
 // ─── REVIEW REQUESTS ─────────────────────────────────────────────────────────
@@ -2767,6 +2834,8 @@ module.exports = {
   getCustomerProfitability,
   // Home Summary (web portal M1)
   getHomeSummary,
+  getMessageInbox,
+  markThreadRead,
   // SMS keyword helpers
   confirmCustomerSelection,
   generateSelectionToken,
