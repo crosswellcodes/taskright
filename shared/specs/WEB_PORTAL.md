@@ -1,6 +1,6 @@
 # TaskRight Business Web Portal — Design Spec
 
-**Status:** 🟡 M0 + M1 BUILT (Oct 12, 2026); M2 + M3 BUILT (Oct 13, 2026); M4 + M5 + M6 BUILT (Oct 14, 2026), awaiting review before M7. M7 not started.
+**Status:** 🟡 M0 + M1 BUILT (Oct 12, 2026); M2 + M3 BUILT (Oct 13, 2026); M4 + M5 + M6 BUILT (Oct 14, 2026). **M7 ON HOLD** pending Stripe/LTD decisions (§7); now refining M0–M6, starting with Home.
 **Author:** Session of Oct 12, 2026.
 **Read with:** `HANDOFF.md` (current state), `shared/API_REFERENCE.md` (endpoints), `shared/DESIGN_SYSTEM.md` (tokens/components), `shared/specs/EARLY_ACCESS_PAYMENT`/Stripe notes (billing — folded in here as Module 7).
 
@@ -169,7 +169,7 @@ Customer-value first; transaction last. Each milestone: implement → `npm run b
   - New `lib/money.ts` (types, period→range).
   - **Fast-follow (not built):** trend charts / time series, exportable reports, editing labor lines on the web (the app doesn't either).
   - **260/260 backend tests** (+6, `businessProfitability.test.js`). Website `npm run build` clean. Live cross-check, biz 22 for 2026: rollup = $495 revenue / $450 cost / $45 (9.09%) over 2 jobs, **identical** to `GET .../customers/19/profitability`. Pipeline: 49 open calls, $5,408.
-- **M7 — Account & Billing (FINAL):** profile + provisioning status + Stripe (Customer/Checkout/Portal/webhook) + billing columns.
+- **M7 — Account & Billing (FINAL):** ⏸️ **ON HOLD (Oct 14, 2026, user decision).** Don't start it until Stripe and the remaining components are decided: Stripe account + keys (`STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PRICE_ID`), the LTD price point + refund policy (§9.3), and the `businesses` billing columns. Until then the portal is in a **refinement phase** over M0–M6, module by module, starting with Home. Carry-over for when M7 resumes: `PATCH /:id/kyc` still crashes on `req.business` (no middleware sets it; same bug fixed for SMS send in M4). Planned scope, unchanged: profile + provisioning status + Stripe (Customer/Checkout/Portal/webhook) + billing columns.
 
 Then **go-live** = all seven live + the go-live criteria below.
 
