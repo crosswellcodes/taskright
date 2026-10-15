@@ -4,7 +4,7 @@ import { requireSession, businessGet } from '@/lib/serverApi';
 import { type GeocodeStatus, formatMoney, formatPhone, frequencyLabel } from '@/lib/customers';
 import { LIFECYCLE_CLASS, LIFECYCLE_LABEL, type LifecycleState, dayKey, formatLongDay } from '@/lib/schedule';
 import ContactCard from '@/components/dashboard/customers/ContactCard';
-import DeleteButton from '@/components/dashboard/customers/DeleteButton';
+import DeleteButton from '@/components/dashboard/DeleteButton';
 import CustomerMap from '@/components/dashboard/customers/CustomerMapLazy';
 
 type CustomerDetail = {

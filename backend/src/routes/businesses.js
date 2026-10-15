@@ -9,6 +9,19 @@ const { getProvider } = require('../services/sms');
 // All business routes require authentication + ownership check
 router.use(authenticate);
 
+// Optional inclusive ?from=&to= (YYYY-MM-DD) date range, shared by the forecast
+// and assignments feeds (web portal M2/M5). Both or neither; span capped at 62
+// days to bound per-day work. → {} (absent) | { range: { from, to } } | { error }
+function parseDateRange({ from, to }) {
+  if (from === undefined && to === undefined) return {};
+  const isDate = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(`${s}T00:00:00Z`));
+  if (!isDate(from) || !isDate(to)) return { error: 'from and to are both required in YYYY-MM-DD format' };
+  const spanDays = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000;
+  if (spanDays < 0) return { error: 'from must be on or before to' };
+  if (spanDays > 62) return { error: 'Date range may not exceed 62 days' };
+  return { range: { from, to } };
+}
+
 // ─── BUSINESS PROFILE ────────────────────────────────────────────────────────
 
 /**
@@ -571,27 +584,14 @@ router.get('/:businessId/selections', requireBusiness, async (req, res) => {
       return res.status(404).json({ success: false, error: 'Business not found', code: 'BUSINESS_NOT_FOUND' });
     }
 
-    // Optional ?from=&to= (YYYY-MM-DD) for the portal's month calendar. Both or
-    // neither; omitted → the original today..+30 window. Span capped at 62 days
-    // to bound the per-day/per-service query loop.
-    const { from, to } = req.query;
-    let range = {};
-    if (from !== undefined || to !== undefined) {
-      const isDate = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(`${s}T00:00:00Z`));
-      if (!isDate(from) || !isDate(to)) {
-        return res.status(400).json({ success: false, error: 'from and to are both required in YYYY-MM-DD format', code: 'VALIDATION_ERROR' });
-      }
-      const spanDays = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000;
-      if (spanDays < 0) {
-        return res.status(400).json({ success: false, error: 'from must be on or before to', code: 'VALIDATION_ERROR' });
-      }
-      if (spanDays > 62) {
-        return res.status(400).json({ success: false, error: 'Date range may not exceed 62 days', code: 'VALIDATION_ERROR' });
-      }
-      range = { from, to };
+    // Optional ?from=&to= for the portal's month calendar; omitted → the original
+    // today..+30 window.
+    const parsed = parseDateRange(req.query);
+    if (parsed.error) {
+      return res.status(400).json({ success: false, error: parsed.error, code: 'VALIDATION_ERROR' });
     }
 
-    const summary = await businessService.getBusinessForecast(businessId, range);
+    const summary = await businessService.getBusinessForecast(businessId, parsed.range || {});
 
     return res.status(200).json({ success: true, summary });
   } catch (error) {
@@ -888,6 +888,9 @@ router.get('/:businessId/team-members', requireBusiness, async (req, res) => {
         hourlyRate: m.hourly_rate == null ? null : Number(m.hourly_rate),
         createdAt: m.created_at,
         groups: Array.isArray(m.groups) ? m.groups : [],
+        // Web portal M5: re-show a pending member's code (cleared on accept).
+        inviteAccepted: !!m.invite_accepted,
+        inviteCode: m.invite_accepted ? null : (m.invite_code || null),
       })),
       total: members.length
     });
@@ -907,9 +910,26 @@ router.put('/:businessId/team-members/:memberId', requireBusiness, async (req, r
     const memberId = parseInt(req.params.memberId);
     const { name, phoneNumber, weeklyHours, hourlyRate } = req.body;
     const updates = {};
-    if (name !== undefined) updates.name = name;
-    if (phoneNumber !== undefined) updates.phoneNumber = phoneNumber;
-    if (weeklyHours !== undefined) updates.weeklyHours = parseInt(weeklyHours, 10);
+    // Same rules as POST (previously unvalidated on edit).
+    if (name !== undefined) {
+      if (typeof name !== 'string' || !name.trim()) {
+        return res.status(400).json({ success: false, error: 'Name is required', code: 'VALIDATION_ERROR' });
+      }
+      updates.name = name.trim();
+    }
+    if (phoneNumber !== undefined) {
+      if (typeof phoneNumber !== 'string' || !/^\+[1-9]\d{1,14}$/.test(phoneNumber)) {
+        return res.status(400).json({ success: false, error: 'Phone number must be in E.164 format (e.g., +1234567890)', code: 'VALIDATION_ERROR' });
+      }
+      updates.phoneNumber = phoneNumber;
+    }
+    if (weeklyHours !== undefined) {
+      const hours = parseInt(weeklyHours, 10);
+      if (!hours || hours < 1 || hours > 168) {
+        return res.status(400).json({ success: false, error: 'Weekly hours must be a number between 1 and 168', code: 'VALIDATION_ERROR' });
+      }
+      updates.weeklyHours = hours;
+    }
     if (hourlyRate !== undefined) {
       if (hourlyRate === null || hourlyRate === '') {
         updates.hourlyRate = null;
@@ -936,6 +956,9 @@ router.put('/:businessId/team-members/:memberId', requireBusiness, async (req, r
     if (error.code === 'NOT_FOUND') {
       return res.status(404).json({ success: false, error: error.message, code: 'NOT_FOUND' });
     }
+    if (error.code === 'DUPLICATE_TEAM_MEMBER') {
+      return res.status(409).json({ success: false, error: 'A team member with this phone number already exists', code: 'DUPLICATE_TEAM_MEMBER' });
+    }
     console.error('Update team member error:', error);
     return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
   }
@@ -957,24 +980,48 @@ router.delete('/:businessId/team-members/:memberId', requireBusiness, async (req
   }
 });
 
+/**
+ * GET /api/businesses/:businessId/active-clocks
+ * Business-wide on-the-clock board (web portal M5 Team): every team member
+ * currently clocked in (latest geofence arrival with no departure). Same query
+ * the Home summary uses. → { activeClocks: [{ teamMemberId, teamMemberName,
+ * selectionCycleId, customerId, customerName, arrivalAt }] }
+ */
+router.get('/:businessId/active-clocks', requireBusiness, async (req, res) => {
+  try {
+    const businessId = parseInt(req.params.businessId);
+    const activeClocks = await businessService.getActiveClocksForBusiness(businessId);
+    return res.status(200).json({ success: true, activeClocks });
+  } catch (error) {
+    console.error('Get active clocks error:', error);
+    return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });
+  }
+});
+
 // ─── SERVICE ASSIGNMENTS ─────────────────────────────────────────────────────
 
 /**
  * GET /api/businesses/:businessId/assignments?serviceDate=YYYY-MM-DD
- * Get all team member assignments for a given service date
+ *   or ?from=YYYY-MM-DD&to=YYYY-MM-DD (inclusive, ≤62 days — web portal M5)
+ * Get all team member assignments for a service date or date range
  */
 router.get('/:businessId/assignments', requireBusiness, async (req, res) => {
   try {
     const businessId = parseInt(req.params.businessId);
     const { serviceDate } = req.query;
-    if (!serviceDate) {
-      return res.status(400).json({ success: false, error: 'serviceDate query param required', code: 'VALIDATION_ERROR' });
+    const parsed = parseDateRange(req.query);
+    if (parsed.error) {
+      return res.status(400).json({ success: false, error: parsed.error, code: 'VALIDATION_ERROR' });
     }
-    const rows = await businessService.getAssignmentsForDate(businessId, serviceDate);
+    if (!serviceDate && !parsed.range) {
+      return res.status(400).json({ success: false, error: 'serviceDate (or from + to) query param required', code: 'VALIDATION_ERROR' });
+    }
+    const rows = await businessService.getAssignmentsForDate(businessId, parsed.range || serviceDate);
     return res.status(200).json({
       success: true,
       assignments: rows.map(r => ({
         selectionCycleId: r.selection_cycle_id,
+        serviceDate: new Date(r.service_date).toISOString().split('T')[0],
         customerId: r.customer_id,
         teamMemberId: r.team_member_id || null,
         teamMemberName: r.team_member_name || null,
@@ -1142,8 +1189,8 @@ router.put('/:businessId/groups/:groupId/members', requireBusiness, async (req, 
     await businessService.setTeamGroupMembers(groupId, businessId, memberIds);
     return res.status(200).json({ success: true, message: 'Group members updated' });
   } catch (error) {
-    if (error.code === 'NOT_FOUND') {
-      return res.status(404).json({ success: false, error: error.message, code: 'NOT_FOUND' });
+    if (error.code === 'NOT_FOUND' || error.code === 'VALIDATION_ERROR') {
+      return res.status(error.statusCode).json({ success: false, error: error.message, code: error.code });
     }
     console.error('Set team group members error:', error);
     return res.status(500).json({ success: false, error: 'Internal server error', code: 'INTERNAL_ERROR' });

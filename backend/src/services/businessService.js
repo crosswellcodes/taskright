@@ -1189,6 +1189,7 @@ async function getTeamMembersByBusiness(businessId) {
     .groupBy('m.id', 'm.name', 'm.phone_number', 'm.weekly_hours', 'm.hourly_rate', 'm.created_at', 'm.updated_at')
     .select(
       'm.id', 'm.name', 'm.phone_number', 'm.weekly_hours', 'm.hourly_rate', 'm.created_at',
+      'm.invite_code', 'm.invite_accepted',
       knex.raw(`COALESCE(
         json_agg(json_build_object('id', t.id, 'name', t.name) ORDER BY t.name)
         FILTER (WHERE t.id IS NOT NULL),
@@ -1208,6 +1209,15 @@ async function updateTeamMember(memberId, businessId, updates) {
     err.code = 'NOT_FOUND';
     err.statusCode = 404;
     throw err;
+  }
+  // Same per-business phone uniqueness addTeamMember enforces.
+  if (updates.phoneNumber !== undefined && updates.phoneNumber !== row.phone_number) {
+    const dup = await knex('team_members')
+      .where('business_id', businessId).where('phone_number', updates.phoneNumber)
+      .whereNot('id', memberId).first();
+    if (dup) {
+      throw Object.assign(new Error('Team member with this phone already exists'), { code: 'DUPLICATE_TEAM_MEMBER', statusCode: 409 });
+    }
   }
   const [updated] = await knex('team_members')
     .where('id', memberId)
@@ -1232,15 +1242,23 @@ async function deleteTeamMember(memberId, businessId) {
 
 // ─── SERVICE ASSIGNMENTS ─────────────────────────────────────────────────────
 
+// serviceDate: 'YYYY-MM-DD' for one day, or { from, to } for an inclusive range
+// (web portal M5 week board). Range rows also carry service_date.
 async function getAssignmentsForDate(businessId, serviceDate) {
-  return knex('service_assignments as sa')
+  const q = knex('service_assignments as sa')
     .join('selection_cycles as sc', 'sa.selection_cycle_id', 'sc.id')
     .leftJoin('team_members as tm', 'sa.team_member_id', 'tm.id')
     .leftJoin('teams as t', 'sa.team_id', 't.id')
-    .where('sa.business_id', businessId)
-    .where('sc.service_date', serviceDate)
+    .where('sa.business_id', businessId);
+  if (typeof serviceDate === 'object') {
+    q.whereBetween('sc.service_date', [serviceDate.from, serviceDate.to]).orderBy('sc.service_date', 'asc');
+  } else {
+    q.where('sc.service_date', serviceDate);
+  }
+  return q
     .select(
       'sa.selection_cycle_id',
+      'sc.service_date',
       'sc.customer_id',
       'sa.team_member_id',
       'tm.name as team_member_name',
@@ -1403,6 +1421,20 @@ async function setTeamGroupMembers(teamId, businessId, memberIds) {
     err.statusCode = 404;
     throw err;
   }
+  // Every member must belong to this business. Without this check a business
+  // could add another business's member to its group — and a group assignment
+  // resolves to all members (S17), exposing this business's jobs to them.
+  const ids = [...new Set(memberIds.map(Number))];
+  if (ids.some(id => !Number.isInteger(id))) {
+    throw Object.assign(new Error('memberIds must be team member ids'), { code: 'VALIDATION_ERROR', statusCode: 400 });
+  }
+  if (ids.length > 0) {
+    const owned = await knex('team_members').whereIn('id', ids).where('business_id', businessId).count('* as n').first();
+    if (Number(owned.n) !== ids.length) {
+      throw Object.assign(new Error('Team member not found'), { code: 'NOT_FOUND', statusCode: 404 });
+    }
+  }
+  memberIds = ids;
   await knex.transaction(async (trx) => {
     await trx('team_memberships').where('team_id', teamId).delete();
     if (memberIds.length > 0) {
@@ -2834,6 +2866,7 @@ module.exports = {
   getCustomerProfitability,
   // Home Summary (web portal M1)
   getHomeSummary,
+  getActiveClocksForBusiness,
   getMessageInbox,
   markThreadRead,
   // SMS keyword helpers

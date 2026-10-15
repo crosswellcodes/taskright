@@ -1,6 +1,6 @@
 # TaskRight Business Web Portal — Design Spec
 
-**Status:** 🟡 M0 + M1 BUILT (Oct 12, 2026); M2 + M3 BUILT (Oct 13, 2026); M4 BUILT (Oct 14, 2026), awaiting review before M5. M5–M7 not started.
+**Status:** 🟡 M0 + M1 BUILT (Oct 12, 2026); M2 + M3 BUILT (Oct 13, 2026); M4 + M5 BUILT (Oct 14, 2026), awaiting review before M6. M6–M7 not started.
 **Author:** Session of Oct 12, 2026.
 **Read with:** `HANDOFF.md` (current state), `shared/API_REFERENCE.md` (endpoints), `shared/DESIGN_SYSTEM.md` (tokens/components), `shared/specs/EARLY_ACCESS_PAYMENT`/Stripe notes (billing — folded in here as Module 7).
 
@@ -141,7 +141,20 @@ Customer-value first; transaction last. Each milestone: implement → `npm run b
     - Home's Action Center gains an "Unread messages" group linking to each thread. Customer detail's Message button (M3) now lands on a live thread.
   - **Deferred:** inbound texts from unknown numbers (`customer_id` NULL) aren't in the inbox. Mobile doesn't call mark-read yet. Templates/canned replies are fast-follow.
   - **245/245 backend tests** (+10, `messagesInbox.test.js`; the message routes had no prior coverage). Website `npm run build` clean. Inbox verified read-only against the live dev DB.
-- **M5 — Team:** members + groups + assignments + live clock board.
+- **M5 — Team:** ✅ **BUILT (Oct 14, 2026).** No user decisions were needed: frontend over existing CRUD, plus small additive endpoints and one hardening fix.
+  - **Backend:**
+    - `GET /:id/active-clocks` exposes the M1 `getActiveClocksForBusiness` as the standalone business-facing board (§5 item 5).
+    - `GET /:id/assignments` gains `?from=&to=` (a shared `parseDateRange` route helper, now also used by the forecast) and `serviceDate` on each row.
+    - The member list gains `inviteAccepted` and `inviteCode` (pending code only; it's cleared on accept). Mobile can't re-show a code after the add screen; the portal can.
+    - Member `PUT` is now validated like `POST` (name / E.164 phone / 1–168 hours → 400) with a duplicate-phone `409`.
+  - **Hardening:** `PUT /:id/groups/:gid/members` checked the group's ownership but not the `memberIds`. A business could add another business's member to its group, and since a group assignment resolves to every member (S17), that member would see this business's jobs and customer addresses. Every id must now belong to the business (404, nothing changes). Ids are integer-validated (400) and deduped.
+  - **Frontend:** `/dashboard/team` with tabs (`?tab=members|groups`; Overview is the default).
+    - **Overview:** a live "On the clock" board (new generic `components/dashboard/AutoRefresh.tsx`, 30s `router.refresh()` while visible). The **This week's assignments** board is one forecast range call plus one assignments range call, bucketed by member/group, with an amber Unassigned column (completed excluded) and every call linking to the M2 call page for (re)assignment.
+    - **Members** (`MembersPanel` + `MemberForm`): roster with phone, hours, rate (amber "no rate set" + a $0-labor note), group chips, and a Joined / "Invite pending · CODE" chip (click copies the app's invite text). Add shows the new code + copyable invite message. Edit and remove spell out the cascade.
+    - **Groups** (`GroupsPanel`): create (opens straight into the editor), rename + member checkboxes, delete (calls assigned to it become unassigned).
+  - `DeleteButton` moved to `components/dashboard/` (shared by Customers + Team). New `lib/team.ts`.
+  - **Fast-follow (not built):** clock board map, utilization analytics (hours + labor cost per member), job history per member.
+  - **254/254 backend tests** (+9, `teamPortal.test.js`). Website `npm run build` clean. Verified read-only on live dev biz 22 (5 members: 2 joined, 3 pending with codes; nobody clocked in; and **biz 22 has no calls at all in the next 7 days**, so its week board will show empty columns).
 - **M6 — Money:** profitability rollup + per-call costs + margins.
 - **M7 — Account & Billing (FINAL):** profile + provisioning status + Stripe (Customer/Checkout/Portal/webhook) + billing columns.
 

@@ -709,12 +709,13 @@ Body: `{ teamMemberId }` **or** `{ teamId }` (XOR). Assigns one person/group to 
 
 #### Get All Team Members
 **GET** `/businesses/:businessId/team-members`
-Each entry includes `hourlyRate` (number or null) alongside `weeklyHours`, `groups`, etc.
+Each entry includes `hourlyRate` (number or null) alongside `weeklyHours`, `groups`, etc. **Added Oct 14, 2026 (web portal M5):** `inviteAccepted` (bool) and `inviteCode` (the pending code, or `null` once accepted, since the code is cleared on accept). This lets the portal re-show a pending member's code.
 
 #### Update Team Member
 **PUT** `/businesses/:businessId/team-members/:memberId`
 
 **Request Body** (all fields optional): `{ name, phoneNumber, weeklyHours, hourlyRate }`
+**Validation (added Oct 14, 2026; same rules as create):** a non-empty `name` (trimmed), `phoneNumber` in E.164, and `weeklyHours` from 1 to 168 → `400 VALIDATION_ERROR`. A `phoneNumber` already used by another member of the business → `409 DUPLICATE_TEAM_MEMBER`.
 `hourlyRate` (non-negative number, nullable — send `null`/`""` to clear) feeds job-costing labor: the labor line is auto-computed on a **geofence departure** as `amount = hoursActual × hourlyRate` (0.00 if the rate is null at that time). Setting the rate applies to labor computed after it's set; existing per-job labor can be adjusted on the Service Call detail screen. Returned as `teamMember.hourlyRate` (number or null).
 
 **Team job resolution (2026-07-14, `TEAM_LABOR_COSTING.md` — no new endpoints):** the member-facing job views (`GET /api/team-members/:teamMemberId/jobs`, `/jobs/:selectionCycleId`, `PATCH .../complete`, `POST .../geofence`) now resolve a Call assigned to a **team** for every member of that team, not just individually-assigned members. `GET .../jobs` therefore includes group jobs and each row carries `isTeamAssigned` (bool) + `teamName` (nullable). Each group member records their own geofence → their own per-member labor line at their own rate, so a team-assigned Call's `laborLines`/profitability populate like an individual job's. Completion is first-to-complete-wins: a later member's `complete` returns `409 ALREADY_COMPLETED` (benign — the client treats it as "a teammate already completed this").
@@ -740,6 +741,14 @@ Each entry includes `hourlyRate` (number or null) alongside `weeklyHours`, `grou
 #### Delete Team Member
 **DELETE** `/businesses/:businessId/team-members/:memberId`
 
+Cascades: their `service_assignments` (those Calls become unassigned), `team_memberships` and `geofence_events` are deleted. `job_costs` rows are kept with `team_member_id` set to NULL (labor $ history preserved).
+
+#### Active Clocks Board (web portal M5)
+**GET** `/businesses/:businessId/active-clocks`
+
+Every team member currently clocked in (their latest geofence event on a Call is an `arrival` with no later `departure`). It's read-only and uses the same query as Home's on-the-clock board (`getActiveClocksForBusiness`).
+→ `{ success, activeClocks: [{ teamMemberId, teamMemberName, selectionCycleId, customerId, customerName, arrivalAt }] }`
+
 ---
 
 ### Team Groups
@@ -747,33 +756,32 @@ Each entry includes `hourlyRate` (number or null) alongside `weeklyHours`, `grou
 #### Create Group
 **POST** `/businesses/:businessId/groups`
 
-**Request Body**:
-```json
-{
-  "name": "Team A",
-  "memberIds": [1, 2, 3]
-}
-```
+**Request Body**: `{ "name": "Team A" }`. Members are set separately (below).
 
-**Response (201)**:
-```json
-{
-  "success": true,
-  "group": {
-    "id": 25,
-    "businessId": 1,
-    "name": "Team A",
-    "members": [
-      { "id": 1, "name": "John Smith" },
-      { "id": 2, "name": "Jane Doe" }
-    ]
-  }
-}
-```
+**Response (201)**: `{ "success": true, "group": { "id": 25, "name": "Team A", "memberCount": 0 } }`
+
+#### List Groups
+**GET** `/businesses/:businessId/groups` → `{ success, groups: [{ id, name, memberCount, members: [{ id, name }] }] }`
+
+#### Rename Group
+**PUT** `/businesses/:businessId/groups/:groupId`. Body `{ name }`; `404` if the group isn't yours.
+
+#### Set Group Members
+**PUT** `/businesses/:businessId/groups/:groupId/members`. Body `{ memberIds: number[] }` **replaces** the membership, deduplicating repeated ids.
+**Ownership (hardened Oct 14, 2026, M5):** every id must be a team member of this business → `404 NOT_FOUND` otherwise (nothing changes). Non-numeric ids → `400 VALIDATION_ERROR`. Previously any member id was accepted. Because a group assignment resolves to every member (S17), another business's member could have been shown this business's jobs.
+
+#### Delete Group
+**DELETE** `/businesses/:businessId/groups/:groupId`. Cascades its `team_memberships` and any `service_assignments` to it (those Calls become unassigned). Members stay on the team.
 
 ---
 
 ### Service Assignments
+
+#### List Assignments
+**GET** `/businesses/:businessId/assignments?serviceDate=YYYY-MM-DD`
+**or** `?from=YYYY-MM-DD&to=YYYY-MM-DD` (inclusive, at most 62 days, same rules as the forecast range; added Oct 14, 2026 for the portal's Team week board).
+
+→ `{ success, assignments: [{ selectionCycleId, serviceDate, customerId, teamMemberId, teamMemberName, teamId, teamName }] }` (`serviceDate` was added Oct 14, 2026). Needs `serviceDate` or a valid range (`400 VALIDATION_ERROR` otherwise).
 
 #### Assign Staff to Cycle
 **PUT** `/businesses/:businessId/assignments/:selectionCycleId`

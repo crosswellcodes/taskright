@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireSession, businessGet } from '@/lib/serverApi';
 import ServiceForm, { type ServiceDefinition } from '@/components/dashboard/customers/ServiceForm';
-import DeleteButton from '@/components/dashboard/customers/DeleteButton';
+import DeleteButton from '@/components/dashboard/DeleteButton';
 
 export default async function EditServicePage({ params }: { params: Promise<{ id: string; serviceId: string }> }) {
   const { id, serviceId } = await params;
