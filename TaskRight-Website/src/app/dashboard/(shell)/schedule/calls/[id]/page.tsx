@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { requireSession, businessGet } from '@/lib/serverApi';
 import { type LifecycleState, LIFECYCLE_CLASS, LIFECYCLE_LABEL, dayKey, formatLongDay } from '@/lib/schedule';
 import CallActions from '@/components/dashboard/schedule/CallActions';
+import JobCostingCard, { type JobCosts } from '@/components/dashboard/money/JobCostingCard';
 
 type ServiceCall = {
   selectionCycleId: number;
@@ -55,11 +56,18 @@ export default async function ServiceCallPage({ params }: { params: Promise<{ id
   if (!/^\d+$/.test(id)) notFound();
   const session = await requireSession();
 
-  const [callRes, membersRes, groupsRes] = await Promise.all([
+  const [callRes, membersRes, groupsRes, costsRes, categoriesRes] = await Promise.all([
     businessGet<{ serviceCall: ServiceCall }>(session, `/selection-cycles/${id}`),
     businessGet<{ teamMembers: { id: number; name: string }[] }>(session, '/team-members'),
     businessGet<{ groups: { id: number; name: string }[] }>(session, '/groups'),
+    businessGet<{ costs: JobCosts }>(session, `/jobs/${id}/costs`),
+    businessGet<{ categories: { id: number; type: string; is_system: boolean }[] }>(session, '/cost-categories'),
   ]);
+  // The single materials / overhead line edits against the system GAAP category.
+  const categoryId = (type: string) => {
+    const cats = (categoriesRes?.categories ?? []).filter(c => c.type === type);
+    return (cats.find(c => c.is_system) ?? cats[0])?.id ?? null;
+  };
   if (!callRes) notFound();
   const call = callRes.serviceCall;
   const date = dayKey(call.serviceDate);
@@ -131,6 +139,15 @@ export default async function ServiceCallPage({ params }: { params: Promise<{ id
               </div>
             )}
           </Card>
+
+          {costsRes && (
+            <JobCostingCard
+              businessId={session.businessId}
+              callId={call.selectionCycleId}
+              costs={costsRes.costs}
+              categoryIds={{ materials: categoryId('materials'), overhead: categoryId('overhead') }}
+            />
+          )}
 
           {call.lifecycleState === 'completed' && (
             <Card title="Completion">

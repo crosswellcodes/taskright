@@ -2437,6 +2437,135 @@ async function getCustomerProfitability(businessId, customerId) {
   };
 }
 
+// ─── BUSINESS PROFITABILITY ROLLUP (web portal M6 — Money) ───────────────────
+// Business-wide version of getCustomerProfitability, over COMPLETED Calls whose
+// service_date falls in [from, to]. Same rules: an unpriced job counts $0 revenue
+// but its costs still count (flagged via unpricedJobCount); margin % only when
+// revenue ≠ 0. Costs are summed in SQL per (Call, category), so this is a fixed
+// number of queries regardless of range length.
+async function getBusinessProfitability(businessId, { from, to }) {
+  const jobsRows = await knex('selection_cycles as sc')
+    .join('customers as c', 'sc.customer_id', 'c.id')
+    .leftJoin('customer_services as cs', 'sc.customer_service_id', 'cs.id')
+    .where('c.business_id', businessId)
+    .where('sc.status', 'completed')
+    .whereBetween('sc.service_date', [from, to])
+    .orderBy('sc.service_date', 'desc')
+    .orderBy('sc.id', 'desc')
+    .select('sc.id', 'sc.service_date', 'sc.price', 'c.id as customer_id', 'c.name as customer_name',
+            'cs.id as service_id', 'cs.name as service_name');
+
+  const jobIds = jobsRows.map(j => j.id);
+  const costRows = jobIds.length
+    ? await knex('job_costs as jc')
+        .join('cost_categories as cat', 'jc.cost_category_id', 'cat.id')
+        .whereIn('jc.selection_cycle_id', jobIds)
+        .groupBy('jc.selection_cycle_id', 'cat.id', 'cat.type')
+        .select('jc.selection_cycle_id', 'cat.id as category_id', 'cat.type')
+        .sum('jc.amount as amount')
+        .select(knex.raw("bool_or(jc.source = 'manual') as has_manual"))
+    : [];
+
+  const perJob = new Map(jobIds.map(id => [id, { labor: 0, materials: 0, overhead: 0, other: 0, manual: false }]));
+  const byCategoryAmount = new Map();
+  for (const r of costRows) {
+    const j = perJob.get(r.selection_cycle_id);
+    const amt = Number(r.amount);
+    const bucket = ['labor', 'materials', 'overhead'].includes(r.type) ? r.type : 'other';
+    j[bucket] += amt;
+    j.manual = j.manual || r.has_manual;
+    byCategoryAmount.set(r.category_id, (byCategoryAmount.get(r.category_id) || 0) + amt);
+  }
+
+  const margin = (revenue, cost) => ({
+    marginDollars: round2(revenue - cost),
+    marginPercent: revenue !== 0 ? round2(((revenue - cost) / revenue) * 100) : null,
+  });
+
+  const jobs = jobsRows.map(r => {
+    const c = perJob.get(r.id);
+    const price = r.price != null ? round2(r.price) : null;
+    const totalCost = round2(c.labor + c.materials + c.overhead + c.other);
+    return {
+      selectionCycleId: r.id,
+      serviceDate: new Date(r.service_date).toISOString().split('T')[0],
+      customerId: r.customer_id,
+      customerName: r.customer_name,
+      serviceId: r.service_id,
+      serviceName: r.service_name,
+      price,
+      laborCost: round2(c.labor),
+      materialsCost: round2(c.materials),
+      overheadCost: round2(c.overhead),
+      totalCost,
+      // Rule 3 (per job): no margin without a price.
+      marginDollars: price != null ? round2(price - totalCost) : null,
+      marginPercent: price != null && price !== 0 ? round2(((price - totalCost) / price) * 100) : null,
+      hasManualEdits: c.manual,
+    };
+  });
+
+  // Roll jobs up by a key (customer / service).
+  function rollup(keyOf, describe) {
+    const groups = new Map();
+    for (const j of jobs) {
+      const key = keyOf(j);
+      if (key == null) continue;
+      const g = groups.get(key) || { ...describe(j), revenue: 0, totalCost: 0, jobs: 0 };
+      g.revenue += j.price || 0;
+      g.totalCost += j.totalCost;
+      g.jobs += 1;
+      groups.set(key, g);
+    }
+    return [...groups.values()]
+      .map(g => ({ ...g, revenue: round2(g.revenue), totalCost: round2(g.totalCost), ...margin(g.revenue, g.totalCost) }))
+      .sort((a, b) => b.revenue - a.revenue || b.marginDollars - a.marginDollars);
+  }
+
+  const revenue = round2(jobs.reduce((s, j) => s + (j.price || 0), 0));
+  const laborCost = round2(jobs.reduce((s, j) => s + j.laborCost, 0));
+  const materialsCost = round2(jobs.reduce((s, j) => s + j.materialsCost, 0));
+  const overheadCost = round2(jobs.reduce((s, j) => s + j.overheadCost, 0));
+  const totalCost = round2(jobs.reduce((s, j) => s + j.totalCost, 0));
+
+  // GAAP-coded statement lines: 4000 revenue + every cost category with activity
+  // (system 5000/5100/5200 always listed so the statement shape is stable).
+  const categories = await getCostCategories(businessId);
+  const byCategory = categories
+    .filter(cat => cat.type === 'revenue' || cat.is_system || byCategoryAmount.has(cat.id))
+    .map(cat => ({
+      code: cat.code,
+      name: cat.name,
+      type: cat.type,
+      amount: cat.type === 'revenue' ? revenue : round2(byCategoryAmount.get(cat.id) || 0),
+    }));
+
+  // Still-open Calls in the same window — scheduled revenue not yet earned.
+  const pipelineRow = await knex('selection_cycles as sc')
+    .join('customers as c', 'sc.customer_id', 'c.id')
+    .where('c.business_id', businessId)
+    .where('sc.status', 'open')
+    .whereBetween('sc.service_date', [from, to])
+    .count('* as n')
+    .sum('sc.price as expected')
+    .first();
+
+  return {
+    range: { from, to },
+    totals: {
+      revenue, laborCost, materialsCost, overheadCost, totalCost,
+      ...margin(revenue, totalCost),
+      completedJobCount: jobs.length,
+      unpricedJobCount: jobs.filter(j => j.price == null).length,
+    },
+    byCategory,
+    byCustomer: rollup(j => j.customerId, j => ({ customerId: j.customerId, customerName: j.customerName })),
+    byService: rollup(j => j.serviceId, j => ({ serviceId: j.serviceId, serviceName: j.serviceName, customerId: j.customerId, customerName: j.customerName })),
+    jobs,
+    pipeline: { openJobCount: Number(pipelineRow.n), expectedRevenue: round2(Number(pipelineRow.expected) || 0) },
+  };
+}
+
 // ─── HOME SUMMARY (web portal M1 — Home/Today) ──────────────────────────────
 // One aggregate call instead of composing N endpoints client-side (WEB_PORTAL.md
 // §4.1). Go-live cut: Action Center (awaiting confirmation / past-deadline /
@@ -2866,6 +2995,7 @@ module.exports = {
   getCustomerProfitability,
   // Home Summary (web portal M1)
   getHomeSummary,
+  getBusinessProfitability,
   getActiveClocksForBusiness,
   getMessageInbox,
   markThreadRead,

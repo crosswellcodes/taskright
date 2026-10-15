@@ -1,6 +1,6 @@
 # TaskRight Business Web Portal — Design Spec
 
-**Status:** 🟡 M0 + M1 BUILT (Oct 12, 2026); M2 + M3 BUILT (Oct 13, 2026); M4 + M5 BUILT (Oct 14, 2026), awaiting review before M6. M6–M7 not started.
+**Status:** 🟡 M0 + M1 BUILT (Oct 12, 2026); M2 + M3 BUILT (Oct 13, 2026); M4 + M5 + M6 BUILT (Oct 14, 2026), awaiting review before M7. M7 not started.
 **Author:** Session of Oct 12, 2026.
 **Read with:** `HANDOFF.md` (current state), `shared/API_REFERENCE.md` (endpoints), `shared/DESIGN_SYSTEM.md` (tokens/components), `shared/specs/EARLY_ACCESS_PAYMENT`/Stripe notes (billing — folded in here as Module 7).
 
@@ -155,7 +155,20 @@ Customer-value first; transaction last. Each milestone: implement → `npm run b
   - `DeleteButton` moved to `components/dashboard/` (shared by Customers + Team). New `lib/team.ts`.
   - **Fast-follow (not built):** clock board map, utilization analytics (hours + labor cost per member), job history per member.
   - **254/254 backend tests** (+9, `teamPortal.test.js`). Website `npm run build` clean. Verified read-only on live dev biz 22 (5 members: 2 joined, 3 pending with codes; nobody clocked in; and **biz 22 has no calls at all in the next 7 days**, so its week board will show empty columns).
-- **M6 — Money:** profitability rollup + per-call costs + margins.
+- **M6 — Money:** ✅ **BUILT (Oct 14, 2026).** No migration, no user decisions needed.
+  - **Backend:** `GET /:id/profitability?from=&to=` (`getBusinessProfitability`), the business-wide rollup that was the M6 gap (§5 item 3).
+    - Covers **completed** Calls by `service_date` (the same date basis as Home's MTD revenue). Two SQL aggregates (jobs; costs grouped per Call × category with a `bool_or(manual)` flag), then grouped in JS, so the cost is fixed regardless of range.
+    - Returns totals (+ `unpricedJobCount`), a GAAP `byCategory` statement, `byCustomer`, `byService`, per-`jobs` lines and a `pipeline` (open Calls in the window, sum of `price`).
+    - Rules match `getCustomerProfitability`: unpriced = $0 revenue with costs still counted, and margin % is null on zero revenue. Defaults to the current month; ≤366 days via `parseDateRange(query, maxDays)`.
+  - **Frontend:**
+    - `/dashboard/money` (Server Component, `?period=month|last-month|90d|year`): KPI tiles, an amber unpriced-jobs warning, a P&L-style statement, by-customer and by-service tables (linking to the customer / service builder), and a jobs table (price / labor / materials / overhead / margin, an "edited" chip, linking to the call). The empty period shows an explanatory state.
+    - **Job costs per call + expected-vs-actual margin** live on the M2 call page as `components/dashboard/money/JobCostingCard.tsx` over the existing `GET .../jobs/:id/costs` + price/cost CRUD (mobile parity):
+      - Price, materials and overhead are click-to-edit (materials/overhead use POST-if-null / PATCH-if-present / DELETE-on-blank against the system GAAP category).
+      - Labor lines are read-only with Auto-tracked/Edited badges and a no-rate warning.
+      - Pre-completion: proposed labor (hours × rates breakdown, a "floor" flag) and expected total/margin. After completion: total + margin, plus "expected $X — came in ahead/short by $Y".
+  - New `lib/money.ts` (types, period→range).
+  - **Fast-follow (not built):** trend charts / time series, exportable reports, editing labor lines on the web (the app doesn't either).
+  - **260/260 backend tests** (+6, `businessProfitability.test.js`). Website `npm run build` clean. Live cross-check, biz 22 for 2026: rollup = $495 revenue / $450 cost / $45 (9.09%) over 2 jobs, **identical** to `GET .../customers/19/profitability`. Pipeline: 49 open calls, $5,408.
 - **M7 — Account & Billing (FINAL):** profile + provisioning status + Stripe (Customer/Checkout/Portal/webhook) + billing columns.
 
 Then **go-live** = all seven live + the go-live criteria below.

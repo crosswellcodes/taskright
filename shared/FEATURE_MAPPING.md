@@ -48,7 +48,7 @@ This document maps TaskRight's features across platforms and indicates where eac
 | **Customer SMS Inbox** | ✅ Per-customer thread (MessageThreadScreen) | ✅ Complete (Oct 14, 2026) | P1 | Web portal Messages: unified cross-customer inbox with unread badges (`messages.read_at`), thread + MMS images, send. Mobile doesn't mark threads read yet. See `WEB_PORTAL.md` M4. |
 | **Mark Service Complete** | ✅ Confirm completion in app | 🔄 Consider | P1 | Could move to web for easier bulk operations |
 | **Team Time Tracking (clock-in/out)** | ✅ Auto geofence + manual fallback | ❌ Mobile-only | P1 | Auto clock-in needs a geocoded customer address; reliability hardened July 20 (relevance-gated geocode + bounded retry + owner "couldn't map this address" flag). Transparency (July 23, all tiers): unified always-present "Time Tracking" card fixes the reactivation dead state + on-the-clock elapsed timer + Enable-location retry + leave-while-clocked-in confirmation (A); My Jobs auto/manual chip via `autoTrackable` (B); cross-screen "you're clocked in" banner via read-only `active-clock` endpoint (C). See `GEOCODING_RELIABILITY.md`, `GEOFENCE_TRANSPARENCY.md`. |
-| **View Analytics** | ❌ Not yet | 🔄 Future | P3 | Aggregate data on web dashboard |
+| **View Analytics** | ⚠️ Per-customer profitability only | ✅ Complete (Oct 14, 2026) | P3 | Web portal Money: business-wide profitability (revenue/cost/margin by period, GAAP statement, by customer, by service, per job) + per-call job costing with expected-vs-actual margin. Trends fast-follow. See `WEB_PORTAL.md` M6. |
 
 ---
 

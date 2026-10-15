@@ -986,6 +986,33 @@ Body: `{ amount?, hoursActual? }` (at least one). Marks the row `source='manual'
 #### Delete Cost Line
 **DELETE** `/businesses/:businessId/jobs/:selectionCycleId/costs/:costId` → `{ success }`.
 
+#### Business Profitability Rollup (web portal M6)
+**GET** `/businesses/:businessId/profitability[?from=YYYY-MM-DD&to=YYYY-MM-DD]`
+
+Business-wide version of the per-customer rollup below, over **completed** Calls whose `service_date` is in range (inclusive). Defaults to the current calendar month (UTC); max 366 days (`400 VALIDATION_ERROR` for a partial, inverted or too-long range). The same rules as per-customer apply: an unpriced job counts as $0 revenue but its costs count, and margin % is `null` when revenue is 0. It runs a fixed number of SQL aggregates regardless of range.
+
+```json
+{
+  "success": true,
+  "profitability": {
+    "range": { "from": "2026-10-01", "to": "2026-10-31" },
+    "totals": { "revenue": 495, "laborCost": 270, "materialsCost": 115, "overheadCost": 65, "totalCost": 450,
+                "marginDollars": 45, "marginPercent": 9.09, "completedJobCount": 2, "unpricedJobCount": 0 },
+    "byCategory": [ { "code": 4000, "name": "Service Revenue", "type": "revenue", "amount": 495 },
+                    { "code": 5000, "name": "Direct Labor", "type": "labor", "amount": 270 } ],
+    "byCustomer": [ { "customerId": 19, "customerName": "Jane", "revenue": 495, "totalCost": 450, "marginDollars": 45, "marginPercent": 9.09, "jobs": 2 } ],
+    "byService":  [ { "serviceId": 31, "serviceName": "Weekly Clean", "customerId": 19, "customerName": "Jane", "revenue": 495, "totalCost": 450, "marginDollars": 45, "marginPercent": 9.09, "jobs": 2 } ],
+    "jobs": [ { "selectionCycleId": 88, "serviceDate": "2026-10-12", "customerId": 19, "customerName": "Jane", "serviceId": 31, "serviceName": "Weekly Clean",
+                "price": 345, "laborCost": 150, "materialsCost": 50, "overheadCost": 20, "totalCost": 220, "marginDollars": 125, "marginPercent": 36.23, "hasManualEdits": false } ],
+    "pipeline": { "openJobCount": 49, "expectedRevenue": 5408 }
+  }
+}
+```
+- `byCategory`: a GAAP-coded statement. 4000 revenue, plus every system cost category (5000/5100/5200, always listed for a stable shape) and any business category with activity in range. Codes are integers.
+- `byCustomer` / `byService`: sorted by revenue, then margin.
+- `jobs`: newest first. Per-job `marginDollars`/`marginPercent` are `null` when the job has no price. `hasManualEdits` is true if any cost line on it is `source='manual'`.
+- `pipeline`: **open** Calls in the same window and the sum of their `price` (scheduled, not yet earned). It isn't counted in totals.
+
 #### Customer Profitability (aggregate)
 **GET** `/businesses/:businessId/customers/:customerId/profitability`
 

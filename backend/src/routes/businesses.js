@@ -9,16 +9,17 @@ const { getProvider } = require('../services/sms');
 // All business routes require authentication + ownership check
 router.use(authenticate);
 
-// Optional inclusive ?from=&to= (YYYY-MM-DD) date range, shared by the forecast
-// and assignments feeds (web portal M2/M5). Both or neither; span capped at 62
-// days to bound per-day work. → {} (absent) | { range: { from, to } } | { error }
-function parseDateRange({ from, to }) {
+// Optional inclusive ?from=&to= (YYYY-MM-DD) date range, shared by the forecast,
+// assignments and profitability feeds (web portal M2/M5/M6). Both or neither;
+// span capped (default 62 days, bounding per-day work; the SQL-aggregated
+// profitability rollup allows a year). → {} | { range: { from, to } } | { error }
+function parseDateRange({ from, to }, maxDays = 62) {
   if (from === undefined && to === undefined) return {};
   const isDate = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(`${s}T00:00:00Z`));
   if (!isDate(from) || !isDate(to)) return { error: 'from and to are both required in YYYY-MM-DD format' };
   const spanDays = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000;
   if (spanDays < 0) return { error: 'from must be on or before to' };
-  if (spanDays > 62) return { error: 'Date range may not exceed 62 days' };
+  if (spanDays > maxDays) return { error: `Date range may not exceed ${maxDays} days` };
   return { range: { from, to } };
 }
 
@@ -1644,6 +1645,37 @@ router.get('/:businessId/customers/:customerId/profitability', requireBusiness, 
     return res.status(200).json({ success: true, profitability: data });
   } catch (err) {
     return handleCostError(res, err, 'Get customer profitability');
+  }
+});
+
+/**
+ * GET /api/businesses/:businessId/profitability[?from=YYYY-MM-DD&to=YYYY-MM-DD]
+ * Business-wide profitability rollup (web portal M6 — Money) over COMPLETED
+ * Calls with service_date in range (default: the current calendar month; max
+ * 366 days). Totals, GAAP category statement, by customer, by service, per-job
+ * lines, and the still-open pipeline in the same window.
+ */
+router.get('/:businessId/profitability', requireBusiness, async (req, res) => {
+  try {
+    const businessId = parseInt(req.params.businessId);
+    const parsed = parseDateRange(req.query, 366);
+    if (parsed.error) {
+      return res.status(400).json({ success: false, error: parsed.error, code: 'VALIDATION_ERROR' });
+    }
+    let range = parsed.range;
+    if (!range) {
+      const now = new Date();
+      const y = now.getUTCFullYear();
+      const m = now.getUTCMonth();
+      range = {
+        from: new Date(Date.UTC(y, m, 1)).toISOString().split('T')[0],
+        to: new Date(Date.UTC(y, m + 1, 0)).toISOString().split('T')[0],
+      };
+    }
+    const profitability = await businessService.getBusinessProfitability(businessId, range);
+    return res.status(200).json({ success: true, profitability });
+  } catch (err) {
+    return handleCostError(res, err, 'Get business profitability');
   }
 });
 
