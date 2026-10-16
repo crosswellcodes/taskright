@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { requireSession, businessGet } from '@/lib/serverApi';
+import { requireSession, businessGet, getBusiness } from '@/lib/serverApi';
+import { todayKey } from '@/lib/schedule';
 import ServiceForm from '@/components/dashboard/customers/ServiceForm';
 
 type Template = { id: number; name: string; frequency: string; daysBeforeServiceDeadline: number | null; tasks: { name: string; timeAllotmentMinutes: number }[] };
@@ -10,9 +11,9 @@ export default async function NewServicePage({ params }: { params: Promise<{ id:
   if (!/^\d+$/.test(id)) notFound();
   const session = await requireSession();
 
-  const [customerRes, businessRes, templatesRes, membersRes, groupsRes] = await Promise.all([
+  const [customerRes, business, templatesRes, membersRes, groupsRes] = await Promise.all([
     businessGet<{ customer: { id: number; name: string } }>(session, `/customers/${id}`),
-    businessGet<{ business: { schedulingFormat: 'date_based' | 'day_of_week' } }>(session, ''),
+    getBusiness(session),
     businessGet<{ serviceTemplates: Template[] }>(session, '/service-templates'),
     businessGet<{ teamMembers: { id: number; name: string }[] }>(session, '/team-members'),
     businessGet<{ groups: { id: number; name: string }[] }>(session, '/groups'),
@@ -30,7 +31,8 @@ export default async function NewServicePage({ params }: { params: Promise<{ id:
         businessId={session.businessId}
         customerId={customer.id}
         customerName={customer.name}
-        schedulingFormat={businessRes?.business.schedulingFormat ?? 'date_based'}
+        schedulingFormat={business.schedulingFormat === 'day_of_week' ? 'day_of_week' : 'date_based'}
+        today={todayKey(business.timeZone)}
         templates={templatesRes?.serviceTemplates ?? []}
         members={membersRes?.teamMembers ?? []}
         groups={groupsRes?.groups ?? []}

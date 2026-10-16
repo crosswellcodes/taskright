@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { requireSession, businessGet } from '@/lib/serverApi';
+import { requireSession, businessGet, getBusiness } from '@/lib/serverApi';
+import { todayKey } from '@/lib/schedule';
 import ServiceForm, { type ServiceDefinition } from '@/components/dashboard/customers/ServiceForm';
 import DeleteButton from '@/components/dashboard/DeleteButton';
 
@@ -9,10 +10,10 @@ export default async function EditServicePage({ params }: { params: Promise<{ id
   if (!/^\d+$/.test(id) || !/^\d+$/.test(serviceId)) notFound();
   const session = await requireSession();
 
-  const [customerRes, serviceRes, businessRes] = await Promise.all([
+  const [customerRes, serviceRes, business] = await Promise.all([
     businessGet<{ customer: { id: number; name: string } }>(session, `/customers/${id}`),
     businessGet<{ service: ServiceDefinition & { customerId: number } }>(session, `/customers/${id}/services/${serviceId}`),
-    businessGet<{ business: { schedulingFormat: 'date_based' | 'day_of_week' } }>(session, ''),
+    getBusiness(session),
   ]);
   // The service lookup is business-scoped; also require it to be this customer's.
   if (!customerRes || !serviceRes || serviceRes.service.customerId !== customerRes.customer.id) notFound();
@@ -30,7 +31,8 @@ export default async function EditServicePage({ params }: { params: Promise<{ id
         businessId={session.businessId}
         customerId={customer.id}
         customerName={customer.name}
-        schedulingFormat={businessRes?.business.schedulingFormat ?? 'date_based'}
+        schedulingFormat={business.schedulingFormat === 'day_of_week' ? 'day_of_week' : 'date_based'}
+        today={todayKey(business.timeZone)}
         service={service}
       />
       <div className="bg-white rounded-2xl border border-border p-6">

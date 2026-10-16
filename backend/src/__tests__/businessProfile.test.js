@@ -20,6 +20,7 @@ describe('GET /api/businesses/:businessId', () => {
     expect(res.body.business.name).toBe('CleanCo');
     expect(res.body.business.phoneNumber).toBe(business.phoneNumber);
     expect(res.body.business.joinCode).toBeDefined();
+    expect(res.body.business.timeZone).toBe('America/Chicago'); // migration 029 default
   });
 
   it('returns 403 when requesting another business\'s profile', async () => {

@@ -153,6 +153,7 @@ Self business profile. Used by the web portal dashboard shell (header) and Accou
     "name": "ABC Cleaning Co.",
     "phoneNumber": "+14155551234",
     "schedulingFormat": "date_based",
+    "timeZone": "America/Chicago",
     "joinCode": "ABC123",
     "entityType": "sole_prop",
     "contactFirstName": null,
@@ -168,6 +169,8 @@ Self business profile. Used by the web portal dashboard shell (header) and Accou
   }
 }
 ```
+
+`timeZone` (added Oct 14, 2026, migration 029) is the business's IANA zone (`businesses.timezone`, default `America/Chicago`; an invalid stored value falls back to the default). The web portal renders "today" and every clock time in it. There's no endpoint to change it yet; that belongs to Account (M7, on hold).
 
 **Error Responses**:
 - `401` — `MISSING_TOKEN` / `INVALID_TOKEN`
@@ -187,6 +190,7 @@ Web portal Home/Today aggregate (`WEB_PORTAL.md` M1) — Action Center, today, a
 {
   "success": true,
   "summary": {
+    "timeZone": "America/Chicago",
     "actionCenter": {
       "awaitingConfirmation": [
         { "selectionCycleId": 12, "customerId": 3, "customerName": "Jane Doe", "serviceDate": "2026-10-14", "submissionDeadline": "2026-10-13" }
@@ -221,7 +225,7 @@ Web portal Home/Today aggregate (`WEB_PORTAL.md` M1) — Action Center, today, a
 }
 ```
 
-`awaitingConfirmation` = open, unsubmitted cycles whose deadline (if any) hasn't passed. `pastDeadline` = open, unsubmitted cycles whose deadline has passed. `unassignedUpcoming` = open cycles due within 7 days with no `service_assignments` row. `today`/`weekStrip` cover the next 7 days starting today. `revenue.monthToDate` sums `price` over cycles completed this calendar month (lean — not a full margin rollup; that lands with Money/M6). `unreadMessages` (added Oct 14, 2026, M4) = customers with unread inbound messages (`messages.read_at` NULL), newest first. The "failed SMS" item is **not yet implemented**, because no delivery-status column exists.
+**Every date boundary is the business's local day** (`timeZone`, from `businesses.timezone`, migration 029; added Oct 14, 2026) — not the server's UTC day. "Today", the week strip, "deadline has passed" (deadline < today) and the month for `monthToDate` all use it, so from 7pm to midnight Central Home still shows the Central date. `awaitingConfirmation` = open, unsubmitted cycles whose deadline (if any) hasn't passed. `pastDeadline` = open, unsubmitted cycles whose deadline has passed. `unassignedUpcoming` = open cycles due within 7 days with no `service_assignments` row. `today`/`weekStrip` cover the next 7 days starting today. `revenue.monthToDate` sums `price` over cycles completed this calendar month (lean — not a full margin rollup; that lands with Money/M6). `unreadMessages` (added Oct 14, 2026, M4) = customers with unread inbound messages (`messages.read_at` NULL), newest first. The "failed SMS" item is **not yet implemented**, because no delivery-status column exists.
 
 **Error Responses**:
 - `401` — `MISSING_TOKEN` / `INVALID_TOKEN`

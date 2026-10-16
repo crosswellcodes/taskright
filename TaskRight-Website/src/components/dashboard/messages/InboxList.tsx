@@ -10,11 +10,12 @@ type Props = {
   threads: InboxThread[];
   selectedId: number | null;
   customers: { id: number; name: string }[];
+  timeZone: string;
 };
 
 // Left pane: every customer thread (latest first) with unread badges, search,
 // and a "New message" picker that opens a thread with any customer.
-export default function InboxList({ threads, selectedId, customers }: Props) {
+export default function InboxList({ threads, selectedId, customers, timeZone }: Props) {
   const router = useRouter();
   const [query, setQuery] = useState('');
 
@@ -71,7 +72,7 @@ export default function InboxList({ threads, selectedId, customers }: Props) {
             >
               <div className="flex items-center justify-between gap-2">
                 <p className={`text-sm truncate ${unread ? 'font-bold text-text' : 'font-medium text-text'}`}>{t.customerName}</p>
-                <span className={`text-xs shrink-0 ${unread ? 'text-brand font-semibold' : 'text-text-muted'}`}>{formatInboxTime(t.lastMessage.createdAt)}</span>
+                <span className={`text-xs shrink-0 ${unread ? 'text-brand font-semibold' : 'text-text-muted'}`}>{formatInboxTime(t.lastMessage.createdAt, timeZone)}</span>
               </div>
               <div className="flex items-center justify-between gap-2 mt-0.5">
                 <p className={`text-xs truncate ${unread ? 'text-text' : 'text-text-muted'}`}>

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { requireSession, businessGet } from '@/lib/serverApi';
+import { requireSession, businessGet, getTimeZone } from '@/lib/serverApi';
 import { formatMoney } from '@/lib/customers';
 import { formatLongDay } from '@/lib/schedule';
 import { type Period, type Profitability, PERIODS, formatPercent, periodRange } from '@/lib/money';
@@ -20,7 +20,7 @@ export default async function MoneyPage({ searchParams }: { searchParams: Promis
   const session = await requireSession();
   const { period: periodParam } = await searchParams;
   const period: Period = PERIODS.some(p => p.value === periodParam) ? (periodParam as Period) : 'month';
-  const { from, to } = periodRange(period);
+  const { from, to } = periodRange(period, await getTimeZone(session));
 
   const res = await businessGet<{ profitability: Profitability }>(session, `/profitability?from=${from}&to=${to}`);
   const p = res?.profitability;

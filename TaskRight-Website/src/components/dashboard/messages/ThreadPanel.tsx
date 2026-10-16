@@ -13,6 +13,7 @@ type Props = {
   messages: ThreadMessage[];
   nextCursor: number | null;
   unreadCount: number;
+  timeZone: string;
 };
 
 const POLL_MS = 20000;
@@ -20,7 +21,7 @@ const POLL_MS = 20000;
 // Right pane: one customer's SMS thread. Marks unread inbound read when shown
 // (explicit POST), polls for new messages while the tab is visible, and sends
 // replies through the BFF proxy.
-export default function ThreadPanel({ businessId, customer, messages, nextCursor, unreadCount }: Props) {
+export default function ThreadPanel({ businessId, customer, messages, nextCursor, unreadCount, timeZone }: Props) {
   const router = useRouter();
   const base = `/${businessId}/customers/${customer.id}/messages`;
 
@@ -116,7 +117,7 @@ export default function ThreadPanel({ businessId, customer, messages, nextCursor
                   </a>
                 ))}
                 {m.body && <p className="text-sm whitespace-pre-wrap break-words">{m.body}</p>}
-                <p className={`text-[11px] mt-1 ${out ? 'text-white/70' : 'text-text-muted'}`}>{formatBubbleTime(m.createdAt)}</p>
+                <p className={`text-[11px] mt-1 ${out ? 'text-white/70' : 'text-text-muted'}`}>{formatBubbleTime(m.createdAt, timeZone)}</p>
               </div>
             </div>
           );

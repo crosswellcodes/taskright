@@ -9,9 +9,13 @@ const {
 // One aggregate call composing Action Center, today, a 7-day week strip, lean
 // MTD revenue, recent reviews, and the on-the-clock board. See WEB_PORTAL.md §4.1.
 
+const businessService = require('../services/businessService');
+const { todayInZone, addDaysKey } = require('../utils/businessDate');
+
 const biz = (req, token) => req.set('Authorization', `Bearer ${token}`);
-const todayStr = () => new Date().toISOString().split('T')[0];
-const daysFromNow = (n) => new Date(Date.now() + n * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+// Business-local (default America/Chicago) — not UTC, or this flakes 7pm–midnight Central.
+const todayStr = () => todayInZone('America/Chicago');
+const daysFromNow = (n) => addDaysKey(todayStr(), n);
 
 async function firstCycleFor(customerId) {
   return knex('selection_cycles').where('customer_id', customerId).orderBy('id', 'asc').first();
@@ -120,5 +124,74 @@ describe('GET /api/businesses/:businessId/home-summary', () => {
 
     expect(summary.activeClocks).toHaveLength(1);
     expect(summary.activeClocks[0]).toMatchObject({ teamMemberId: member, teamMemberName: 'Ann', selectionCycleId: assignedCycle.id, customerName: 'Assigned Co' });
+  });
+});
+
+// Time-zone correctness (WEB_PORTAL.md "Time zones"): every Home date boundary
+// is the business's local day. Pinned at 2026-10-31 03:30 UTC = Fri Oct 30,
+// 10:30pm CDT — the UTC date is already the 31st, and in Central it's the
+// last evening of October.
+describe('getHomeSummary — business-local day', () => {
+  const NOW = new Date('2026-10-31T03:30:00Z');
+
+  async function cycleOn(businessId, token, template, name, phone, fields) {
+    const c = await addCustomerToBusiness(businessId, token, { name, phoneNumber: phone });
+    await assignCycleToCustomer(businessId, c.id, template.id, token, 2);
+    const cycle = await firstCycleFor(c.id);
+    await knex('selection_cycles').where('id', cycle.id).update(fields);
+    return cycle;
+  }
+
+  it('uses the business zone (Central) for today, week strip, deadlines and MTD at 10:30pm', async () => {
+    const { business, token } = await createTestBusiness();
+    const template = await createTestServiceCycle(business.id, token, [{ name: 'Clean', timeAllotmentMinutes: 60 }]);
+
+    const today = await cycleOn(business.id, token, template, 'Today Co', '+13335550101',
+      { service_date: '2026-10-30', submission_deadline: '2026-10-30' });
+    const tomorrow = await cycleOn(business.id, token, template, 'Tomorrow Co', '+13335550102',
+      { service_date: '2026-10-31', submission_deadline: '2026-10-31' });
+    await cycleOn(business.id, token, template, 'October Co', '+13335550103',
+      { status: 'completed', service_date: '2026-10-15', price: 100 });
+    await cycleOn(business.id, token, template, 'September Co', '+13335550104',
+      { status: 'completed', service_date: '2026-09-30', price: 999 });
+
+    const summary = await businessService.getHomeSummary(business.id, { now: NOW });
+
+    expect(summary.timeZone).toBe('America/Chicago');
+    expect(summary.today.serviceDate).toBe('2026-10-30');
+    expect(summary.today.items.map((i) => i.selectionCycleId)).toEqual([today.id]);
+    expect(summary.weekStrip.map((d) => d.date)).toEqual(
+      ['2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05']);
+    expect(summary.weekStrip[0].count).toBeGreaterThanOrEqual(1);
+    expect(summary.weekStrip[1].count).toBeGreaterThanOrEqual(1);
+    // A deadline of today is not past yet (UTC would already call it overdue).
+    // (Each customer also gets a second, real-clock-dated cycle — assert only ours.)
+    const pastIds = summary.actionCenter.pastDeadline.map((i) => i.selectionCycleId);
+    expect(pastIds).not.toContain(today.id);
+    expect(pastIds).not.toContain(tomorrow.id);
+    expect(summary.actionCenter.awaitingConfirmation.map((i) => i.selectionCycleId))
+      .toEqual(expect.arrayContaining([today.id, tomorrow.id]));
+    // Still October in Central — MTD must not snap to November.
+    expect(summary.revenue.monthToDate).toBe(100);
+  });
+
+  it('honors a non-default business zone', async () => {
+    const { business } = await createTestBusiness();
+    await knex('businesses').where('id', business.id).update({ timezone: 'Pacific/Auckland' });
+
+    const summary = await businessService.getHomeSummary(business.id, { now: NOW });
+
+    expect(summary.timeZone).toBe('Pacific/Auckland');
+    expect(summary.today.serviceDate).toBe('2026-10-31'); // 4:30pm Sat in Auckland
+  });
+
+  it('falls back to America/Chicago for an invalid stored zone', async () => {
+    const { business } = await createTestBusiness();
+    await knex('businesses').where('id', business.id).update({ timezone: 'Not/AZone' });
+
+    const summary = await businessService.getHomeSummary(business.id, { now: NOW });
+
+    expect(summary.timeZone).toBe('America/Chicago');
+    expect(summary.today.serviceDate).toBe('2026-10-30');
   });
 });

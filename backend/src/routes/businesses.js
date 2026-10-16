@@ -5,6 +5,7 @@ const { authenticate, requireBusiness } = require('../middleware/auth');
 const businessService = require('../services/businessService');
 const notificationService = require('../services/notificationService');
 const { getProvider } = require('../services/sms');
+const { resolveTimeZone } = require('../utils/businessDate');
 
 // All business routes require authentication + ownership check
 router.use(authenticate);
@@ -44,6 +45,7 @@ router.get('/:businessId', requireBusiness, async (req, res) => {
         name: business.name,
         phoneNumber: business.phone_number,
         schedulingFormat: business.scheduling_format,
+        timeZone: resolveTimeZone(business.timezone),
         joinCode: business.join_code,
         entityType: business.entity_type,
         contactFirstName: business.contact_first_name,

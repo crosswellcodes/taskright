@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { requireSession, businessGet } from '@/lib/serverApi';
+import { requireSession, businessGet, getTimeZone } from '@/lib/serverApi';
 import {
   type Forecast, type ForecastDay, LIFECYCLE_CLASS, LIFECYCLE_DOT, LIFECYCLE_LABEL,
   callsForDay, dayKey, formatLongDay, formatMonth, isDateKey, isMonthKey, monthGrid, shiftMonth, todayKey,
@@ -87,7 +87,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   const session = await requireSession();
   const params = await searchParams;
 
-  const today = todayKey();
+  const today = todayKey(await getTimeZone(session));
   const day = isDateKey(params.day) ? params.day : undefined;
   // A selected day must sit inside the visible grid (its data comes from the
   // same ranged fetch) — otherwise follow the day to its own month.

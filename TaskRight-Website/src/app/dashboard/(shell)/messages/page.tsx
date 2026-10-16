@@ -1,4 +1,4 @@
-import { requireSession, businessGet } from '@/lib/serverApi';
+import { requireSession, businessGet, getTimeZone } from '@/lib/serverApi';
 import type { InboxThread, ThreadMessage } from '@/lib/messages';
 import InboxList from '@/components/dashboard/messages/InboxList';
 import ThreadPanel from '@/components/dashboard/messages/ThreadPanel';
@@ -10,7 +10,8 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
   const { customer: customerParam } = await searchParams;
   const selectedId = customerParam && /^\d+$/.test(customerParam) ? Number(customerParam) : null;
 
-  const [inboxRes, customersRes, threadRes] = await Promise.all([
+  const [timeZone, inboxRes, customersRes, threadRes] = await Promise.all([
+    getTimeZone(session),
     businessGet<{ threads: InboxThread[]; totalUnread: number }>(session, '/messages/inbox'),
     businessGet<{ customers: { id: number; name: string; phoneNumber: string }[] }>(session, '/customers'),
     selectedId ? businessGet<Thread>(session, `/customers/${selectedId}/messages`) : null,
@@ -31,7 +32,7 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
 
       <div className="bg-white rounded-2xl border border-border overflow-hidden grid grid-cols-1 lg:grid-cols-[320px_1fr] h-[calc(100vh-12rem)] min-h-[480px]">
         <div className={`border-r border-border min-h-0 ${selected ? 'hidden lg:flex lg:flex-col' : 'flex flex-col'}`}>
-          <InboxList threads={threads} selectedId={selectedId} customers={customers.map(c => ({ id: c.id, name: c.name }))} />
+          <InboxList threads={threads} selectedId={selectedId} customers={customers.map(c => ({ id: c.id, name: c.name }))} timeZone={timeZone} />
         </div>
         <div className={`min-h-0 ${selected ? 'flex flex-col' : 'hidden lg:flex lg:flex-col'}`}>
           {selected && threadRes ? (
@@ -41,6 +42,7 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
               messages={threadRes.messages}
               nextCursor={threadRes.pagination.nextCursor}
               unreadCount={unreadCount}
+              timeZone={timeZone}
             />
           ) : (
             <div className="flex-1 flex items-center justify-center p-8 text-center">

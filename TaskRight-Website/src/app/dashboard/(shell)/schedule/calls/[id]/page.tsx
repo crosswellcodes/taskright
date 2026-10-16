@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { requireSession, businessGet } from '@/lib/serverApi';
-import { type LifecycleState, LIFECYCLE_CLASS, LIFECYCLE_LABEL, dayKey, formatLongDay } from '@/lib/schedule';
+import { requireSession, businessGet, getTimeZone } from '@/lib/serverApi';
+import { type LifecycleState, LIFECYCLE_CLASS, LIFECYCLE_LABEL, dayKey, formatDateTimeIn, formatLongDay } from '@/lib/schedule';
 import CallActions from '@/components/dashboard/schedule/CallActions';
 import JobCostingCard, { type JobCosts } from '@/components/dashboard/money/JobCostingCard';
 
@@ -55,6 +55,7 @@ export default async function ServiceCallPage({ params }: { params: Promise<{ id
   const { id } = await params;
   if (!/^\d+$/.test(id)) notFound();
   const session = await requireSession();
+  const timeZone = await getTimeZone(session);
 
   const [callRes, membersRes, groupsRes, costsRes, categoriesRes] = await Promise.all([
     businessGet<{ serviceCall: ServiceCall }>(session, `/selection-cycles/${id}`),
@@ -153,7 +154,7 @@ export default async function ServiceCallPage({ params }: { params: Promise<{ id
             <Card title="Completion">
               <p className="text-text text-sm">
                 {call.completedAt
-                  ? `Completed ${new Date(call.completedAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}`
+                  ? `Completed ${formatDateTimeIn(call.completedAt, timeZone)}`
                   : 'Marked completed.'}
               </p>
               {call.completionNotes && <p className="text-text-muted text-sm mt-2">{call.completionNotes}</p>}

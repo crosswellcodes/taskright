@@ -2,6 +2,7 @@ const knex = require('../db');
 const crypto = require('crypto');
 const https = require('https');
 const notificationService = require('./notificationService');
+const { resolveTimeZone, todayInZone, addDaysKey } = require('../utils/businessDate');
 
 // ─── GEOCODING ───────────────────────────────────────────────────────────────
 // See shared/specs/GEOCODING_RELIABILITY.md. Coordinates drive team-member
@@ -2601,27 +2602,29 @@ async function getActiveClocksForBusiness(businessId) {
   return rows;
 }
 
-async function getHomeSummary(businessId) {
+// `now` is injectable so tests can pin the clock (e.g. 9pm Central, when UTC
+// is already tomorrow). Every date boundary is the business's local day.
+async function getHomeSummary(businessId, { now = new Date() } = {}) {
   const business = await knex('businesses').where('id', businessId).first();
   if (!business) {
     throw Object.assign(new Error('Business not found'), { code: 'NOT_FOUND', statusCode: 404 });
   }
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const weekEndStr = new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-  const monthStartStr = new Date().toISOString().slice(0, 7) + '-01';
+  const timeZone = resolveTimeZone(business.timezone);
+  const todayStr = todayInZone(timeZone, now);
+  const weekDates = Array.from({ length: 7 }, (_, i) => addDaysKey(todayStr, i));
+  const weekEndStr = weekDates[6];
+  const monthStartStr = todayStr.slice(0, 7) + '-01';
 
   const customers = await knex('customers').where('business_id', businessId).select('id', 'name');
   const customerName = (id) => (customers.find((c) => c.id === id) || {}).name || null;
   const customerIds = customers.map((c) => c.id);
 
   const empty = {
+    timeZone,
     actionCenter: { awaitingConfirmation: [], pastDeadline: [], unassignedUpcoming: [], unreadMessages: [] },
     today: { serviceDate: todayStr, items: [] },
-    weekStrip: Array.from({ length: 7 }, (_, i) => ({
-      date: new Date(Date.now() + i * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      count: 0,
-    })),
+    weekStrip: weekDates.map((date) => ({ date, count: 0 })),
     revenue: { monthToDate: 0 },
     recentReviews: [],
     activeClocks: [],
@@ -2672,10 +2675,7 @@ async function getHomeSummary(businessId) {
     if (dateStr >= todayStr && dateStr <= weekEndStr) weekCounts[dateStr] = (weekCounts[dateStr] || 0) + 1;
   }
 
-  const weekStrip = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(Date.now() + i * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    return { date: d, count: weekCounts[d] || 0 };
-  });
+  const weekStrip = weekDates.map((date) => ({ date, count: weekCounts[date] || 0 }));
 
   const completedThisMonth = await knex('selection_cycles')
     .whereIn('customer_id', customerIds)
@@ -2701,6 +2701,7 @@ async function getHomeSummary(businessId) {
     .sort((a, b) => new Date(b.lastMessageAt) - new Date(a.lastMessageAt));
 
   return {
+    timeZone,
     actionCenter: { awaitingConfirmation, pastDeadline, unassignedUpcoming, unreadMessages },
     today: { serviceDate: todayStr, items: todayItems },
     weekStrip,

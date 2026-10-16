@@ -1,5 +1,8 @@
 // Shared Schedule-module types + date helpers. All dates are plain YYYY-MM-DD
 // strings; math is done in UTC so the server's timezone never shifts a day.
+// "Today" and clock times are the BUSINESS's zone (GET /businesses/:id
+// timeZone), never the server's — on Vercel that's UTC. See WEB_PORTAL.md
+// "Time zones".
 
 export type LifecycleState = 'proposed' | 'confirmed' | 'completed';
 
@@ -79,7 +82,24 @@ export function callsForDay(day: ForecastDay) {
   );
 }
 
-export function todayKey() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+export const DEFAULT_TIME_ZONE = 'America/Chicago';
+
+// Calendar date (YYYY-MM-DD) of an instant in the business's zone; en-CA
+// formats as ISO year-month-day.
+export function dateKeyIn(timeZone: string, at: Date | string = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(at));
+}
+
+export function todayKey(timeZone: string) {
+  return dateKeyIn(timeZone);
+}
+
+// "3:45 PM" for an ISO timestamp, in the business's zone.
+export function formatTimeIn(iso: string, timeZone: string) {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone });
+}
+
+// "Oct 14, 2026, 3:45 PM" for an ISO timestamp, in the business's zone.
+export function formatDateTimeIn(iso: string, timeZone: string) {
+  return new Date(iso).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone });
 }

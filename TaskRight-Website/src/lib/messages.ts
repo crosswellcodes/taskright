@@ -1,4 +1,5 @@
 // Shared Messages-module types + helpers (WEB_PORTAL M4).
+import { dateKeyIn } from '@/lib/schedule';
 
 export type InboxThread = {
   customerId: number;
@@ -22,15 +23,15 @@ export function mediaSrc(stored: string) {
   return `/api/media/messages/${stored.split('/').pop()}`;
 }
 
-// Inbox timestamp: time today, weekday this week, else a short date.
-export function formatInboxTime(iso: string) {
+// Inbox timestamp: time today, weekday this week, else a short date — all in
+// the business's zone (these render on the server first, then hydrate).
+export function formatInboxTime(iso: string, timeZone: string) {
   const d = new Date(iso);
-  const now = new Date();
-  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  if (now.getTime() - d.getTime() < 6 * 864e5) return d.toLocaleDateString('en-US', { weekday: 'short' });
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  if (dateKeyIn(timeZone, d) === dateKeyIn(timeZone)) return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone });
+  if (Date.now() - d.getTime() < 6 * 864e5) return d.toLocaleDateString('en-US', { weekday: 'short', timeZone });
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone });
 }
 
-export function formatBubbleTime(iso: string) {
-  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+export function formatBubbleTime(iso: string, timeZone: string) {
+  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone });
 }

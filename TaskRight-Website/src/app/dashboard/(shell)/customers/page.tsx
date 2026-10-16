@@ -1,4 +1,4 @@
-import { requireSession, businessGet } from '@/lib/serverApi';
+import { requireSession, businessGet, getTimeZone } from '@/lib/serverApi';
 import { type Forecast, callsForDay, todayKey } from '@/lib/schedule';
 import type { CustomerListItem } from '@/lib/customers';
 import CustomersView from '@/components/dashboard/customers/CustomersView';
@@ -6,7 +6,7 @@ import CustomersView from '@/components/dashboard/customers/CustomersView';
 export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   const session = await requireSession();
   const { view } = await searchParams;
-  const today = todayKey();
+  const today = todayKey(await getTimeZone(session));
 
   const [customersRes, todayRes] = await Promise.all([
     businessGet<{ customers: CustomerListItem[] }>(session, '/customers'),

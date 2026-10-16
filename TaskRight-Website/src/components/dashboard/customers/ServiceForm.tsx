@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { post, patch, type ApiError } from '@/lib/apiClient';
 import { DAY_NAMES, FREQUENCIES } from '@/lib/customers';
-import { addDays, todayKey } from '@/lib/schedule';
+import { addDays } from '@/lib/schedule';
 
 type Task = { id?: number; name: string; timeAllotmentMinutes: number };
 
@@ -25,6 +25,7 @@ type Props = {
   customerId: number;
   customerName: string;
   schedulingFormat: 'date_based' | 'day_of_week';
+  today: string;                        // business-local YYYY-MM-DD, from the server page
   service?: ServiceDefinition;          // present → edit mode
   templates?: Template[];               // create mode only
   members?: { id: number; name: string }[];
@@ -32,8 +33,8 @@ type Props = {
 };
 
 // Next date (from tomorrow) falling on `day` — same rule as the app's builder.
-function nextOccurrence(day: number) {
-  const tomorrow = addDays(todayKey(), 1);
+function nextOccurrence(today: string, day: number) {
+  const tomorrow = addDays(today, 1);
   const dow = new Date(`${tomorrow}T00:00:00Z`).getUTCDay();
   return addDays(tomorrow, (day - dow + 7) % 7);
 }
@@ -41,7 +42,7 @@ function nextOccurrence(day: number) {
 // The web Service builder (create + definition-only edit). Mirrors the app's
 // AssignCycleScreen payload: tasks are diff-upserted by id on edit, so existing
 // task ids are preserved; new rows omit id.
-export default function ServiceForm({ businessId, customerId, customerName, schedulingFormat, service, templates = [], members = [], groups = [] }: Props) {
+export default function ServiceForm({ businessId, customerId, customerName, schedulingFormat, today, service, templates = [], members = [], groups = [] }: Props) {
   const router = useRouter();
   const isEdit = !!service;
   const isDayOfWeek = schedulingFormat === 'day_of_week';
@@ -53,7 +54,7 @@ export default function ServiceForm({ businessId, customerId, customerName, sche
   const [price, setPrice] = useState(service?.pricePerVisit != null ? String(Number(service.pricePerVisit)) : '');
   const [deadlineDays, setDeadlineDays] = useState(service?.daysBeforeServiceDeadline != null ? String(service.daysBeforeServiceDeadline) : '3');
   const [tasks, setTasks] = useState<Task[]>(service?.tasks ?? []);
-  const [startDate, setStartDate] = useState(addDays(todayKey(), 1));
+  const [startDate, setStartDate] = useState(addDays(today, 1));
   const [dayOfWeek, setDayOfWeek] = useState<number | null>(null);
   const [assignee, setAssignee] = useState('');
   const [busy, setBusy] = useState(false);
@@ -107,7 +108,7 @@ export default function ServiceForm({ businessId, customerId, customerName, sche
       body = {
         ...base,
         ...(templateId != null ? { templateId } : {}),
-        startDate: isDayOfWeek ? nextOccurrence(dayOfWeek!) : startDate,
+        startDate: isDayOfWeek ? nextOccurrence(today, dayOfWeek!) : startDate,
         ...(isDayOfWeek ? { dayOfWeek } : {}),
         ...(assignee ? { assignee: kind === 'm' ? { teamMemberId: Number(aid) } : { teamId: Number(aid) } } : {}),
       };
@@ -208,12 +209,12 @@ export default function ServiceForm({ businessId, customerId, customerName, sche
                   <option value="">Pick a day…</option>
                   {DAY_NAMES.map((d, i) => <option key={d} value={i}>{d}</option>)}
                 </select>
-                {dayOfWeek != null && <span className="text-text-muted text-xs">First visit {nextOccurrence(dayOfWeek)}</span>}
+                {dayOfWeek != null && <span className="text-text-muted text-xs">First visit {nextOccurrence(today, dayOfWeek)}</span>}
               </label>
             ) : (
               <label className="block">
                 <span className={label}>First service date</span>
-                <input className={input} type="date" min={todayKey()} value={startDate} onChange={e => setStartDate(e.target.value)} />
+                <input className={input} type="date" min={today} value={startDate} onChange={e => setStartDate(e.target.value)} />
               </label>
             )}
             <label className="block">

@@ -1,6 +1,6 @@
 import Link from 'next/link';
-import { requireSession, businessGet } from '@/lib/serverApi';
-import { type Forecast, LIFECYCLE_CLASS, LIFECYCLE_LABEL, addDays, callsForDay, dayKey, todayKey } from '@/lib/schedule';
+import { requireSession, businessGet, getTimeZone } from '@/lib/serverApi';
+import { type Forecast, LIFECYCLE_CLASS, LIFECYCLE_LABEL, addDays, callsForDay, dayKey, formatTimeIn, todayKey } from '@/lib/schedule';
 import type { ActiveClock, RangeAssignment, TeamGroup, TeamMember } from '@/lib/team';
 import AutoRefresh from '@/components/dashboard/AutoRefresh';
 import MembersPanel from '@/components/dashboard/team/MembersPanel';
@@ -8,9 +8,9 @@ import GroupsPanel from '@/components/dashboard/team/GroupsPanel';
 
 type Tab = 'overview' | 'members' | 'groups';
 
-function formatSince(iso: string) {
+function formatSince(iso: string, timeZone: string) {
   const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
-  const since = new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  const since = formatTimeIn(iso, timeZone);
   return `since ${since} · ${mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`}`;
 }
 
@@ -45,7 +45,8 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
   const { tab: tabParam } = await searchParams;
   const tab: Tab = tabParam === 'members' || tabParam === 'groups' ? tabParam : 'overview';
 
-  const today = todayKey();
+  const timeZone = await getTimeZone(session);
+  const today = todayKey(timeZone);
   const weekEnd = addDays(today, 6);
 
   const [membersRes, groupsRes, clocksRes, forecastRes, assignmentsRes] = await Promise.all([
@@ -122,7 +123,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
                     <span className="w-2.5 h-2.5 rounded-full bg-success shrink-0" />
                     <div className="min-w-0">
                       <p className="text-text text-sm font-medium">{c.teamMemberName}</p>
-                      <p className="text-text-muted text-xs truncate">at {c.customerName} · {formatSince(c.arrivalAt)}</p>
+                      <p className="text-text-muted text-xs truncate">at {c.customerName} · {formatSince(c.arrivalAt, timeZone)}</p>
                     </div>
                   </Link>
                 ))}

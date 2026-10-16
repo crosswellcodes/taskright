@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/session';
+import { getTimeZone } from '@/lib/serverApi';
+import { dateKeyIn, formatTimeIn } from '@/lib/schedule';
 import AutoRefresh from '@/components/dashboard/AutoRefresh';
 import { formatMoney } from '@/lib/customers';
 import { type Profitability, formatPercent, periodRange } from '@/lib/money';
@@ -62,12 +64,9 @@ type HomeSummary = {
   activeClocks: ActiveClock[];
 };
 
+// YYYY-MM-DD key → "Wed, Oct 14" (noon UTC anchor never crosses a day).
 function formatDay(dateStr: string) {
-  return new Date(`${dateStr}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-}
-
-function formatTime(dateStr: string) {
-  return new Date(dateStr).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return new Date(`${dateStr}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
 const callHref = (id: number) => `/dashboard/schedule/calls/${id}`;
@@ -168,7 +167,8 @@ export default async function HomePage() {
   if (!session) redirect('/dashboard/login');
 
   const headers = { Authorization: `Bearer ${session.token}` };
-  const month = periodRange('month');
+  const timeZone = await getTimeZone(session);
+  const month = periodRange('month', timeZone);
   const [res, profitRes] = await Promise.all([
     fetch(`${API_BASE}/api/businesses/${session.businessId}/home-summary`, { headers, cache: 'no-store' }),
     fetch(`${API_BASE}/api/businesses/${session.businessId}/profitability?from=${month.from}&to=${month.to}`, { headers, cache: 'no-store' }),
@@ -211,7 +211,7 @@ export default async function HomePage() {
                 <Link key={t.customerId} href={`/dashboard/messages?customer=${t.customerId}`} className={rowLink}>
                   <div>
                     <p className="text-text text-sm font-medium">{t.customerName || `Customer #${t.customerId}`}</p>
-                    <p className="text-text-muted text-xs">last at {formatTime(t.lastMessageAt)}, {formatDay(t.lastMessageAt.split('T')[0])}</p>
+                    <p className="text-text-muted text-xs">last at {formatTimeIn(t.lastMessageAt, timeZone)}, {formatDay(dateKeyIn(timeZone, t.lastMessageAt))}</p>
                   </div>
                   <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-brand text-white">{t.unreadCount} new</span>
                 </Link>
@@ -265,7 +265,7 @@ export default async function HomePage() {
                 <Link key={c.teamMemberId} href={callHref(c.selectionCycleId)} className={rowLink}>
                   <div>
                     <p className="text-text text-sm font-medium">{c.teamMemberName}</p>
-                    <p className="text-text-muted text-xs">at {c.customerName} · since {formatTime(c.arrivalAt)}</p>
+                    <p className="text-text-muted text-xs">at {c.customerName} · since {formatTimeIn(c.arrivalAt, timeZone)}</p>
                   </div>
                   <span className="w-2 h-2 rounded-full bg-success" />
                 </Link>

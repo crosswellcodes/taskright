@@ -41,9 +41,9 @@ export const PERIODS = [
 ] as const;
 export type Period = (typeof PERIODS)[number]['value'];
 
-// Inclusive YYYY-MM-DD range for a period, in the viewer's calendar.
-export function periodRange(period: Period) {
-  const today = todayKey();
+// Inclusive YYYY-MM-DD range for a period, in the business's calendar.
+export function periodRange(period: Period, timeZone: string) {
+  const today = todayKey(timeZone);
   const [y, m] = today.split('-').map(Number);
   const pad = (n: number) => String(n).padStart(2, '0');
   const lastDay = (yy: number, mm: number) => new Date(Date.UTC(yy, mm, 0)).getUTCDate(); // mm is 1-based
