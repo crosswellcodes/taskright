@@ -33,4 +33,14 @@ function addDaysKey(key, n) {
   return d.toISOString().split('T')[0];
 }
 
-module.exports = { DEFAULT_TIME_ZONE, isValidTimeZone, resolveTimeZone, todayInZone, addDaysKey };
+// YYYY-MM-DD for a pg DATE value. node-pg builds a DATE as LOCAL midnight of
+// the backend process, so its local Y-M-D is the stored date on any host —
+// whereas toISOString() shifts it back a day on hosts east of UTC.
+function pgDateKey(value) {
+  if (value == null) return null;
+  if (typeof value === 'string') return value.slice(0, 10);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+}
+
+module.exports = { DEFAULT_TIME_ZONE, isValidTimeZone, resolveTimeZone, todayInZone, addDaysKey, pgDateKey };

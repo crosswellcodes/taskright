@@ -139,6 +139,10 @@ describe('getHomeSummary — business-local day', () => {
     await assignCycleToCustomer(businessId, c.id, template.id, token, 2);
     const cycle = await firstCycleFor(c.id);
     await knex('selection_cycles').where('id', cycle.id).update(fields);
+    // The customer's other generated cycles are dated from the real clock —
+    // park them outside every window under test so the pinned case is stable.
+    await knex('selection_cycles').where('customer_id', c.id).whereNot('id', cycle.id)
+      .update({ service_date: '2030-01-01', submission_deadline: '2030-01-01' });
     return cycle;
   }
 
@@ -162,13 +166,10 @@ describe('getHomeSummary — business-local day', () => {
     expect(summary.today.items.map((i) => i.selectionCycleId)).toEqual([today.id]);
     expect(summary.weekStrip.map((d) => d.date)).toEqual(
       ['2026-10-30', '2026-10-31', '2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05']);
-    expect(summary.weekStrip[0].count).toBeGreaterThanOrEqual(1);
-    expect(summary.weekStrip[1].count).toBeGreaterThanOrEqual(1);
+    expect(summary.weekStrip[0].count).toBe(1);
+    expect(summary.weekStrip[1].count).toBe(1);
     // A deadline of today is not past yet (UTC would already call it overdue).
-    // (Each customer also gets a second, real-clock-dated cycle — assert only ours.)
-    const pastIds = summary.actionCenter.pastDeadline.map((i) => i.selectionCycleId);
-    expect(pastIds).not.toContain(today.id);
-    expect(pastIds).not.toContain(tomorrow.id);
+    expect(summary.actionCenter.pastDeadline).toEqual([]);
     expect(summary.actionCenter.awaitingConfirmation.map((i) => i.selectionCycleId))
       .toEqual(expect.arrayContaining([today.id, tomorrow.id]));
     // Still October in Central — MTD must not snap to November.

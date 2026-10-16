@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const router = express.Router();
 const knex = require('../db');
+const { pgDateKey } = require('../utils/businessDate');
 const { sendSMS } = require('../services/notificationService');
 const { getProvider } = require('../services/sms');
 const {
@@ -40,7 +41,7 @@ async function handleKeyword(business, customer, fromPhone, body) {
     });
 
     if (openCycle) {
-      const serviceDate = new Date(openCycle.service_date).toISOString().split('T')[0];
+      const serviceDate = pgDateKey(openCycle.service_date);
       await knex('selection_cycles').where('id', openCycle.id).update({
         customer_note: body.trim(),
         updated_at: knex.raw('CURRENT_TIMESTAMP'),
@@ -81,7 +82,7 @@ async function handleKeyword(business, customer, fromPhone, body) {
     }
 
     const token = await generateSelectionToken(openCycle.id);
-    const serviceDate = new Date(openCycle.service_date).toISOString().split('T')[0];
+    const serviceDate = pgDateKey(openCycle.service_date);
     await sendSMS(business, fromPhone, `Review your tasks for ${serviceDate}: ${WEBSITE_URL}/s/${token}`);
     return;
   }
@@ -105,7 +106,7 @@ async function handleKeyword(business, customer, fromPhone, body) {
       return;
     }
 
-    const serviceDate = new Date(openCycle.service_date).toISOString().split('T')[0];
+    const serviceDate = pgDateKey(openCycle.service_date);
     await knex('customers').where('id', customer.id).update({
       pending_sms_action: 'note_pending',
       updated_at: knex.raw('CURRENT_TIMESTAMP'),

@@ -2,7 +2,7 @@ const knex = require('../db');
 const crypto = require('crypto');
 const https = require('https');
 const notificationService = require('./notificationService');
-const { resolveTimeZone, todayInZone, addDaysKey } = require('../utils/businessDate');
+const { resolveTimeZone, todayInZone, addDaysKey, pgDateKey } = require('../utils/businessDate');
 
 // ─── GEOCODING ───────────────────────────────────────────────────────────────
 // See shared/specs/GEOCODING_RELIABILITY.md. Coordinates drive team-member
@@ -554,7 +554,7 @@ async function createCustomerService(customerId, {
           .orderBy('service_date', 'asc')
           .first()
       ]);
-      const firstServiceDate = firstCycle ? new Date(firstCycle.service_date).toISOString().split('T')[0] : null;
+      const firstServiceDate = firstCycle ? pgDateKey(firstCycle.service_date) : null;
       await notificationService.sendWelcomeNotification(business, customer.phone_number, business.name, firstServiceDate);
     } catch (e) {
       console.error('Welcome SMS failed:', e.message);
@@ -703,8 +703,8 @@ async function updateCustomerService(businessId, serviceId, data = {}) {
     const openCalls = await knex('selection_cycles')
       .where('customer_service_id', serviceId).where('status', 'open');
     for (const call of openCalls) {
-      // pg may return date columns as Date or string; normalize to YYYY-MM-DD first.
-      const sdStr = new Date(call.service_date).toISOString().split('T')[0];
+      // pg returns date columns as local-midnight Dates; normalize to YYYY-MM-DD first.
+      const sdStr = pgDateKey(call.service_date);
       const serviceMs = new Date(sdStr + 'T00:00:00Z').getTime();
       const deadline = new Date(serviceMs - data.daysBeforeServiceDeadline * 864e5)
         .toISOString().split('T')[0];
@@ -756,7 +756,27 @@ function addDays(date, n) {
   return new Date(date.getTime() + n * 24 * 60 * 60 * 1000);
 }
 
-async function generateUpcomingSelectionCycles(customerId, serviceCycle, startDate, dayOfWeek = null) {
+// The business's IANA zone (migration 029) for a customer / team member, so
+// "today" is the business's day rather than the server's (WEB_PORTAL.md §2).
+async function timeZoneForCustomer(customerId) {
+  const row = await knex('customers').join('businesses', 'customers.business_id', 'businesses.id')
+    .where('customers.id', customerId).first('businesses.timezone');
+  return resolveTimeZone(row && row.timezone);
+}
+
+async function timeZoneForTeamMember(teamMemberId) {
+  const row = await knex('team_members').join('businesses', 'team_members.business_id', 'businesses.id')
+    .where('team_members.id', teamMemberId).first('businesses.timezone');
+  return resolveTimeZone(row && row.timezone);
+}
+
+async function timeZoneForBusiness(businessId) {
+  const row = await knex('businesses').where('id', businessId).first('timezone');
+  return resolveTimeZone(row && row.timezone);
+}
+
+// `now` is injectable so tests can pin the clock for the no-startDate default.
+async function generateUpcomingSelectionCycles(customerId, serviceCycle, startDate, dayOfWeek = null, { now = new Date() } = {}) {
   // `serviceCycle` is now the customer_services row (the Service itself), which
   // carries the definition + recurring price directly.
   // D2 (Business Rule 4): pre-fill each Service Call's price from the Service's
@@ -770,11 +790,12 @@ async function generateUpcomingSelectionCycles(customerId, serviceCycle, startDa
       // User picked a specific starting date from the inline calendar — honour it
       currentDate = new Date(startDate);
     } else {
-      // No specific date chosen — default to the next occurrence of this weekday from tomorrow
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(0, 0, 0, 0);
-      const daysUntil = (dayOfWeek - tomorrow.getDay() + 7) % 7;
+      // No specific date chosen — default to the next occurrence of this weekday
+      // from the business's tomorrow. Built as a UTC-midnight Date so the
+      // toISOString() keying below never depends on the server's zone.
+      const tomorrowKey = addDaysKey(todayInZone(await timeZoneForCustomer(customerId), now), 1);
+      const tomorrow = new Date(`${tomorrowKey}T00:00:00Z`);
+      const daysUntil = (dayOfWeek - tomorrow.getUTCDay() + 7) % 7;
       currentDate = addDays(tomorrow, daysUntil);
     }
   } else {
@@ -949,12 +970,16 @@ async function updateFeedbackBusinessNotes(feedbackId, businessId, notes) {
 // ─── FORECAST ────────────────────────────────────────────────────────────────
 
 // range: optional { from, to } (YYYY-MM-DD, validated by the route). Omitted →
-// the original today..today+30 window (mobile contract unchanged).
-async function getBusinessForecast(businessId, range = {}) {
-  const today = new Date();
-  const thirtyDaysLater = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
-  const todayStr = range.from || today.toISOString().split('T')[0];
-  const thirtyDaysStr = range.to || thirtyDaysLater.toISOString().split('T')[0];
+// the original today..today+30 window (mobile contract unchanged), where
+// "today" is the business's day, not the server's UTC day.
+async function getBusinessForecast(businessId, range = {}, { now = new Date() } = {}) {
+  let todayStr = range.from;
+  let thirtyDaysStr = range.to;
+  if (!todayStr || !thirtyDaysStr) {
+    const today = todayInZone(await timeZoneForBusiness(businessId), now);
+    todayStr = todayStr || today;
+    thirtyDaysStr = thirtyDaysStr || addDaysKey(today, 30);
+  }
 
   const customers = await knex('customers').where('business_id', businessId);
   const customerIds = customers.map(c => c.id);
@@ -973,9 +998,7 @@ async function getBusinessForecast(businessId, range = {}) {
   const dateGrouped = {};
   for (const sc of selectionCycles) {
     // Normalize to plain YYYY-MM-DD string (pg returns date columns as Date objects)
-    const dateKey = typeof sc.service_date === 'string'
-      ? sc.service_date.split('T')[0]
-      : sc.service_date.toISOString().split('T')[0];
+    const dateKey = pgDateKey(sc.service_date);
     if (!dateGrouped[dateKey]) {
       dateGrouped[dateKey] = { serviceDate: sc.service_date, cycleGroups: {} };
     }
@@ -1095,8 +1118,8 @@ async function markServiceComplete(selectionCycleId, customerId, notes) {
           .orderBy('service_date', 'asc')
           .first()
       ]);
-      const nextDate = nextCycle ? new Date(nextCycle.service_date).toISOString().split('T')[0] : null;
-      const nextDeadline = nextCycle ? new Date(nextCycle.submission_deadline).toISOString().split('T')[0] : null;
+      const nextDate = nextCycle ? pgDateKey(nextCycle.service_date) : null;
+      const nextDeadline = nextCycle ? pgDateKey(nextCycle.submission_deadline) : null;
       await notificationService.sendServiceCompletionNotification(business, customer.phone_number, nextDate, nextDeadline);
     } catch (e) {
       console.error('Completion SMS failed:', e.message);
@@ -1514,8 +1537,10 @@ async function assertMemberAssignedToCall(teamMemberId, selectionCycleId) {
   return assignment;
 }
 
-async function getJobsForTeamMember(teamMemberId) {
-  const today = new Date().toISOString().split('T')[0];
+// "Upcoming" starts at the business's today — from 7pm Central a UTC today
+// would already hide tonight's jobs.
+async function getJobsForTeamMember(teamMemberId, { now = new Date() } = {}) {
+  const today = todayInZone(await timeZoneForTeamMember(teamMemberId), now);
   // Broadened to include group jobs: individual assignment OR membership in the
   // assigned team. selection_cycle_id is UNIQUE in service_assignments, so the
   // sa join yields at most one row per cycle — no dedup needed (TL4). teams is
@@ -1792,7 +1817,7 @@ async function confirmCustomerSelection(customerId) {
 
   if (!cycle) return { status: 'no_cycle' };
 
-  const serviceDate = new Date(cycle.service_date).toISOString().split('T')[0];
+  const serviceDate = pgDateKey(cycle.service_date);
 
   const existing = await knex('selections')
     .where('selection_cycle_id', cycle.id)
@@ -1875,7 +1900,7 @@ async function getSelectionByToken(token) {
 
   return {
     cycleId: cycle.id,
-    serviceDate: new Date(cycle.service_date).toISOString().split('T')[0],
+    serviceDate: pgDateKey(cycle.service_date),
     businessName: business.name,
     availableTasks: tasks,
     currentTaskIds,
@@ -1932,7 +1957,7 @@ async function submitSelectionByToken(token, selectedTaskIds) {
     });
   }
 
-  return { serviceDate: new Date(cycle.service_date).toISOString().split('T')[0] };
+  return { serviceDate: pgDateKey(cycle.service_date) };
 }
 
 // ─── GEOFENCE EVENTS ─────────────────────────────────────────────────────────
@@ -2489,7 +2514,7 @@ async function getBusinessProfitability(businessId, { from, to }) {
     const totalCost = round2(c.labor + c.materials + c.overhead + c.other);
     return {
       selectionCycleId: r.id,
-      serviceDate: new Date(r.service_date).toISOString().split('T')[0],
+      serviceDate: pgDateKey(r.service_date),
       customerId: r.customer_id,
       customerName: r.customer_name,
       serviceId: r.service_id,
@@ -2657,8 +2682,8 @@ async function getHomeSummary(businessId, { now = new Date() } = {}) {
   const weekCounts = {};
 
   for (const c of openCycles) {
-    const dateStr = new Date(c.service_date).toISOString().split('T')[0];
-    const deadlineStr = c.submission_deadline ? new Date(c.submission_deadline).toISOString().split('T')[0] : null;
+    const dateStr = pgDateKey(c.service_date);
+    const deadlineStr = c.submission_deadline ? pgDateKey(c.submission_deadline) : null;
     const isSubmitted = submittedSet.has(c.id);
     const isAssigned = assignedSet.has(c.id);
     const base = { selectionCycleId: c.id, customerId: c.customer_id, customerName: customerName(c.customer_id), serviceDate: dateStr };
@@ -2859,7 +2884,7 @@ async function getReviewByToken(token) {
     valid: true,
     customerName: customer ? customer.name : null,
     businessName: business ? business.name : null,
-    serviceDate: cycle ? new Date(cycle.service_date).toISOString().split('T')[0] : null,
+    serviceDate: cycle ? pgDateKey(cycle.service_date) : null,
     alreadySubmitted: row.submitted_at != null,
   };
 }

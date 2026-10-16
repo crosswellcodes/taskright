@@ -5,7 +5,7 @@ const { authenticate, requireBusiness } = require('../middleware/auth');
 const businessService = require('../services/businessService');
 const notificationService = require('../services/notificationService');
 const { getProvider } = require('../services/sms');
-const { resolveTimeZone } = require('../utils/businessDate');
+const { resolveTimeZone, pgDateKey } = require('../utils/businessDate');
 
 // All business routes require authentication + ownership check
 router.use(authenticate);
@@ -1024,7 +1024,7 @@ router.get('/:businessId/assignments', requireBusiness, async (req, res) => {
       success: true,
       assignments: rows.map(r => ({
         selectionCycleId: r.selection_cycle_id,
-        serviceDate: new Date(r.service_date).toISOString().split('T')[0],
+        serviceDate: pgDateKey(r.service_date),
         customerId: r.customer_id,
         teamMemberId: r.team_member_id || null,
         teamMemberName: r.team_member_name || null,

@@ -4,6 +4,7 @@ const {
   addCustomerToBusiness, assignCycleToCustomer,
 } = require('./helpers');
 const businessService = require('../services/businessService');
+const { pgDateKey } = require('../utils/businessDate');
 
 // Web portal M5 (Team): invite status on the member list, validated member
 // edits, group-membership ownership hardening, the active-clocks board, and the
@@ -122,7 +123,7 @@ describe('Active clocks + ranged assignments', () => {
 
   it('GET /assignments?from=&to= returns assignments in range with serviceDate', async () => {
     const sc = await knex('selection_cycles').where('id', callIds[0]).first();
-    const day = new Date(sc.service_date).toISOString().split('T')[0];
+    const day = pgDateKey(sc.service_date);
     const res = await auth(request(app).get(`/api/businesses/${businessId}/assignments?from=${day}&to=${day}`));
     expect(res.status).toBe(200);
     expect(res.body.assignments).toEqual([

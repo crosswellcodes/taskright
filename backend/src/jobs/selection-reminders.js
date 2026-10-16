@@ -1,5 +1,6 @@
 const schedule = require('node-schedule');
 const knex = require('../db');
+const { pgDateKey } = require('../utils/businessDate');
 const { sendSelectionReminder } = require('../services/notificationService');
 
 /**
@@ -50,9 +51,7 @@ function startSelectionReminderJob() {
             sms_phone_number: service.sms_phone_number,
           };
 
-          const serviceDate = service.service_date instanceof Date
-            ? service.service_date.toISOString().split('T')[0]
-            : String(service.service_date).split('T')[0];
+          const serviceDate = pgDateKey(service.service_date);
 
           await sendSelectionReminder(business, service.phone_number, serviceDate, 3, service.business_name);
           successCount++;

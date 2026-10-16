@@ -1,4 +1,7 @@
-const { todayInZone, addDaysKey, isValidTimeZone, resolveTimeZone } = require('../utils/businessDate');
+const { todayInZone, addDaysKey, isValidTimeZone, resolveTimeZone, pgDateKey } = require('../utils/businessDate');
+const knex = require('../db');
+
+afterAll(async () => { await knex.destroy(); });
 
 // Business-local calendar dates (WEB_PORTAL.md "Time zones").
 describe('businessDate', () => {
@@ -28,5 +31,15 @@ describe('businessDate', () => {
     expect(addDaysKey('2026-11-01', 1)).toBe('2026-11-02'); // DST ends Nov 1
     expect(addDaysKey('2026-12-31', 1)).toBe('2027-01-01');
     expect(addDaysKey('2026-03-01', -1)).toBe('2026-02-28');
+  });
+
+  it('keys a pg DATE to its stored date regardless of the backend host zone', async () => {
+    // node-pg returns DATE as local midnight; run under TZ=Asia/Tokyo to see
+    // toISOString() slip a day while pgDateKey does not.
+    const { rows: [r] } = await knex.raw("SELECT DATE '2026-10-30' AS d");
+    expect(pgDateKey(r.d)).toBe('2026-10-30');
+    expect(pgDateKey('2026-10-30')).toBe('2026-10-30');
+    expect(pgDateKey('2026-10-30T05:00:00.000Z')).toBe('2026-10-30');
+    expect(pgDateKey(null)).toBeNull();
   });
 });
