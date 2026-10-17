@@ -43,7 +43,11 @@ All endpoints return JSON:
 ### Send OTP Verification Code
 **POST** `/auth/verify/send`
 
-Used by the web signup flow to verify a phone number before account creation. Powered by Twilio Verify — requires `TWILIO_VERIFY_SERVICE_SID` in backend `.env`.
+Step one of **every** login and signup (business, customer, team member; web and mobile), added as a hard requirement Oct 16, 2026. Texts a 6-digit code through `getProvider('otp')`: Twilio Verify today (`TWILIO_VERIFY_SERVICE_SID`), SignalHouse once `SMS_PROVIDER_OTP=signalhouse`.
+
+**Code rule for every auth route below:** call it without `otpCode` first. It answers its usual 400/403/404/409, or **`401 OTP_REQUIRED`** with no token. Then call this endpoint and retry with the code: wrong or expired → `400 INVALID_OTP`; a code works once.
+
+**Dev bypass (local only):** 555 numbers can't receive texts. When backend `.env` sets `OTP_DEV_BYPASS_CODE` and `NODE_ENV` isn't `production`, a `+1555…` number skips the real send and that code is accepted (`services/otpGate.js`). It never applies to a non-555 number. **Never set it on a deployed backend.**
 
 **Request Body**:
 ```json
@@ -75,7 +79,7 @@ Used by the web signup flow to verify a phone number before account creation. Po
 }
 ```
 
-`otpCode` is optional. When present (web signup flow), the phone is verified against Twilio Verify before account creation. When absent (mobile app flow), verification is skipped — existing behaviour unchanged.
+`otpCode` is **required** (Oct 16, 2026; web and mobile). An already-registered phone returns `409 DUPLICATE_PHONE` *before* the code check, so clients can offer login without texting a code. Otherwise no code → `401 OTP_REQUIRED`; wrong code → `400 INVALID_OTP`.
 
 **Response (201)**:
 ```json
@@ -115,7 +119,7 @@ Used by the web signup flow to verify a phone number before account creation. Po
 }
 ```
 
-`otpCode` is optional. When present (web portal login — see `WEB_PORTAL.md` M0), it's verified via `getProvider('otp')` before a token is issued. When absent (mobile app flow), verification is skipped — existing behaviour unchanged.
+`otpCode` is **required** (Oct 16, 2026; web portal and mobile app). Without it: `404 BUSINESS_NOT_FOUND` for an unknown phone (the app slides into signup), else `401 OTP_REQUIRED` with no token.
 
 **Response (200)**:
 ```json
@@ -133,7 +137,8 @@ Used by the web signup flow to verify a phone number before account creation. Po
 
 **Error Responses**:
 - `400` — `VALIDATION_ERROR` — Phone not provided
-- `400` — `INVALID_OTP` — OTP code wrong or expired (web flow only)
+- `400` — `INVALID_OTP` — OTP code wrong, expired or already used
+- `401` — `OTP_REQUIRED` — No code sent (phone is registered)
 - `404` — `BUSINESS_NOT_FOUND`
 - `500` — `INTERNAL_ERROR`
 
@@ -270,9 +275,7 @@ Pre-signup lookup used by the web customer signup page (`/join/[code]`). Returns
 }
 ```
 
-`name` and `otpCode` are both optional.
-- **Web flow** (`/join/[code]` page): include both — `name` is collected in Step 1, `otpCode` from Twilio Verify in Step 2. Account is only created after OTP is approved.
-- **Mobile flow**: omit both — `businessId` is passed directly, verification is skipped. Existing behaviour unchanged.
+`otpCode` is **required** (Oct 16, 2026); `name` is optional. The web `/join/[code]` page collects `name` in Step 1 and the code in Step 2; the account is only created after the code checks out. No code → `401 OTP_REQUIRED`.
 
 If `name` is omitted, the customer's phone number is stored as a placeholder name.
 
@@ -293,7 +296,8 @@ If `name` is omitted, the customer's phone number is stored as a placeholder nam
 
 **Error Responses**:
 - `400` — `VALIDATION_ERROR` — Invalid input
-- `400` — `INVALID_OTP` — OTP code wrong or expired (web flow only)
+- `400` — `INVALID_OTP` — OTP code wrong, expired or already used
+- `401` — `OTP_REQUIRED` — No code sent
 - `404` — `BUSINESS_NOT_FOUND`
 - `409` — `DUPLICATE_CUSTOMER` — Customer already exists for this business
 - `500` — `INTERNAL_ERROR`
@@ -306,9 +310,12 @@ If `name` is omitted, the customer's phone number is stored as a placeholder nam
 **Request Body**:
 ```json
 {
-  "phoneNumber": "+14155559876"
+  "phoneNumber": "+14155559876",
+  "otpCode": "123456"
 }
 ```
+
+`otpCode` is **required** (Oct 16, 2026). Without it: `404 CUSTOMER_NOT_FOUND` for an unknown phone, else `401 OTP_REQUIRED` with no token.
 
 **Response (200)**:
 ```json
@@ -327,8 +334,24 @@ If `name` is omitted, the customer's phone number is stored as a placeholder nam
 
 **Error Responses**:
 - `400` — `VALIDATION_ERROR` — Phone not provided
+- `400` — `INVALID_OTP` — OTP code wrong, expired or already used
+- `401` — `OTP_REQUIRED` — No code sent (phone is registered)
 - `404` — `CUSTOMER_NOT_FOUND`
 - `500` — `INTERNAL_ERROR`
+
+---
+
+### Team Member Accept Invite
+**POST** `/auth/team-members/accept-invite`
+
+First-time activation: `{ "phoneNumber", "inviteCode" }` (the 6-digit code the owner shares from Team) → JWT (`type: 'team_member'`). No texted code: the invite code is the proof. **Guess limit (migration 030, Oct 16, 2026):** 5 wrong codes lock that invite for 15 minutes (`invite_failed_attempts` / `invite_locked_until`). The code itself doesn't change, so the owner never re-shares it.
+
+**Error Responses**: `400 VALIDATION_ERROR` · `401 INVALID_INVITE_CODE` · `404 TEAM_MEMBER_NOT_FOUND` · `409 INVITE_ALREADY_ACCEPTED` · `429 INVITE_LOCKED` · `500 INTERNAL_ERROR`.
+
+### Team Member Login
+**POST** `/auth/team-members/login`
+
+`{ "phoneNumber", "otpCode" }` → JWT. `otpCode` is **required** (Oct 16, 2026). Checked in order: `404 TEAM_MEMBER_NOT_FOUND` → `403 INVITE_PENDING` (accept the invite first) → `401 OTP_REQUIRED` → `400 INVALID_OTP`.
 
 ---
 

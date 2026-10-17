@@ -1131,6 +1131,9 @@ async function markServiceComplete(selectionCycleId, customerId, notes) {
 
 // ─── TEAM MEMBERS ─────────────────────────────────────────────────────────────
 
+const INVITE_MAX_ATTEMPTS = 5;
+const INVITE_LOCK_MS = 15 * 60 * 1000;
+
 function generateInviteCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
@@ -1186,7 +1189,20 @@ async function acceptTeamMemberInvite(phoneNumber, inviteCode) {
     err.statusCode = 409;
     throw err;
   }
+  // Guess limit (migration 030): 5 wrong codes lock the invite for 15 minutes.
+  if (member.invite_locked_until && new Date(member.invite_locked_until).getTime() > Date.now()) {
+    const err = new Error('Too many incorrect codes. Try again in 15 minutes.');
+    err.code = 'INVITE_LOCKED';
+    err.statusCode = 429;
+    throw err;
+  }
   if (member.invite_code !== inviteCode) {
+    const attempts = (member.invite_failed_attempts || 0) + 1;
+    const locking = attempts >= INVITE_MAX_ATTEMPTS;
+    await knex('team_members').where('id', member.id).update({
+      invite_failed_attempts: locking ? 0 : attempts,
+      invite_locked_until: locking ? new Date(Date.now() + INVITE_LOCK_MS) : null,
+    });
     const err = new Error('Invalid invite code');
     err.code = 'INVALID_INVITE_CODE';
     err.statusCode = 401;
@@ -1198,6 +1214,8 @@ async function acceptTeamMemberInvite(phoneNumber, inviteCode) {
     .update({
       invite_accepted: true,
       invite_code: null,
+      invite_failed_attempts: 0,
+      invite_locked_until: null,
       updated_at: knex.raw('CURRENT_TIMESTAMP'),
     })
     .returning('*');

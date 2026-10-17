@@ -3,7 +3,8 @@ const {
   app, knex, truncateAllTables,
   createTestBusiness, createTestCustomer,
   createTestServiceCycle, getServiceTasksForCustomer,
-  addCustomerToBusiness, assignCycleToCustomer
+  addCustomerToBusiness, assignCycleToCustomer,
+  loginCustomer,
 } = require('./helpers');
 
 let businessId, bizToken, customerId, custToken, selectionCycleId, task1, task2;
@@ -37,9 +38,7 @@ beforeEach(async () => {
   // Customer logs in
   const custRes = await createTestCustomer(businessId, { phoneNumber: '+13330001111' });
   // The customer already exists from addCustomerToBusiness, so we login instead
-  const loginRes = await request(app)
-    .post('/api/auth/customers/login')
-    .send({ phoneNumber: '+13330001111' });
+  const loginRes = await loginCustomer('+13330001111');
   custToken = loginRes.body.token;
   customerId = loginRes.body.customer.id;
 
@@ -76,9 +75,7 @@ describe('GET /api/customers/:customerId/selection-cycle/current', () => {
   it('returns 403 with another customer token', async () => {
     const other = await createTestBusiness();
     const otherCust = await addCustomerToBusiness(other.business.id, other.token, { name: 'Bob', phoneNumber: '+13330009999' });
-    const otherLogin = await request(app)
-      .post('/api/auth/customers/login')
-      .send({ phoneNumber: '+13330009999' });
+    const otherLogin = await loginCustomer('+13330009999');
 
     const res = await request(app)
       .get(`/api/customers/${customerId}/selection-cycle/current`)

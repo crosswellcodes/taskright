@@ -1,16 +1,23 @@
 import { post } from './client';
 
-export const businessSignup = (name, phoneNumber, schedulingFormat) =>
-  post('/api/auth/businesses/signup', { name, phoneNumber, schedulingFormat });
+// Every login and signup needs a texted code. Call without otpCode first: the
+// backend answers 404/403/409 as before, or 401 OTP_REQUIRED (no token) — then
+// sendVerificationCode() and retry with the code the user enters.
 
-export const businessLogin = (phoneNumber) =>
-  post('/api/auth/businesses/login', { phoneNumber });
+export const sendVerificationCode = (phoneNumber) =>
+  post('/api/auth/verify/send', { phoneNumber });
 
-export const customerLogin = (phoneNumber) =>
-  post('/api/auth/customers/login', { phoneNumber });
+export const businessSignup = (name, phoneNumber, schedulingFormat, otpCode) =>
+  post('/api/auth/businesses/signup', { name, phoneNumber, schedulingFormat, otpCode });
+
+export const businessLogin = (phoneNumber, otpCode) =>
+  post('/api/auth/businesses/login', { phoneNumber, otpCode });
+
+export const customerLogin = (phoneNumber, otpCode) =>
+  post('/api/auth/customers/login', { phoneNumber, otpCode });
 
 export const teamMemberAcceptInvite = (phoneNumber, inviteCode) =>
   post('/api/auth/team-members/accept-invite', { phoneNumber, inviteCode });
 
-export const teamMemberLogin = (phoneNumber) =>
-  post('/api/auth/team-members/login', { phoneNumber });
+export const teamMemberLogin = (phoneNumber, otpCode) =>
+  post('/api/auth/team-members/login', { phoneNumber, otpCode });

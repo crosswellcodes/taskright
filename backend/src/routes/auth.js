@@ -5,6 +5,16 @@ const { validateBusinessSignup, validateCustomerSignup } = require('../utils/val
 const businessService = require('../services/businessService');
 const customerService = require('../services/customerService');
 const { getProvider } = require('../services/sms');
+const { sendLoginCode, verifyLoginCode } = require('../services/otpGate');
+
+// Every login and signup must prove phone possession with a texted code
+// (otpGate). Missing code → 401 OTP_REQUIRED; wrong/expired → 400 INVALID_OTP.
+function otpRequired(res) {
+  return res.status(401).json({ success: false, error: 'Verification code required', code: 'OTP_REQUIRED' });
+}
+function otpInvalid(res) {
+  return res.status(400).json({ success: false, error: 'Invalid or expired verification code', code: 'INVALID_OTP' });
+}
 
 // Normalize a US phone number to E.164 format
 function normalizePhone(phone) {
@@ -17,7 +27,7 @@ function normalizePhone(phone) {
 /**
  * POST /api/auth/verify/send
  * Send a 6-digit OTP to the given phone number via the configured SMS provider.
- * Used by the web signup flow before account creation.
+ * Step one of every login and signup (web and mobile).
  */
 router.post('/verify/send', async (req, res) => {
   const { phoneNumber } = req.body;
@@ -27,7 +37,7 @@ router.post('/verify/send', async (req, res) => {
   }
 
   try {
-    await getProvider('otp').sendOtp(normalizePhone(phoneNumber));
+    await sendLoginCode(normalizePhone(phoneNumber));
     return res.json({ success: true });
   } catch (error) {
     // Twilio rate-limit error code 20429
@@ -41,9 +51,7 @@ router.post('/verify/send', async (req, res) => {
 
 /**
  * POST /api/auth/businesses/signup
- * Create a new business account.
- * Web flow: include otpCode to verify phone before account creation.
- * Mobile flow: omit otpCode — verification is skipped (existing behaviour unchanged).
+ * Create a new business account. Requires otpCode (web and mobile).
  */
 router.post('/businesses/signup', async (req, res) => {
   try {
@@ -69,13 +77,13 @@ router.post('/businesses/signup', async (req, res) => {
       });
     }
 
-    // Web signup: verify OTP before creating the account
-    if (otpCode) {
-      const ok = await getProvider('otp').verifyOtp(normalizePhone(phoneNumber), otpCode);
-      if (!ok) {
-        return res.status(400).json({ success: false, error: 'Invalid or expired verification code', code: 'INVALID_OTP' });
-      }
+    // Already registered → 409 before asking for a code (the app offers login).
+    if (await businessService.getBusinessByPhone(phoneNumber)) {
+      return res.status(409).json({ success: false, error: 'Phone number already registered', code: 'DUPLICATE_PHONE' });
     }
+
+    if (!otpCode) return otpRequired(res);
+    if (!(await verifyLoginCode(phoneNumber, otpCode))) return otpInvalid(res);
 
     // Create business
     const business = await businessService.createBusiness(name, phoneNumber, schedulingFormat || 'date_based', resolvedEntityType);
@@ -125,9 +133,8 @@ router.post('/businesses/signup', async (req, res) => {
 
 /**
  * POST /api/auth/businesses/login
- * Login with phone number.
- * Web flow: include otpCode to verify phone possession before issuing a token.
- * Mobile flow: omit otpCode — verification is skipped (existing behaviour unchanged).
+ * Login with phone number + otpCode. Without a code: 404 if the phone isn't
+ * registered (the app slides into signup), else 401 OTP_REQUIRED — no token.
  */
 router.post('/businesses/login', async (req, res) => {
   try {
@@ -151,12 +158,8 @@ router.post('/businesses/login', async (req, res) => {
       });
     }
 
-    if (otpCode) {
-      const ok = await getProvider('otp').verifyOtp(normalizePhone(phoneNumber), otpCode);
-      if (!ok) {
-        return res.status(400).json({ success: false, error: 'Invalid or expired verification code', code: 'INVALID_OTP' });
-      }
-    }
+    if (!otpCode) return otpRequired(res);
+    if (!(await verifyLoginCode(normalizePhone(phoneNumber), otpCode))) return otpInvalid(res);
 
     const { token, expiresIn } = generateToken({
       sub: business.id.toString(),
@@ -205,8 +208,7 @@ router.get('/businesses/join/:joinCode', async (req, res) => {
 
 /**
  * POST /api/auth/customers/signup
- * Create a new customer account.
- * Web flow: include name + otpCode. Mobile flow: omit both (existing behaviour unchanged).
+ * Create a new customer account. Requires otpCode; name is optional.
  */
 router.post('/customers/signup', async (req, res) => {
   try {
@@ -230,13 +232,8 @@ router.post('/customers/signup', async (req, res) => {
       });
     }
 
-    // Web signup: verify OTP before creating the account
-    if (otpCode) {
-      const ok = await getProvider('otp').verifyOtp(normalizePhone(phoneNumber), otpCode);
-      if (!ok) {
-        return res.status(400).json({ success: false, error: 'Invalid or expired verification code', code: 'INVALID_OTP' });
-      }
-    }
+    if (!otpCode) return otpRequired(res);
+    if (!(await verifyLoginCode(normalizePhone(phoneNumber), otpCode))) return otpInvalid(res);
 
     const customer = await customerService.createCustomer(businessId, phoneNumber, name || null);
 
@@ -277,11 +274,11 @@ router.post('/customers/signup', async (req, res) => {
 
 /**
  * POST /api/auth/customers/login
- * Login customer with phone number
+ * Login customer with phone number + otpCode (404 / 401 OTP_REQUIRED as business login).
  */
 router.post('/customers/login', async (req, res) => {
   try {
-    const { phoneNumber } = req.body;
+    const { phoneNumber, otpCode } = req.body;
 
     if (!phoneNumber) {
       return res.status(400).json({
@@ -300,6 +297,9 @@ router.post('/customers/login', async (req, res) => {
         code: 'CUSTOMER_NOT_FOUND'
       });
     }
+
+    if (!otpCode) return otpRequired(res);
+    if (!(await verifyLoginCode(normalizePhone(phoneNumber), otpCode))) return otpInvalid(res);
 
     const { token, expiresIn } = generateToken({
       sub: customer.id.toString(),
@@ -371,6 +371,9 @@ router.post('/team-members/accept-invite', async (req, res) => {
     if (error.code === 'INVALID_INVITE_CODE') {
       return res.status(401).json({ success: false, error: 'Invalid invite code', code: 'INVALID_INVITE_CODE' });
     }
+    if (error.code === 'INVITE_LOCKED') {
+      return res.status(429).json({ success: false, error: error.message, code: 'INVITE_LOCKED' });
+    }
     if (error.code === 'INVITE_ALREADY_ACCEPTED') {
       return res.status(409).json({ success: false, error: error.message, code: 'INVITE_ALREADY_ACCEPTED' });
     }
@@ -381,11 +384,12 @@ router.post('/team-members/accept-invite', async (req, res) => {
 
 /**
  * POST /api/auth/team-members/login
- * Subsequent logins after invite is accepted — phone number only
+ * Subsequent logins after invite is accepted — phone number + otpCode
+ * (404 / 403 INVITE_PENDING / 401 OTP_REQUIRED, checked in that order).
  */
 router.post('/team-members/login', async (req, res) => {
   try {
-    const { phoneNumber } = req.body;
+    const { phoneNumber, otpCode } = req.body;
 
     if (!phoneNumber) {
       return res.status(400).json({ success: false, error: 'Phone number is required', code: 'VALIDATION_ERROR' });
@@ -399,6 +403,9 @@ router.post('/team-members/login', async (req, res) => {
     if (!member.invite_accepted) {
       return res.status(403).json({ success: false, error: 'Invite not yet accepted', code: 'INVITE_PENDING' });
     }
+
+    if (!otpCode) return otpRequired(res);
+    if (!(await verifyLoginCode(normalizePhone(phoneNumber), otpCode))) return otpInvalid(res);
 
     const { token, expiresIn } = generateToken({
       sub: member.id.toString(),

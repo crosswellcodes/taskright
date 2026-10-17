@@ -4,17 +4,21 @@ import {
   StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { businessLogin, businessSignup, customerLogin, teamMemberLogin, teamMemberAcceptInvite } from '../../api/authApi';
+import {
+  businessLogin, businessSignup, customerLogin, teamMemberLogin, teamMemberAcceptInvite, sendVerificationCode,
+} from '../../api/authApi';
 import { useAuth } from '../../context/AuthContext';
 import { normalizePhone } from '../../utils/phoneUtils';
 
 export default function PhoneEntryScreen() {
   const { login } = useAuth();
-  const [mode, setMode] = useState('select'); // 'select' | 'business' | 'customer' | 'signup' | 'team_member' | 'team_member_invite'
+  const [mode, setMode] = useState('select'); // 'select' | 'business' | 'customer' | 'signup' | 'team_member' | 'team_member_invite' | 'otp'
   const [phoneNumber, setPhoneNumber] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [schedulingFormat, setSchedulingFormat] = useState('date_based');
   const [inviteCode, setInviteCode] = useState('');
+  const [otpRole, setOtpRole] = useState(null); // which flow the code step finishes: 'business' | 'signup' | 'customer' | 'team_member'
+  const [otpCode, setOtpCode] = useState('');
   const [loading, setLoading] = useState(false);
 
   const goBack = () => {
@@ -22,22 +26,86 @@ export default function PhoneEntryScreen() {
     setBusinessName('');
     setSchedulingFormat('date_based');
     setInviteCode('');
+    setOtpRole(null);
+    setOtpCode('');
     setMode('select');
+  };
+
+  const completeBusiness = (data) => login(data.token, {
+    type: 'business',
+    businessId: data.business.id,
+    name: data.business.name,
+    schedulingFormat: data.business.schedulingFormat,
+  });
+
+  const completeCustomer = (data) =>
+    login(data.token, { type: 'customer', customerId: data.customer.id, name: data.customer.name });
+
+  const completeTeamMember = (data) => login(data.token, {
+    type: 'team_member',
+    teamMemberId: data.teamMember.id,
+    businessId: data.teamMember.businessId,
+    name: data.teamMember.name,
+  });
+
+  // Every login/signup proves phone possession with a texted code. Each flow
+  // first asks without a code (so 404/403/409 still route as before); the
+  // backend's 401 OTP_REQUIRED lands here: text the code, show the code step.
+  const beginOtp = async (role) => {
+    await sendVerificationCode(normalizePhone(phoneNumber));
+    setOtpRole(role);
+    setOtpCode('');
+    setMode('otp');
+  };
+
+  const sendCodeError = (err) => {
+    Alert.alert('Error', err.code === 'RATE_LIMITED'
+      ? 'Too many attempts. Please wait a minute before requesting another code.'
+      : err.message || 'Could not send a verification code');
+  };
+
+  const handleVerifyCode = async () => {
+    if (otpCode.length !== 6) return Alert.alert('Error', 'Enter the 6-digit code we texted you');
+    const phone = normalizePhone(phoneNumber);
+    setLoading(true);
+    try {
+      if (otpRole === 'business') await completeBusiness(await businessLogin(phone, otpCode));
+      else if (otpRole === 'signup') await completeBusiness(await businessSignup(businessName.trim(), phone, schedulingFormat, otpCode));
+      else if (otpRole === 'customer') await completeCustomer(await customerLogin(phone, otpCode));
+      else if (otpRole === 'team_member') await completeTeamMember(await teamMemberLogin(phone, otpCode));
+    } catch (err) {
+      if (err.code === 'INVALID_OTP') {
+        Alert.alert('Invalid Code', 'That code is incorrect or expired. Try again or resend a new code.');
+      } else {
+        Alert.alert('Error', err.message || 'Verification failed');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    setLoading(true);
+    try {
+      await sendVerificationCode(normalizePhone(phoneNumber));
+      setOtpCode('');
+      Alert.alert('Code Sent', 'We texted you a new code.');
+    } catch (err) {
+      sendCodeError(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleBusinessLogin = async () => {
     if (!phoneNumber.trim()) return Alert.alert('Error', 'Enter your phone number');
     setLoading(true);
     try {
-      const data = await businessLogin(normalizePhone(phoneNumber));
-      await login(data.token, {
-        type: 'business',
-        businessId: data.business.id,
-        name: data.business.name,
-        schedulingFormat: data.business.schedulingFormat,
-      });
+      await completeBusiness(await businessLogin(normalizePhone(phoneNumber)));
     } catch (err) {
-      if (err.status === 404) {
+      if (err.code === 'OTP_REQUIRED') {
+        await beginOtp('business').catch(sendCodeError);
+      } else if (err.status === 404) {
         setMode('signup'); // phone not found — slide into signup with number pre-filled
       } else {
         Alert.alert('Error', err.message || 'Login failed');
@@ -52,15 +120,15 @@ export default function PhoneEntryScreen() {
     if (!businessName.trim()) return Alert.alert('Error', 'Enter your business name');
     setLoading(true);
     try {
-      const data = await businessSignup(businessName.trim(), normalizePhone(phoneNumber), schedulingFormat);
-      await login(data.token, {
-        type: 'business',
-        businessId: data.business.id,
-        name: data.business.name,
-        schedulingFormat: data.business.schedulingFormat,
-      });
+      await completeBusiness(await businessSignup(businessName.trim(), normalizePhone(phoneNumber), schedulingFormat));
     } catch (err) {
-      Alert.alert('Error', err.message || 'Signup failed');
+      if (err.code === 'OTP_REQUIRED') {
+        await beginOtp('signup').catch(sendCodeError);
+      } else if (err.code === 'DUPLICATE_PHONE') {
+        Alert.alert('Already Registered', 'This phone number already has an account. Log in instead.');
+      } else {
+        Alert.alert('Error', err.message || 'Signup failed');
+      }
     } finally {
       setLoading(false);
     }
@@ -70,10 +138,11 @@ export default function PhoneEntryScreen() {
     if (!phoneNumber.trim()) return Alert.alert('Error', 'Enter your phone number');
     setLoading(true);
     try {
-      const data = await customerLogin(normalizePhone(phoneNumber));
-      await login(data.token, { type: 'customer', customerId: data.customer.id, name: data.customer.name });
+      await completeCustomer(await customerLogin(normalizePhone(phoneNumber)));
     } catch (err) {
-      if (err.status === 404) {
+      if (err.code === 'OTP_REQUIRED') {
+        await beginOtp('customer').catch(sendCodeError);
+      } else if (err.status === 404) {
         Alert.alert('Not Found', 'No account found for this phone number. Ask your service provider to add you.');
       } else {
         Alert.alert('Error', err.message || 'Login failed');
@@ -87,15 +156,11 @@ export default function PhoneEntryScreen() {
     if (!phoneNumber.trim()) return Alert.alert('Error', 'Enter your phone number');
     setLoading(true);
     try {
-      const data = await teamMemberLogin(normalizePhone(phoneNumber));
-      await login(data.token, {
-        type: 'team_member',
-        teamMemberId: data.teamMember.id,
-        businessId: data.teamMember.businessId,
-        name: data.teamMember.name,
-      });
+      await completeTeamMember(await teamMemberLogin(normalizePhone(phoneNumber)));
     } catch (err) {
-      if (err.status === 403) {
+      if (err.code === 'OTP_REQUIRED') {
+        await beginOtp('team_member').catch(sendCodeError);
+      } else if (err.status === 403) {
         // Invite not yet accepted — guide them to accept first
         setMode('team_member_invite');
       } else if (err.status === 404) {
@@ -113,15 +178,11 @@ export default function PhoneEntryScreen() {
     if (!inviteCode.trim()) return Alert.alert('Error', 'Enter your invite code');
     setLoading(true);
     try {
-      const data = await teamMemberAcceptInvite(normalizePhone(phoneNumber), inviteCode.trim());
-      await login(data.token, {
-        type: 'team_member',
-        teamMemberId: data.teamMember.id,
-        businessId: data.teamMember.businessId,
-        name: data.teamMember.name,
-      });
+      await completeTeamMember(await teamMemberAcceptInvite(normalizePhone(phoneNumber), inviteCode.trim()));
     } catch (err) {
-      if (err.status === 401) {
+      if (err.code === 'INVITE_LOCKED') {
+        Alert.alert('Too Many Attempts', 'Too many incorrect invite codes. Try again in 15 minutes.');
+      } else if (err.status === 401) {
         Alert.alert('Invalid Code', 'That invite code is incorrect. Check with your business owner.');
       } else if (err.status === 409) {
         // Already accepted — redirect to regular login
@@ -226,6 +287,61 @@ export default function PhoneEntryScreen() {
     );
   }
 
+  // ─── Verification code (every login and signup) ───────────────────────────
+
+  if (mode === 'otp') {
+    const backTo = otpRole === 'signup' ? 'signup' : otpRole;
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <ScrollView
+            contentContainerStyle={styles.formContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Text style={styles.formTitle}>Enter Your Code</Text>
+            <Text style={styles.formSubtitle}>
+              We texted a 6-digit code to {phoneNumber}
+            </Text>
+
+            <Text style={styles.label}>Verification Code</Text>
+            <TextInput
+              style={[styles.input, styles.codeInput]}
+              placeholder="------"
+              value={otpCode}
+              onChangeText={(t) => setOtpCode(t.replace(/\D/g, '').slice(0, 6))}
+              keyboardType="number-pad"
+              textContentType="oneTimeCode"
+              autoComplete="sms-otp"
+              maxLength={6}
+              autoFocus
+            />
+
+            <TouchableOpacity
+              style={[styles.primaryBtn, (loading || otpCode.length !== 6) && styles.primaryBtnDisabled]}
+              onPress={handleVerifyCode}
+              disabled={loading || otpCode.length !== 6}
+            >
+              <Text style={styles.primaryBtnText}>
+                {loading ? 'Verifying...' : 'Verify'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.linkBtn} onPress={handleResendCode} disabled={loading}>
+              <Text style={styles.linkText}>Resend Code</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.linkBtn} onPress={() => { setOtpCode(''); setMode(backTo); }}>
+              <Text style={styles.linkText}>Back</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    );
+  }
+
   // ─── Business signup ──────────────────────────────────────────────────────
 
   if (mode === 'signup') {
@@ -290,7 +406,7 @@ export default function PhoneEntryScreen() {
               disabled={loading}
             >
               <Text style={styles.primaryBtnText}>
-                {loading ? 'Creating Account...' : 'Create Account'}
+                {loading ? 'Sending Code...' : 'Create Account'}
               </Text>
             </TouchableOpacity>
 
@@ -536,6 +652,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14, alignItems: 'center', marginTop: 24,
   },
   primaryBtnDisabled: { backgroundColor: '#93c5fd' },
+  codeInput: { textAlign: 'center', fontSize: 24, fontWeight: '700', letterSpacing: 8 },
   primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   secondaryBtn: {
     borderWidth: 1.5, borderColor: '#2563eb', borderRadius: 10,

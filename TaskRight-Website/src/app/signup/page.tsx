@@ -5,7 +5,7 @@ import Link from 'next/link';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
-type Step = 'entity' | 'info' | 'success';
+type Step = 'entity' | 'info' | 'otp' | 'success';
 type EntityType = 'sole_prop' | 'llc_corp';
 
 const inputClass =
@@ -22,6 +22,7 @@ export default function SignupPage() {
   const [phone, setPhone] = useState('');
   const [schedulingFormat, setSchedulingFormat] = useState<'date_based' | 'day_of_week'>('date_based');
 
+  const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -36,6 +37,40 @@ export default function SignupPage() {
     setPhone(formatPhoneDisplay(e.target.value));
   }
 
+  // Signup requires a texted code. Posting without one first lets the backend
+  // answer 409 for an already-registered number before any code is sent;
+  // otherwise it answers 401 OTP_REQUIRED and we text the code.
+  async function postSignup(otpCode?: string) {
+    const res = await fetch(`${API_BASE}/api/auth/businesses/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: businessName.trim(),
+        phoneNumber: phone,
+        schedulingFormat,
+        entityType,
+        ...(otpCode ? { otpCode } : {}),
+      }),
+    });
+    return { res, data: await res.json() };
+  }
+
+  async function sendCode() {
+    const res = await fetch(`${API_BASE}/api/auth/verify/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phoneNumber: phone }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.code === 'RATE_LIMITED'
+        ? 'Too many attempts. Please wait a moment before requesting another code.'
+        : data.error || 'Failed to send code. Please try again.');
+      return false;
+    }
+    return true;
+  }
+
   async function handleCreateAccount() {
     setError('');
     const digits = phone.replace(/\D/g, '');
@@ -44,19 +79,46 @@ export default function SignupPage() {
 
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/auth/businesses/signup`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: businessName.trim(),
-          phoneNumber: phone,
-          schedulingFormat,
-          entityType,
-        }),
-      });
-      const data = await res.json();
+      const { res, data } = await postSignup();
+      if (data.code === 'DUPLICATE_PHONE') {
+        setError('This phone number is already registered.');
+      } else if (data.code === 'OTP_REQUIRED') {
+        if (await sendCode()) { setOtp(''); setStep('otp'); }
+      } else if (res.ok) {
+        setStep('success');
+      } else {
+        setError(data.error || 'Something went wrong. Please try again.');
+      }
+    } catch {
+      setError('Network error. Make sure the backend is running.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleResend() {
+    setError('');
+    setLoading(true);
+    try {
+      if (await sendCode()) setOtp('');
+    } catch {
+      setError('Network error.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleVerifyAndCreate() {
+    setError('');
+    if (otp.length !== 6) { setError('Enter the 6-digit code we texted you.'); return; }
+
+    setLoading(true);
+    try {
+      const { res, data } = await postSignup(otp);
       if (!res.ok) {
-        if (data.code === 'DUPLICATE_PHONE') {
+        if (data.code === 'INVALID_OTP') {
+          setError('That code is incorrect or expired. Check your messages or request a new code.');
+        } else if (data.code === 'DUPLICATE_PHONE') {
           setError('This phone number is already registered.');
         } else {
           setError(data.error || 'Something went wrong. Please try again.');
@@ -254,7 +316,65 @@ export default function SignupPage() {
             </div>
           )}
 
-          {/* Step 2 — Success */}
+          {/* Step 2 — Verify phone */}
+          {step === 'otp' && (
+            <div className="bg-white rounded-2xl border border-border p-8 shadow-sm">
+              <button
+                onClick={() => { setStep('info'); setError(''); setOtp(''); }}
+                className="text-text-muted text-sm mb-6 hover:text-text transition-colors flex items-center gap-1"
+              >
+                ← Back
+              </button>
+
+              <div className="mb-8">
+                <h1 className="text-2xl font-bold text-text mb-2">Check your texts</h1>
+                <p className="text-text-muted text-sm">
+                  We sent a 6-digit code to <span className="font-semibold text-text">{phone}</span>.
+                  Enter it below to verify your number.
+                </p>
+              </div>
+
+              <div className="space-y-5">
+                <div>
+                  <label className={labelClass} htmlFor="otp">Verification code</label>
+                  <input
+                    id="otp"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    autoFocus
+                    maxLength={6}
+                    className={`${inputClass} text-center text-2xl tracking-[0.5em] font-bold`}
+                    placeholder="------"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  />
+                </div>
+
+                <div className="text-center text-sm">
+                  <button
+                    onClick={handleResend}
+                    disabled={loading}
+                    className="text-brand font-semibold hover:underline disabled:opacity-60"
+                  >
+                    Resend code
+                  </button>
+                </div>
+
+                {error && <p className={errorClass}>{error}</p>}
+
+                <button
+                  onClick={handleVerifyAndCreate}
+                  disabled={loading || otp.length !== 6}
+                  className="w-full bg-brand hover:bg-brand-dark text-white font-semibold px-6 py-3.5 rounded-lg transition-colors text-base disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {loading ? 'Reserving your spot…' : 'Verify & reserve'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3 — Success */}
           {step === 'success' && (
             <div className="bg-white rounded-2xl border border-border p-8 shadow-sm text-center">
               <div className="w-16 h-16 bg-brand/10 rounded-full flex items-center justify-center mx-auto mb-6">

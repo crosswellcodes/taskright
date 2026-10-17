@@ -28,6 +28,7 @@
 
 ### `shared/API_REFERENCE.md`
 **Owns:** All endpoint signatures, request/response shapes, auth patterns, error formats.
+**Auth rule (Oct 16, 2026):** every login and signup requires a texted code. The "Send OTP Verification Code" section owns the rule, the `OTP_REQUIRED`/`INVALID_OTP` contract and the local-only 555 dev bypass.
 **Updated:** When new routes are added or existing routes change.
 **Must sync with:**
 - `HANDOFF.md` — route list in HANDOFF "What's Fully Built → Backend" must match documented endpoints

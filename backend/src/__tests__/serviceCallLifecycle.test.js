@@ -3,7 +3,8 @@ const {
   app, knex, truncateAllTables,
   createTestBusiness, createTestCustomer,
   createTestServiceCycle, getServiceTasksForCustomer,
-  addCustomerToBusiness, assignCycleToCustomer
+  addCustomerToBusiness, assignCycleToCustomer,
+  loginCustomer,
 } = require('./helpers');
 
 // SERVICE_CALL_LIFECYCLE.md §7 — the proposed → confirmed → completed derivation on
@@ -34,9 +35,7 @@ beforeEach(async () => {
   taskA = svcTasks[0];
   taskB = svcTasks[1];
 
-  const loginRes = await request(app)
-    .post('/api/auth/customers/login')
-    .send({ phoneNumber: '+13330001111' });
+  const loginRes = await loginCustomer('+13330001111');
   custToken = loginRes.body.token;
   customerId = loginRes.body.customer.id;
 

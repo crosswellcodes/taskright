@@ -2,7 +2,8 @@ const request = require('supertest');
 const {
   app, knex, truncateAllTables,
   createTestBusiness, createTestServiceCycle, getServiceTasksForCustomer,
-  addCustomerToBusiness, assignCycleToCustomer
+  addCustomerToBusiness, assignCycleToCustomer,
+  loginCustomer,
 } = require('./helpers');
 
 // Phase 2: template menus are inline task objects.
@@ -64,9 +65,7 @@ describe('GET /api/businesses/:businessId/selections', () => {
     await assignCycleToCustomer(businessId, customer.id, cycle.id, token, 2);
 
     // Customer submits a selection
-    const loginRes = await request(app)
-      .post('/api/auth/customers/login')
-      .send({ phoneNumber: '+13330001111' });
+    const loginRes = await loginCustomer('+13330001111');
     const custToken = loginRes.body.token;
     const custId = loginRes.body.customer.id;
 

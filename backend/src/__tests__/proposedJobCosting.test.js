@@ -3,6 +3,7 @@ const {
   app, knex, truncateAllTables,
   createTestBusiness, createTestServiceCycle,
   addCustomerToBusiness, assignCycleToCustomer,
+  loginCustomer,
 } = require('./helpers');
 
 // Proposed / expected job costing (SERVICE_CALL_LIFECYCLE.md §9): before a job runs,
@@ -77,7 +78,7 @@ describe('proposed labor — individual assignment', () => {
     const ann = await makeMember('Ann', '+13330007702', 20);
     await assignMember(ann);
 
-    const login = await request(app).post('/api/auth/customers/login').send({ phoneNumber: '+13330007700' });
+    const login = await loginCustomer('+13330007700');
     await request(app)
       .post(`/api/customers/${customerId}/selection-cycle/${selectionCycleId}/submit`)
       .set('Authorization', `Bearer ${login.body.token}`)

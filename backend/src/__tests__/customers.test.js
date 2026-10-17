@@ -2,7 +2,8 @@ const request = require('supertest');
 const {
   app, knex, truncateAllTables,
   createTestBusiness, createTestServiceCycle,
-  addCustomerToBusiness, assignCycleToCustomer
+  addCustomerToBusiness, assignCycleToCustomer,
+  loginCustomer,
 } = require('./helpers');
 
 let businessId, token, cycle;
@@ -134,9 +135,7 @@ describe('GET /api/businesses/:businessId/customers/:customerId', () => {
     const firstCycle = await knex('selection_cycles')
       .where('customer_id', customer.id).orderBy('service_date', 'asc').first();
 
-    const login = await request(app)
-      .post('/api/auth/customers/login')
-      .send({ phoneNumber: '+13330003333' });
+    const login = await loginCustomer('+13330003333');
     await request(app)
       .post(`/api/customers/${customer.id}/selection-cycle/${firstCycle.id}/submit`)
       .set('Authorization', `Bearer ${login.body.token}`)
@@ -213,9 +212,7 @@ describe('POST /api/customers/:customerId/feedback (rating)', () => {
     await assignCycleToCustomer(businessId, customer.id, cycle.id, token, 2);
     const firstCycle = await knex('selection_cycles')
       .where('customer_id', customer.id).orderBy('service_date', 'asc').first();
-    const login = await request(app)
-      .post('/api/auth/customers/login')
-      .send({ phoneNumber: '+13330004444' });
+    const login = await loginCustomer('+13330004444');
     return { customer, firstCycle, custToken: login.body.token };
   }
 

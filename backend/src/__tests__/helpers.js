@@ -1,6 +1,7 @@
 const request = require('supertest');
 const app = require('../app');
 const knex = require('../db');
+const SignalHouseProvider = require('../services/sms/SignalHouseProvider');
 
 // ─── DB LIFECYCLE ─────────────────────────────────────────────────────────────
 
@@ -43,6 +44,27 @@ async function truncateAllTables() {
   }
 }
 
+// ─── OTP (every login/signup needs a texted code — otpGate) ───────────────────
+// Tests issue codes through the SignalHouse provider's dev path: stored hashed
+// in otp_codes and logged, never sent (no SIGNALHOUSE_* env in tests).
+
+const TEST_OTP = '123456';
+
+async function issueTestOtp(phoneNumber) {
+  process.env.SMS_PROVIDER_OTP = 'signalhouse';
+  await knex('otp_codes').where('phone', phoneNumber).del(); // skip the 60s resend throttle
+  await new SignalHouseProvider({ otpGenerator: () => TEST_OTP }).sendOtp(phoneNumber);
+  return TEST_OTP;
+}
+
+// POST an auth route with a freshly issued valid code for body.phoneNumber.
+async function authPost(path, body) {
+  const otpCode = await issueTestOtp(body.phoneNumber);
+  return request(app).post(path).send({ ...body, otpCode });
+}
+
+const loginCustomer = (phoneNumber) => authPost('/api/auth/customers/login', { phoneNumber });
+
 // ─── TEST FACTORIES ───────────────────────────────────────────────────────────
 
 let businessCounter = 1;
@@ -55,9 +77,7 @@ async function createTestBusiness(overrides = {}) {
   };
   businessCounter++;
 
-  const res = await request(app)
-    .post('/api/auth/businesses/signup')
-    .send(data);
+  const res = await authPost('/api/auth/businesses/signup', data);
 
   return { business: res.body.business, token: res.body.token };
 }
@@ -69,9 +89,7 @@ async function createTestCustomer(businessId, overrides = {}) {
   };
   customerCounter++;
 
-  const res = await request(app)
-    .post('/api/auth/customers/signup')
-    .send(data);
+  const res = await authPost('/api/auth/customers/signup', data);
 
   return { customer: res.body.customer, token: res.body.token };
 }
@@ -134,6 +152,10 @@ async function assignCycleToCustomer(businessId, customerId, serviceCycleId, tok
 module.exports = {
   app,
   knex,
+  TEST_OTP,
+  issueTestOtp,
+  authPost,
+  loginCustomer,
   truncateAllTables,
   createTestBusiness,
   createTestCustomer,
