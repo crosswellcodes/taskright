@@ -1,13 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-
-type Hotspot = {
-  title: string;
-  description: string;
-  top?: string;
-  left?: string;
-};
+import { type Hotspot, HotspotDot, HotspotPanel } from './showcase/Hotspot';
 
 type RenderParams = {
   onCalViewChange?: (v: boolean) => void;
@@ -22,24 +16,6 @@ type Screen = {
   calHotspots?: Hotspot[];
   embedsHotspots?: boolean;
 };
-
-// ─── Shared hotspot dot ───────────────────────────────────────────────────────
-
-function HotspotDot({ index, activeHotspot, onHotspotTap }: {
-  index: number;
-  activeHotspot?: number | null;
-  onHotspotTap?: (i: number) => void;
-}) {
-  return (
-    <button
-      onClick={(e) => { e.stopPropagation(); onHotspotTap?.(index); }}
-      className={`w-4 h-4 rounded-full ring-2 ring-white cursor-pointer z-30 transition-all duration-150 shrink-0 ${
-        activeHotspot === index ? 'bg-[#10b981] scale-110' : 'bg-[#2563eb] animate-pulse'
-      }`}
-      aria-label={`Hotspot ${index + 1}`}
-    />
-  );
-}
 
 // ─── Business screen mocks ────────────────────────────────────────────────────
 
@@ -1268,7 +1244,6 @@ export default function AppShowcase() {
   const screens = activeTab === 'business' ? businessScreens : activeTab === 'customer' ? customerScreens : teamMemberScreens;
   const current = screens[activeScreen];
   const hotspots = (dashCalView && current.calHotspots) ? current.calHotspots : current.hotspots;
-  const activeHotspotData = activeHotspot !== null ? hotspots[activeHotspot] : null;
 
   function switchTab(tab: 'business' | 'customer' | 'teamMember') {
     setActiveTab(tab);
@@ -1371,72 +1346,16 @@ export default function AppShowcase() {
 
           {/* Popup panel — right of phone on desktop, below on mobile */}
           <div className="w-full lg:w-80 shrink-0">
-            {activeHotspotData !== null ? (
-              /* Active popup card */
-              <div
-                key={`${activeTab}-${activeScreen}-${activeHotspot}`}
-                className="bg-surface rounded-2xl border-2 border-brand shadow-lg p-6 relative
-                  animate-[fadeSlideIn_0.18s_ease-out]"
-              >
-                {/* Close button */}
-                <button
-                  onClick={() => setActiveHotspot(null)}
-                  className="absolute top-4 right-4 w-6 h-6 rounded-full bg-border flex items-center justify-center text-text-muted hover:bg-brand/10 hover:text-brand transition-colors text-sm font-bold"
-                  aria-label="Close"
-                >
-                  ✕
-                </button>
-
-                {/* Title */}
-                <div className="flex items-center gap-2.5 mb-3">
-                  <span className="w-3 h-3 rounded-full bg-success shrink-0" />
-                  <p className="font-bold text-text text-base leading-tight pr-6">
-                    {activeHotspotData.title}
-                  </p>
-                </div>
-
-                {/* Description */}
-                <p className="text-text-muted text-sm leading-relaxed pl-5.5">
-                  {activeHotspotData.description}
-                </p>
-
-                {/* Hotspot navigation dots */}
-                <div className="flex gap-2 mt-5 pl-11">
-                  {hotspots.map((_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setActiveHotspot(i)}
-                      className={`w-2 h-2 rounded-full transition-all ${
-                        activeHotspot === i ? 'bg-brand w-4' : 'bg-border hover:bg-brand/40'
-                      }`}
-                      aria-label={`Hotspot ${i + 1}`}
-                    />
-                  ))}
-                </div>
-              </div>
-            ) : (
-              /* Idle hint */
-              <div className="bg-surface rounded-2xl border border-dashed border-border p-6 text-center">
-                <div className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center mx-auto mb-3">
-                  <span className="text-brand font-bold text-sm">?</span>
-                </div>
-                <p className="text-sm font-semibold text-text mb-1">Click a blue dot</p>
-                <p className="text-xs text-text-muted">
-                  Click any blue dot on the screen to see a description of that feature.
-                </p>
-              </div>
-            )}
+            <HotspotPanel
+              hotspots={hotspots}
+              activeHotspot={activeHotspot}
+              onSelect={setActiveHotspot}
+              panelKey={`${activeTab}-${activeScreen}-${activeHotspot}`}
+            />
           </div>
         </div>
       </div>
 
-      {/* Keyframe for popup animation */}
-      <style>{`
-        @keyframes fadeSlideIn {
-          from { opacity: 0; transform: translateY(6px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
     </section>
   );
 }

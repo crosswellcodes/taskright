@@ -2,6 +2,7 @@ const features = [
   "Unlimited customers",
   "Unlimited team members",
   "Automated SMS to customers & team",
+  "Mobile app + web portal for the office",
   "Customer task selection & preferences",
   "All features — no upgrade tiers",
 ];

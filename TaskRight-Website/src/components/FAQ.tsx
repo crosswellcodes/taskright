@@ -12,7 +12,7 @@ const faqs = [
   {
     question: "How do I use TaskRight?",
     answer:
-      "TaskRight is an app right now. Business owners can do all functions from an admin-like view, team members can see their assigned service calls with ease, and customers can get the app — or benefit from our text message mechanisms to get transparency. All simple, all in one place. We have plans to build a web-based tool for business owners. The most value comes from our simple app, so we built that first.",
+      "Business owners run TaskRight from the mobile app and from a web portal on their computer — the same customers, schedule, and messages in both, with the portal adding a month calendar, a customer map, a unified text inbox, a live team board, and job margins. Team members use the app to see their assigned service calls and clock in on site. Customers can get the app — or simply use text messages to confirm visits and stay in the loop. All simple, all in one place.",
   },
   {
     question: "What about data security?",
