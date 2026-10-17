@@ -68,7 +68,7 @@ These features exist in mobile and could expand to web for power users:
 
 ### ✅ Web-Only (Marketing & Admin)
 These features should live on web to complement mobile:
-- **Marketing landing page** — product demo, feature showcase
+- **Marketing landing page** — product demo, feature showcase. **Oct 16, 2026:** the homepage now showcases both surfaces: `AppShowcase` (phone mocks of the app) and `PortalShowcase` ("Run your business from your desk", browser-frame mocks of the business web portal's Home, Schedule, Customers, Messages, Team and Money with sample data and hotspot dots; Account & Billing left out while M7 is on hold). The portal itself is built (`WEB_PORTAL.md` M0–M6) but has no public login link on the site yet; `/demo` has a "Web Portal" tab placeholder for a future recording.
 - **Public business profiles** — customers discover new services
 - **Business owner dashboard** — analytics, team management, bulk operations
 

@@ -29,6 +29,7 @@ const personas = [
       "Dispatch jobs to specific team members",
       "Automated reminders sent on your behalf",
       "Track feedback and service history",
+      "A desktop web portal for your inbox, customer map, and job margins",
     ],
   },
 ];

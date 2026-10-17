@@ -8,7 +8,7 @@ export default function Hero() {
         <p className="text-lg text-text-muted leading-relaxed mb-10 max-w-2xl mx-auto">
           Built for residential cleaning, lawn care, and home service businesses that need
           a tool for connecting teams, managing relationships, and logistics without the
-          enterprise bloat.
+          enterprise bloat. An app for your team in the field, and a web portal for you in the office.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
           <a

@@ -4,6 +4,7 @@ import Problem from '@/components/Problem';
 import Features from '@/components/Features';
 import HowItWorks from '@/components/HowItWorks';
 import AppShowcase from '@/components/AppShowcase';
+import PortalShowcase from '@/components/PortalShowcase';
 import PersonaCards from '@/components/PersonaCards';
 import DemoVideo from '@/components/DemoVideo';
 import Pricing from '@/components/Pricing';
@@ -21,6 +22,7 @@ export default function Home() {
         <PersonaCards />
         <DemoVideo />
         <AppShowcase />
+        <PortalShowcase />
         <Problem />
         <Features />
         <HowItWorks />

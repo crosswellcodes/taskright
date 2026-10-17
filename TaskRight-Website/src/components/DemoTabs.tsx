@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 
-type Tab = 'business' | 'team' | 'customer';
+type Tab = 'business' | 'portal' | 'team' | 'customer';
 
 const businessDemos = [
   {
@@ -38,9 +38,37 @@ const businessDemos = [
 
 const tabs: { id: Tab; label: string }[] = [
   { id: 'business', label: 'Business Owner' },
+  { id: 'portal',   label: 'Web Portal'     },
   { id: 'team',     label: 'Team Member'    },
   { id: 'customer', label: 'Customer'       },
 ];
+
+// No recording yet — point at the interactive portal mocks on the homepage.
+function PortalComingSoon() {
+  return (
+    <div className="max-w-xl mx-auto text-center py-16">
+      <div className="w-14 h-14 rounded-full bg-brand/10 flex items-center justify-center mx-auto mb-6">
+        <svg className="w-6 h-6 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V5zM8 21h8M12 17v4" />
+        </svg>
+      </div>
+      <h3 className="text-xl font-bold text-text mb-3">
+        Web portal walkthrough coming soon
+      </h3>
+      <p className="text-text-muted leading-relaxed mb-8">
+        The business web portal brings your schedule, customers, text inbox, team and job
+        margins to your computer. We&apos;re recording the full walkthrough next — in the
+        meantime, click through an interactive preview on the homepage.
+      </p>
+      <Link
+        href="/#portal-showcase"
+        className="inline-block bg-brand hover:bg-brand-dark text-white font-semibold px-6 py-3 rounded-lg transition-colors text-sm"
+      >
+        Explore the web portal
+      </Link>
+    </div>
+  );
+}
 
 function ComingSoon({ persona }: { persona: string }) {
   return (
@@ -74,12 +102,12 @@ export default function DemoTabs() {
     <div>
       {/* Tab strip */}
       <div className="flex justify-center mb-12">
-        <div className="inline-flex bg-surface border border-border rounded-xl p-1 gap-1">
+        <div className="inline-flex flex-wrap justify-center bg-surface border border-border rounded-xl p-1 gap-1">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
+              className={`px-3.5 sm:px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
                 activeTab === tab.id
                   ? 'bg-brand text-white shadow-sm'
                   : 'text-text-muted hover:text-text'
@@ -122,6 +150,9 @@ export default function DemoTabs() {
           ))}
         </div>
       )}
+
+      {/* Web Portal */}
+      {activeTab === 'portal' && <PortalComingSoon />}
 
       {/* Team Member */}
       {activeTab === 'team' && <ComingSoon persona="Team Member" />}

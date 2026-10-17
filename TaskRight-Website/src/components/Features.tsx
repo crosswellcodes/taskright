@@ -15,6 +15,16 @@ const features = [
       "After every service, customers rate their experience and can leave comments. Understand what's working before you lose them.",
   },
   {
+    title: "Know Your Margin on Every Job",
+    description:
+      "Time on site is tracked automatically and costed at each team member's rate. Add materials and overhead, and see what every job, customer, and service actually earns you.",
+  },
+  {
+    title: "A Web Portal for the Office",
+    description:
+      "Your team runs on the app in the field. You get a desktop view of the same business — a month calendar, a customer map, one inbox for every text, a live team board, and your profit and loss.",
+  },
+  {
     title: "Affordable Pricing",
     description:
       "No enterprise price tag for features you don't need. TaskRight is built for businesses with 10–75 customers, not 500 — and priced to match the size of your operation.",

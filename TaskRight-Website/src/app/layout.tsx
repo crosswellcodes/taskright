@@ -91,7 +91,7 @@ const localBusinessSchema = {
   name: "TaskRight",
   url: "https://taskrightpro.com",
   description:
-    "Service management app built for small cleaning, lawn care, and home service businesses in the Midwest. Manage customer preferences, automate reminders, collect feedback.",
+    "Service management app and web portal built for small cleaning, lawn care, and home service businesses in the Midwest. Manage customer preferences, automate reminders, collect feedback.",
   priceRange: "$$",
   areaServed: [
     { "@type": "State", name: "Illinois" },
