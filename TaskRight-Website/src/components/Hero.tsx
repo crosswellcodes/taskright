@@ -1,3 +1,5 @@
+import { SIGNUP_HREF } from '@/lib/signup';
+
 export default function Hero() {
   return (
     <section className="bg-bg py-24 px-6">
@@ -12,7 +14,7 @@ export default function Hero() {
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
           <a
-            href="/signup"
+            href={SIGNUP_HREF}
             className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-8 py-3.5 rounded-lg transition-colors text-base"
           >
             Get TaskRight

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { SIGNUP_HREF } from '@/lib/signup';
 
 type Tab = 'business' | 'portal' | 'team' | 'customer';
 
@@ -86,7 +87,7 @@ function ComingSoon({ persona }: { persona: string }) {
         Sign up for early access and we&apos;ll reach out when they&apos;re live.
       </p>
       <Link
-        href="/signup"
+        href={SIGNUP_HREF}
         className="inline-block bg-orange-600 hover:bg-orange-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors text-sm"
       >
         Get TaskRight

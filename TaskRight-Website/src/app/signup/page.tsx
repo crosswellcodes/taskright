@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
+import { SIGNUP_OPEN } from '@/lib/signup';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
@@ -13,12 +14,57 @@ const inputClass =
 const labelClass = 'block text-text text-sm font-semibold mb-1.5';
 const errorClass = 'text-red-500 text-sm mt-1';
 
+// Closed until production has a backend (lib/signup.ts): a direct visit or old
+// link lands here and gets sent to the Early Access form instead of failing at
+// the code step.
 export default function SignupPage() {
+  return SIGNUP_OPEN ? <SignupFlow /> : <SignupClosed />;
+}
+
+function SignupClosed() {
+  return (
+    <div className="min-h-screen bg-bg flex flex-col">
+      <header className="bg-white border-b border-border px-6 py-4">
+        <Link href="/" className="text-brand font-bold text-xl tracking-tight">
+          TaskRight
+        </Link>
+      </header>
+
+      <main className="flex-1 flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-md bg-white rounded-2xl border border-border p-8 shadow-sm text-center">
+          <div className="inline-block bg-brand/10 text-brand text-xs font-semibold px-3 py-1 rounded-full mb-4">
+            Early Access
+          </div>
+          <h1 className="text-2xl font-bold text-text mb-3">Accounts aren&apos;t open yet</h1>
+          <p className="text-text-muted text-base mb-8 leading-relaxed">
+            We&apos;re finishing TaskRight and opening accounts to early access members first.
+            Join the list and we&apos;ll reach out personally when your spot is ready.
+          </p>
+          <Link
+            href="/#early-access"
+            className="block w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold px-6 py-3.5 rounded-lg transition-colors text-base"
+          >
+            Join the early access list
+          </Link>
+          <Link
+            href="/"
+            className="block mt-5 text-text-muted text-sm hover:text-text transition-colors"
+          >
+            Back to homepage
+          </Link>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function SignupFlow() {
   const [step, setStep] = useState<Step>('entity');
 
   const [entityType, setEntityType] = useState<EntityType>('sole_prop');
 
   const [businessName, setBusinessName] = useState('');
+  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [schedulingFormat, setSchedulingFormat] = useState<'date_based' | 'day_of_week'>('date_based');
 
@@ -35,6 +81,24 @@ export default function SignupPage() {
 
   function handlePhoneChange(e: React.ChangeEvent<HTMLInputElement>) {
     setPhone(formatPhoneDisplay(e.target.value));
+  }
+
+  // Every prospect lands on the MailerLite early-access list (same as the
+  // homepage form), sent before the backend call so we keep the contact even if
+  // account creation fails. Fire-and-forget: the list is a side channel, never
+  // a blocker. Once per email, so retries don't resend.
+  const subscribedEmail = useRef('');
+  function addToEarlyAccessList() {
+    const addr = email.trim();
+    if (subscribedEmail.current === addr) return;
+    subscribedEmail.current = addr;
+    fetch('/api/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: businessName.trim(), email: addr, wantsUpdates: false }),
+    })
+      .then((res) => { if (!res.ok) subscribedEmail.current = ''; })
+      .catch(() => { subscribedEmail.current = ''; }); // retry on the next attempt
   }
 
   // Signup requires a texted code. Posting without one first lets the backend
@@ -75,8 +139,10 @@ export default function SignupPage() {
     setError('');
     const digits = phone.replace(/\D/g, '');
     if (!businessName.trim()) { setError('Business name is required.'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError('Enter a valid email address.'); return; }
     if (digits.length !== 10) { setError('Enter a valid 10-digit US phone number.'); return; }
 
+    addToEarlyAccessList();
     setLoading(true);
     try {
       const { res, data } = await postSignup();
@@ -245,6 +311,19 @@ export default function SignupPage() {
                     value={businessName}
                     onChange={(e) => setBusinessName(e.target.value)}
                     autoComplete="organization"
+                  />
+                </div>
+
+                <div>
+                  <label className={labelClass} htmlFor="email">Email address</label>
+                  <input
+                    id="email"
+                    type="email"
+                    className={inputClass}
+                    placeholder="you@yourbusiness.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    autoComplete="email"
                   />
                 </div>
 

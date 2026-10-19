@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { track } from '@vercel/analytics';
+import { SIGNUP_OPEN } from '@/lib/signup';
 
 const businessTypes = [
   { value: 'cleaning', label: 'House / Office Cleaning' },
@@ -118,15 +119,17 @@ export default function EarlyAccessForm() {
               We review every application personally and will be in touch within a few days.
               Early access spots are limited — you&apos;re ahead of the line.
             </p>
-            <div className="border-t border-white/20 pt-6">
-              <p className="text-white/60 text-sm mb-3">Want to lock in your account now?</p>
-              <Link
-                href="/signup"
-                className="inline-block bg-white text-brand font-semibold px-6 py-2.5 rounded-lg text-sm hover:bg-white/90 transition-colors"
-              >
-                Complete registration →
-              </Link>
-            </div>
+            {SIGNUP_OPEN && (
+              <div className="border-t border-white/20 pt-6">
+                <p className="text-white/60 text-sm mb-3">Want to lock in your account now?</p>
+                <Link
+                  href="/signup"
+                  className="inline-block bg-white text-brand font-semibold px-6 py-2.5 rounded-lg text-sm hover:bg-white/90 transition-colors"
+                >
+                  Complete registration →
+                </Link>
+              </div>
+            )}
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-5">

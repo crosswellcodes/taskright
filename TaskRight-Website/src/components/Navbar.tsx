@@ -1,3 +1,5 @@
+import { SIGNUP_HREF } from '@/lib/signup';
+
 export default function Navbar() {
   return (
     <nav className="sticky top-0 z-50 bg-white border-b border-border">
@@ -17,7 +19,7 @@ export default function Navbar() {
             Blog
           </a>
           <a
-            href="/signup"
+            href={SIGNUP_HREF}
             className="bg-orange-600 hover:bg-orange-700 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
           >
             Get TaskRight

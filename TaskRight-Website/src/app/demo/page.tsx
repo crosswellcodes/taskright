@@ -3,6 +3,7 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import DemoTabs from '@/components/DemoTabs';
+import { SIGNUP_HREF } from '@/lib/signup';
 
 export const metadata: Metadata = {
   title: 'Demo — See TaskRight in Action',
@@ -51,7 +52,7 @@ export default function DemoPage() {
               Early access spots are limited. Reserve yours and we&apos;ll reach out personally when your account is ready.
             </p>
             <Link
-              href="/signup"
+              href={SIGNUP_HREF}
               className="inline-block bg-orange-600 hover:bg-orange-700 text-white font-semibold px-8 py-3.5 rounded-lg transition-colors text-base"
             >
               Get TaskRight
