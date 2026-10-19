@@ -9,6 +9,7 @@
 // Never set OTP_DEV_BYPASS_CODE on a deployed backend.
 
 const { getProvider } = require('./sms');
+const { reserveOtpSend, releaseOtpSend } = require('./otpRateLimit');
 
 const DEV_PHONE_RE = /^\+1555\d{7}$/;
 
@@ -18,12 +19,20 @@ function devBypassCode(phone) {
   return DEV_PHONE_RE.test(String(phone || '')) ? String(code) : null;
 }
 
-async function sendLoginCode(phone) {
+// `ip` is the requesting client, for the per-IP limit (otpRateLimit). The dev
+// bypass texts nothing, so it isn't limited.
+async function sendLoginCode(phone, { ip } = {}) {
   if (devBypassCode(phone)) {
     console.log(`📱 [DEV OTP BYPASS] ${phone}: enter OTP_DEV_BYPASS_CODE`);
     return;
   }
-  await getProvider('otp').sendOtp(phone);
+  const reservation = await reserveOtpSend(phone, ip);
+  try {
+    await getProvider('otp').sendOtp(phone);
+  } catch (err) {
+    await releaseOtpSend(reservation);
+    throw err;
+  }
 }
 
 async function verifyLoginCode(phone, code) {

@@ -49,10 +49,22 @@ Step one of **every** login and signup (business, customer, team member; web and
 
 **Dev bypass (local only):** 555 numbers can't receive texts. When backend `.env` sets `OTP_DEV_BYPASS_CODE` and `NODE_ENV` isn't `production`, a `+1555…` number skips the real send and that code is accepted (`services/otpGate.js`). It never applies to a non-555 number. **Never set it on a deployed backend.**
 
+**Rate limit (Oct 18, 2026):** the endpoint is public, so the backend limits texted codes itself (`services/otpRateLimit.js`, counted in `otp_send_events`, migration 031 — shared across backend processes):
+
+| Key | Short window | Daily |
+|---|---|---|
+| Phone (normalized E.164) | 3 per 10 min | 10 per 24 h |
+| Client IP | 20 per hour | 100 per 24 h |
+
+Over a limit → `429 RATE_LIMITED` with a `Retry-After` header and `retryAfterSeconds` in the body; `error` says when to try again ("…in 7 minutes" / "…in about 22 hours"). Only codes actually texted count: a provider failure is un-counted, and the 555 dev bypass is never counted or limited. Rows older than a day are pruned on write. The provider's own throttles (Twilio 20429, SignalHouse's 60 s resend window) still return `429 RATE_LIMITED`, without `retryAfterSeconds`.
+
+**Client IP:** `req.ip`. Behind a load balancer set backend `TRUST_PROXY` (hop count, e.g. `1`), or every user shares the proxy's IP. The website's server-side `/api/auth/send-otp` (portal login) forwards the browser IP as `X-TaskRight-Client-IP` with `X-TaskRight-Proxy-Secret`; the backend honors it only when that secret matches its `OTP_PROXY_SECRET`. Set the same `OTP_PROXY_SECRET` on Vercel (server-only, not `NEXT_PUBLIC_`). Unset → the portal's sends share Vercel's IPs.
+
 **Request Body**:
 ```json
 { "phoneNumber": "+14155551234" }
 ```
+US numbers only: a 10-digit number gets `+1`; anything that isn't `+1` + a 10-digit NANP number (area code 2–9) is refused.
 
 **Response (200)**:
 ```json
@@ -60,8 +72,8 @@ Step one of **every** login and signup (business, customer, team member; web and
 ```
 
 **Error Responses**:
-- `400` — `VALIDATION_ERROR` — Phone number missing
-- `429` — `RATE_LIMITED` — Too many send attempts for this number
+- `400` — `VALIDATION_ERROR` — Phone number missing, or not a valid US number
+- `429` — `RATE_LIMITED` — Over a per-phone or per-IP limit (`retryAfterSeconds`, `Retry-After`), or a provider throttle
 - `500` — `INTERNAL_ERROR`
 
 ---

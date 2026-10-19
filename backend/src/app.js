@@ -11,6 +11,14 @@ const reviewRoutes = require('./routes/review');
 
 const app = express();
 
+// Behind a load balancer/reverse proxy, req.ip is the proxy unless Express trusts
+// it, and the per-IP OTP send limit would then lump every user together. Set
+// TRUST_PROXY to the hop count (e.g. 1) or an Express trust-proxy value there.
+if (process.env.TRUST_PROXY) {
+  const v = process.env.TRUST_PROXY;
+  app.set('trust proxy', /^\d+$/.test(v) ? Number(v) : v === 'true' ? true : v);
+}
+
 // Middleware
 app.use(cors());
 app.use(express.json());

@@ -9,6 +9,7 @@ async function truncateAllTables() {
   await knex.raw(`
     TRUNCATE TABLE
       otp_codes,
+      otp_send_events,
       messages,
       review_tokens,
       geofence_events,

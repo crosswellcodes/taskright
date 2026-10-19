@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const express = require('express');
 const router = express.Router();
 const { generateToken } = require('../utils/jwt');
@@ -24,10 +25,31 @@ function normalizePhone(phone) {
   return phone;
 }
 
+// The client IP for the per-IP send limit. The website's server-side routes (the
+// web portal login BFF) all reach us from Vercel's IPs, so they forward the
+// browser's IP alongside a shared secret; without a matching secret the header is
+// ignored (anyone could set it). Behind a load balancer, set TRUST_PROXY so req.ip
+// is the real client (app.js).
+function clientIp(req) {
+  const secret = process.env.OTP_PROXY_SECRET;
+  const forwarded = req.get('x-taskright-client-ip');
+  const given = req.get('x-taskright-proxy-secret');
+  if (secret && forwarded && given) {
+    const a = Buffer.from(String(given));
+    const b = Buffer.from(secret);
+    if (a.length === b.length && crypto.timingSafeEqual(a, b)) return forwarded.trim().slice(0, 64);
+  }
+  return req.ip;
+}
+
+// +1 and a 10-digit NANP number (area codes never start with 0 or 1).
+const US_E164 = /^\+1[2-9]\d{9}$/;
+
 /**
  * POST /api/auth/verify/send
  * Send a 6-digit OTP to the given phone number via the configured SMS provider.
- * Step one of every login and signup (web and mobile).
+ * Step one of every login and signup (web and mobile). US numbers only, and
+ * rate-limited per phone and per client IP (otpRateLimit) → 429 RATE_LIMITED.
  */
 router.post('/verify/send', async (req, res) => {
   const { phoneNumber } = req.body;
@@ -35,12 +57,20 @@ router.post('/verify/send', async (req, res) => {
   if (!phoneNumber) {
     return res.status(400).json({ success: false, error: 'Phone number is required', code: 'VALIDATION_ERROR' });
   }
+  const phone = normalizePhone(String(phoneNumber));
+  if (!US_E164.test(phone)) {
+    return res.status(400).json({ success: false, error: 'Enter a valid US phone number', code: 'VALIDATION_ERROR' });
+  }
 
   try {
-    await sendLoginCode(normalizePhone(phoneNumber));
+    await sendLoginCode(phone, { ip: clientIp(req) });
     return res.json({ success: true });
   } catch (error) {
-    // Twilio rate-limit error code 20429
+    if (error.code === 'RATE_LIMITED') {
+      res.set('Retry-After', String(error.retryAfterSeconds));
+      return res.status(429).json({ success: false, error: error.message, code: 'RATE_LIMITED', retryAfterSeconds: error.retryAfterSeconds });
+    }
+    // Provider-side throttles: Twilio error 20429, SignalHouse OTP 60s resend window
     if (error.status === 429 || error.code === 20429) {
       return res.status(429).json({ success: false, error: 'Too many attempts. Please wait before requesting another code.', code: 'RATE_LIMITED' });
     }
